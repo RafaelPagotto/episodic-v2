@@ -4,7 +4,7 @@ Episodic v2 uses a new clean Supabase project/database. The legacy v1 Supabase p
 
 ## Source Of Truth
 
-The v2 migration files under `v2/supabase/migrations/` are the database source of truth for launch.
+The migration files under `supabase/migrations/` are the database source of truth for launch.
 
 The SQL files in this folder are reviewed reference snapshots:
 
@@ -12,7 +12,7 @@ The SQL files in this folder are reviewed reference snapshots:
 - `policies.sql`: Row Level Security policies for user-owned rows and shared TMDB metadata.
 - `indexes.sql`: supporting indexes for common library, progress, and metadata queries.
 
-Do not copy these files into the repository-root `supabase/migrations/` folder. That root Supabase folder belongs to the legacy project history.
+Do not copy these reference snapshots over the migration files unless intentionally creating a reviewed migration.
 
 ## Fresh Project Warning
 
@@ -24,21 +24,21 @@ Do not run them against the v1 Supabase project or any database that already con
 
 Apply the v2 migrations in this exact order:
 
-1. `v2/supabase/migrations/20260604000100_create_core_schema.sql`
-2. `v2/supabase/migrations/20260604000200_enable_rls_and_policies.sql`
-3. `v2/supabase/migrations/20260604000300_add_supporting_indexes.sql`
+1. `supabase/migrations/20260604000100_create_core_schema.sql`
+2. `supabase/migrations/20260604000200_enable_rls_and_policies.sql`
+3. `supabase/migrations/20260604000300_add_supporting_indexes.sql`
 
 The first migration creates schema objects, helper functions, and triggers. The second enables RLS and adds access policies. The third adds performance indexes.
 
 ## Type Generation
 
-`v2/lib/supabase/types.ts` should be regenerated from the v2 Supabase schema after migrations are applied:
+`lib/supabase/types.ts` should be regenerated from the v2 Supabase schema after migrations are applied:
 
 ```bash
-supabase gen types typescript --project-id <v2-project-id> --schema public > v2/lib/supabase/types.ts
+supabase gen types typescript --project-id <v2-project-id> --schema public > lib/supabase/types.ts
 ```
 
-If you run the command from inside `v2/`, write to `lib/supabase/types.ts` instead. Use only the new v2 Supabase project id, never the legacy v1 project.
+Use only the new v2 Supabase project id, never the legacy v1 project.
 
 ## Applying With Supabase Dashboard
 
@@ -48,17 +48,16 @@ Stop if any migration fails. Do not skip ahead, because later migrations depend 
 
 ## Applying With Supabase CLI
 
-Use a v2-specific Supabase CLI setup from inside `v2/`, not the repository root. The `v2/supabase/` directory is already committed for v2 migrations; do not run CLI commands from the repository root.
+Use a v2-specific Supabase CLI setup from the repository root. The `supabase/` directory is already committed for v2 migrations.
 
 Example flow after installing and authenticating the Supabase CLI:
 
 ```bash
-cd v2
 supabase link --project-ref <v2-project-ref>
 supabase db push
 ```
 
-If your local Supabase CLI requires a `supabase/config.toml`, run `supabase init` from inside `v2/` only and review the generated config before linking. Keep any generated `v2/supabase/config.toml` scoped to the v2 project. Do not link the root Supabase folder to the v2 project.
+If your local Supabase CLI requires a `supabase/config.toml`, run `supabase init` from the repository root and review the generated config before linking. Keep any generated `supabase/config.toml` scoped to the v2 project.
 
 ## Security Model
 

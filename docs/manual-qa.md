@@ -20,7 +20,7 @@ Environment:
 - Fresh Supabase v2 project
 - v1 Supabase project untouched
 - v2 migrations applied in documented order
-- Local app connected through `v2/.env.local`
+- Local app connected through `.env.local`
 
 Validated:
 
@@ -518,7 +518,7 @@ Expected result:
 
 Preconditions:
 
-- Vercel project is configured with root directory `v2`.
+- Vercel project uses the default root directory, which is the repository root.
 - Staging environment variables are configured.
 - Supabase staging Auth redirect URLs include the staging domain.
 - v2 migrations have been applied to the staging Supabase project.
@@ -533,7 +533,7 @@ Steps:
 
 Expected result:
 
-- Vercel builds from `v2`.
+- Vercel builds from the repository root.
 - Auth redirects return to the staging app.
 - Server-only Supabase and TMDB values are not exposed to browser code.
 - Core user flows work against the staging Supabase project.

@@ -2,9 +2,7 @@
 
 This directory is for the clean v2 Supabase project only.
 
-Do not mix these migrations with the repository-root `supabase/` directory, which belongs to legacy project history.
-
-If you use the Supabase CLI from `v2/`, keep CLI-generated temp files and local environment files out of git.
+If you use the Supabase CLI from the repository root, keep CLI-generated temp files and local environment files out of git.
 
 ## Migration Order
 
@@ -30,19 +28,13 @@ These migrations assume a fresh v2 database. They do not migrate data from v1.
 
 Apply these migrations only to the new v2 Supabase project after reviewing the SQL.
 
-For Supabase CLI usage, run commands from `v2/`, not from the repository root. Link the CLI only to the v2 Supabase project.
+For Supabase CLI usage, run commands from the repository root. Link the CLI only to the v2 Supabase project.
 
 ## Regenerating TypeScript Types
 
 After these migrations are applied to the v2 Supabase project, regenerate the app database types from the live v2 schema.
 
 From the repository root:
-
-```bash
-supabase gen types typescript --project-id <v2-project-id> --schema public > v2/lib/supabase/types.ts
-```
-
-From inside `v2/`:
 
 ```bash
 supabase gen types typescript --project-id <v2-project-id> --schema public > lib/supabase/types.ts

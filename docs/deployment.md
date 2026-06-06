@@ -1,11 +1,10 @@
 # Deployment
 
-This guide covers deploying Episodic v2 from the `v2/` app directory.
+This guide covers deploying Episodic v2 from the repository root. The repository root is the Next.js app root.
 
 ## Local Setup
 
 ```bash
-cd v2
 npm install
 cp .env.example .env.local
 npm run dev
@@ -32,7 +31,7 @@ Do not prefix server-only secrets with `NEXT_PUBLIC_`.
 
 ## Supabase Setup
 
-Use a clean v2 Supabase project. The root legacy Supabase project and v1 data are not part of this deployment path.
+Use a clean v2 Supabase project. Legacy v1 data is not part of this deployment path.
 
 Before deploying production traffic:
 
@@ -46,16 +45,15 @@ Before deploying production traffic:
 
 Apply these SQL migrations in timestamp order:
 
-1. `v2/supabase/migrations/20260604000100_create_core_schema.sql`
-2. `v2/supabase/migrations/20260604000200_enable_rls_and_policies.sql`
-3. `v2/supabase/migrations/20260604000300_add_supporting_indexes.sql`
+1. `supabase/migrations/20260604000100_create_core_schema.sql`
+2. `supabase/migrations/20260604000200_enable_rls_and_policies.sql`
+3. `supabase/migrations/20260604000300_add_supporting_indexes.sql`
 
 With the Supabase Dashboard SQL Editor, open each file and run it in that order.
 
-With the Supabase CLI, run commands from `v2/` and link only to the v2 project:
+With the Supabase CLI, run commands from the repository root and link only to the v2 project:
 
 ```bash
-cd v2
 supabase link --project-ref <v2-project-ref>
 supabase db push
 ```
@@ -107,10 +105,10 @@ The app calls TMDB only from server route handlers and server actions. Browser c
 
 ## Vercel Deployment Setup
 
-When deploying from the monorepo/root repository, set:
+When deploying this repository to Vercel, use:
 
 - Framework preset: Next.js
-- Root Directory: `v2`
+- Root Directory: leave as the default repository root
 - Install Command: `npm install`
 - Build Command: `npm run build`
 - Output Directory: leave as the Next.js default

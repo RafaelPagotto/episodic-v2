@@ -2,7 +2,7 @@
 
 Episodic v2 is the Next.js rebuild of the personal TV show tracking app.
 
-The legacy vanilla HTML/CSS/JavaScript app remains at the repository root as functional reference only. Do not migrate legacy JavaScript into this app.
+This clean repository uses the repository root as the Next.js app root. Legacy v1 code and data migration are out of scope for this app.
 
 ## Stack
 
@@ -35,7 +35,6 @@ The legacy vanilla HTML/CSS/JavaScript app remains at the repository root as fun
 ## Local Setup
 
 ```bash
-cd v2
 npm install
 cp .env.example .env.local
 npm run dev
@@ -115,7 +114,7 @@ See [docs/tracking-status-model.md](docs/tracking-status-model.md) for the full 
 
 See [docs/deployment.md](docs/deployment.md) for Vercel setup, environment variables, migration order, security notes, and known limitations.
 
-For Vercel deployments from the repository root, set the Vercel root directory to `v2`.
+For Vercel deployments, use the default Root Directory so Vercel builds from the repository root. Do not set Root Directory to `v2`.
 
 ## Security Notes
 
