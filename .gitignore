@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Production
+build/
+
+# Local environment files
+.env
+.env*.local
+
+# Logs
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Database
+supabase_config.txt

@@ -1,0 +1,210 @@
+import { describe, expect, it } from "vitest";
+
+import {
+  calculateProgressPercentage,
+  calculateTotalEpisodeCount,
+  calculateWatchedEpisodeCount,
+  deriveDisplayStatus,
+  deriveTrackingStatusAfterProgressChange,
+  getNextEpisodeToWatch,
+  isTrackingStatus,
+  isShowCompleted,
+} from "../features/tracking";
+import type { Episode, WatchedEpisode } from "../features/tracking";
+
+function episode(seasonNumber: number, episodeNumber: number, airDate: string | null = null): Episode {
+  return {
+    airDate,
+    episodeNumber,
+    metadata: {},
+    overview: null,
+    runtimeMinutes: null,
+    seasonNumber,
+    showTmdbId: 100,
+    stillPath: null,
+    title: `Episode ${episodeNumber}`,
+    tmdbId: null,
+  };
+}
+
+function watched(seasonNumber: number, episodeNumber: number): WatchedEpisode {
+  return {
+    episodeNumber,
+    id: episodeNumber,
+    seasonNumber,
+    showTmdbId: 100,
+    userId: "user-1",
+    watchedAt: "2026-05-29T00:00:00.000Z",
+  };
+}
+
+describe("tracking progress helpers", () => {
+  it("counts unique total episodes and matching watched episodes", () => {
+    const episodes = [episode(1, 1), episode(1, 2), episode(1, 2), episode(1, 3)];
+    const watchedEpisodes = [watched(1, 1), watched(1, 1), watched(1, 4)];
+
+    expect(calculateTotalEpisodeCount(episodes)).toBe(3);
+    expect(calculateWatchedEpisodeCount(episodes, watchedEpisodes)).toBe(1);
+  });
+
+  it("excludes future episodes from trackable counts when air dates are available", () => {
+    const episodes = [
+      episode(1, 1, "2026-01-01"),
+      episode(1, 2, "2026-01-08"),
+      episode(1, 3, "2026-02-01"),
+    ];
+    const options = { referenceDate: "2026-01-15T00:00:00.000Z" };
+
+    expect(calculateTotalEpisodeCount(episodes, options)).toBe(2);
+    expect(calculateWatchedEpisodeCount(episodes, [watched(1, 1), watched(1, 3)], options)).toBe(1);
+  });
+
+  it("calculates rounded progress and clamps invalid counts", () => {
+    expect(calculateProgressPercentage({ totalEpisodeCount: 0, watchedEpisodeCount: 5 })).toBe(0);
+    expect(calculateProgressPercentage({ totalEpisodeCount: 3, watchedEpisodeCount: 1 })).toBe(33);
+    expect(calculateProgressPercentage({ totalEpisodeCount: 3, watchedEpisodeCount: 4 })).toBe(100);
+  });
+
+  it("finds the first unwatched episode in season order", () => {
+    const episodes = [episode(2, 1), episode(1, 2), episode(1, 1)];
+    const nextEpisode = getNextEpisodeToWatch(episodes, [watched(1, 1)]);
+
+    expect(nextEpisode).toMatchObject({
+      episodeNumber: 2,
+      seasonNumber: 1,
+    });
+  });
+
+  it("returns null for next episode when the show is complete", () => {
+    const episodes = [episode(1, 1), episode(1, 2)];
+    const watchedEpisodes = [watched(1, 1), watched(1, 2)];
+
+    expect(getNextEpisodeToWatch(episodes, watchedEpisodes)).toBeNull();
+    expect(isShowCompleted(episodes, watchedEpisodes)).toBe(true);
+  });
+
+  it("does not treat shows with no episodes as completed", () => {
+    expect(isShowCompleted([], [])).toBe(false);
+  });
+
+  it("derives display status from progress and lifecycle metadata", () => {
+    expect(
+      deriveDisplayStatus({
+        totalEpisodeCount: 10,
+        trackingStatus: "watchlist",
+        watchedEpisodeCount: 1,
+      }),
+    ).toBe("watching");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount: 10,
+        trackingStatus: "watching",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("caught_up");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Ended",
+        totalEpisodeCount: 10,
+        trackingStatus: "watching",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("completed");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Canceled",
+        totalEpisodeCount: 10,
+        trackingStatus: "dropped",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("dropped");
+    expect(
+      deriveDisplayStatus({
+        totalEpisodeCount: 10,
+        trackingStatus: "watched",
+        watchedEpisodeCount: 0,
+      }),
+    ).toBe("watchlist");
+    expect(
+      deriveDisplayStatus({
+        totalEpisodeCount: 10,
+        trackingStatus: "watched",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("caught_up");
+  });
+
+  it("does not let future episodes prevent caught up status until they release", () => {
+    const episodes = [
+      episode(1, 1, "2026-01-01"),
+      episode(1, 2, "2026-01-08"),
+      episode(1, 3, "2026-02-01"),
+    ];
+    const watchedEpisodes = [watched(1, 1), watched(1, 2)];
+    const beforeRelease = { referenceDate: "2026-01-15T00:00:00.000Z" };
+    const afterRelease = { referenceDate: "2026-02-02T00:00:00.000Z" };
+
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount: calculateTotalEpisodeCount(episodes, beforeRelease),
+        trackingStatus: "watchlist",
+        watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, beforeRelease),
+      }),
+    ).toBe("caught_up");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount: calculateTotalEpisodeCount(episodes, afterRelease),
+        trackingStatus: "watchlist",
+        watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, afterRelease),
+      }),
+    ).toBe("watching");
+  });
+
+  it("derives stored tracking status after progress changes", () => {
+    expect(
+      deriveTrackingStatusAfterProgressChange({
+        totalEpisodeCount: 10,
+        trackingStatus: "watchlist",
+        watchedEpisodeCount: 1,
+      }),
+    ).toBe("watching");
+    expect(
+      deriveTrackingStatusAfterProgressChange({
+        totalEpisodeCount: 10,
+        trackingStatus: "watching",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("watched");
+    expect(
+      deriveTrackingStatusAfterProgressChange({
+        totalEpisodeCount: 10,
+        trackingStatus: "watching",
+        watchedEpisodeCount: 0,
+      }),
+    ).toBe("watchlist");
+    expect(
+      deriveTrackingStatusAfterProgressChange({
+        totalEpisodeCount: 10,
+        trackingStatus: "watched",
+        watchedEpisodeCount: 0,
+      }),
+    ).toBe("watchlist");
+    expect(
+      deriveTrackingStatusAfterProgressChange({
+        totalEpisodeCount: 10,
+        trackingStatus: "dropped",
+        watchedEpisodeCount: 10,
+      }),
+    ).toBe("dropped");
+  });
+
+  it("validates tracking statuses at runtime", () => {
+    expect(isTrackingStatus("watchlist")).toBe(true);
+    expect(isTrackingStatus("dropped")).toBe(true);
+    expect(isTrackingStatus("paused")).toBe(false);
+    expect(isTrackingStatus(null)).toBe(false);
+  });
+});
