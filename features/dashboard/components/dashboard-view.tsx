@@ -68,8 +68,8 @@ function formatUpcomingAirDate(airDate: string) {
 
 function SummaryCard({ icon: Icon, label, value }: SummaryCardProps) {
   return (
-    <Card className="min-w-0 bg-card/80">
-      <CardContent className="flex min-w-0 items-center gap-3 p-3">
+    <Card className="flex h-full min-w-0 bg-card/80">
+      <CardContent className="flex min-h-16 min-w-0 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
         <div
           aria-hidden="true"
           className="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
@@ -89,11 +89,11 @@ function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
   const episodeCode = `S${item.seasonNumber}E${item.episodeNumber}`;
 
   return (
-    <Card className="bg-card/70">
-      <CardContent className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{item.showTitle}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">
+    <Card className="flex h-full bg-card/70">
+      <CardContent className="flex min-h-20 flex-1 flex-col justify-center gap-3 p-3 pt-3 sm:flex-row sm:items-center sm:justify-between sm:p-3 sm:pt-3">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm font-medium leading-snug">{item.showTitle}</p>
+          <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
             <span className="font-semibold text-foreground">{episodeCode}</span>
             {item.episodeTitle ? ` - ${item.episodeTitle}` : null}
           </p>
@@ -102,7 +102,7 @@ function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
             {formatUpcomingAirDate(item.airDate)}
           </p>
         </div>
-        <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
+        <Button asChild className="w-full shrink-0 sm:w-auto" size="sm" variant="outline">
           <Link aria-label={`View details for ${item.showTitle} ${episodeCode}`} href={item.detailHref}>
             Details
           </Link>
@@ -139,13 +139,13 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
   const episodeCode = `S${item.seasonNumber}E${item.episodeNumber}`;
 
   return (
-    <Card className="bg-card/70">
-      <CardContent className="flex gap-3 p-3">
+    <Card className="flex h-full bg-card/70">
+      <CardContent className="flex min-h-24 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
         <StartWatchingPoster item={item} />
-        <div className="flex min-w-0 flex-1 flex-col gap-3">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{item.showTitle}</p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
+            <p className="break-words text-sm font-medium leading-snug">{item.showTitle}</p>
+            <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
               <span className="font-semibold text-foreground">{episodeCode}</span>
               {item.episodeTitle ? ` - ${item.episodeTitle}` : null}
             </p>
