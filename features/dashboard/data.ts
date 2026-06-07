@@ -5,15 +5,19 @@ import type { Database } from "@/lib/supabase/types";
 import { DEFAULT_USER_PREFERENCES } from "../preferences/defaults";
 import type { UserPreferences } from "../preferences/types";
 import { setEpisodeWatched } from "../shows/data";
+import {
+  loadEpisodesByShowIds,
+  loadWatchedEpisodesByShowIds,
+  mapEpisodeRow,
+  mapWatchedEpisodeRow,
+} from "../tracking";
 import type { Episode, WatchedEpisode } from "../tracking";
 import type { DashboardShowRecord } from "./types";
 import { createDashboardData, getContinueWatchingNextEpisode } from "./view-model";
 
 type EpisodicSupabaseClient = SupabaseClient<Database>;
-type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
 type ShowRow = Database["public"]["Tables"]["shows"]["Row"];
 type UserShowRow = Database["public"]["Tables"]["user_shows"]["Row"];
-type WatchedEpisodeRow = Database["public"]["Tables"]["watched_episodes"]["Row"];
 
 export class DashboardDataError extends Error {
   constructor(message: string) {
@@ -28,58 +32,43 @@ function throwDataError(error: { message?: string } | null, fallbackMessage: str
   }
 }
 
-function groupByShowTmdbId<TRow extends { show_tmdb_id: number }>(rows: TRow[]) {
-  return rows.reduce((groups, row) => {
-    const currentRows = groups.get(row.show_tmdb_id) ?? [];
-    currentRows.push(row);
-    groups.set(row.show_tmdb_id, currentRows);
-    return groups;
-  }, new Map<number, TRow[]>());
-}
-
-function mapEpisode(row: EpisodeRow): Episode {
-  return {
-    airDate: row.air_date,
-    episodeNumber: row.episode_number,
-    metadata: {},
-    overview: row.overview,
-    runtimeMinutes: row.runtime_minutes,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    stillPath: row.still_path,
-    title: row.title,
-    tmdbId: row.tmdb_id,
-  };
-}
-
-function mapWatchedEpisode(row: WatchedEpisodeRow): WatchedEpisode {
-  return {
-    episodeNumber: row.episode_number,
-    id: row.id,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    userId: row.user_id,
-    watchedAt: row.watched_at,
-  };
-}
-
 function createDashboardRecord(
   userShow: UserShowRow,
   show: ShowRow | undefined,
-  episodeRows: EpisodeRow[],
-  watchedEpisodeRows: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
 ): DashboardShowRecord {
   return {
     addedAt: userShow.added_at,
-    episodes: episodeRows.map(mapEpisode),
+    episodes,
     favourite: userShow.favourite,
     posterPath: show?.poster_path ?? null,
     title: show?.title ?? `Show ${userShow.show_tmdb_id}`,
     tmdbId: userShow.show_tmdb_id,
     tmdbStatus: show?.tmdb_status ?? null,
     trackingStatus: userShow.status,
-    watchedEpisodes: watchedEpisodeRows.map(mapWatchedEpisode),
+    watchedEpisodes,
   };
+}
+
+async function getDashboardEpisodesByShowId(supabase: EpisodicSupabaseClient, showIds: number[]) {
+  try {
+    return await loadEpisodesByShowIds(supabase, showIds);
+  } catch {
+    throw new DashboardDataError("Unable to load episodes.");
+  }
+}
+
+async function getDashboardWatchedEpisodesByShowId(
+  supabase: EpisodicSupabaseClient,
+  userId: string,
+  showIds: number[],
+) {
+  try {
+    return await loadWatchedEpisodesByShowIds(supabase, userId, showIds);
+  } catch {
+    throw new DashboardDataError("Unable to load watched progress.");
+  }
 }
 
 export async function getUserDashboardData(
@@ -103,30 +92,17 @@ export async function getUserDashboardData(
 
   const [
     { data: shows, error: showsError },
-    { data: episodes, error: episodesError },
-    { data: watchedEpisodes, error: watchedEpisodesError },
+    episodesByShowId,
+    watchedByShowId,
   ] = await Promise.all([
     supabase.from("shows").select("*").in("tmdb_id", showIds),
-    supabase
-      .from("episodes")
-      .select("*")
-      .in("show_tmdb_id", showIds)
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true }),
-    supabase
-      .from("watched_episodes")
-      .select("*")
-      .eq("user_id", userId)
-      .in("show_tmdb_id", showIds),
+    getDashboardEpisodesByShowId(supabase, showIds),
+    getDashboardWatchedEpisodesByShowId(supabase, userId, showIds),
   ]);
 
   throwDataError(showsError, "Unable to load show details.");
-  throwDataError(episodesError, "Unable to load episodes.");
-  throwDataError(watchedEpisodesError, "Unable to load watched progress.");
 
   const showsById = new Map((shows ?? []).map((show) => [show.tmdb_id, show]));
-  const episodesByShowId = groupByShowTmdbId(episodes ?? []);
-  const watchedByShowId = groupByShowTmdbId(watchedEpisodes ?? []);
   const records = userShows.map((userShow) =>
     createDashboardRecord(
       userShow,
@@ -183,7 +159,12 @@ export async function markContinueWatchingNextEpisodeWatched(
     throw new DashboardDataError("This show is not in your library.");
   }
 
-  const record = createDashboardRecord(userShow, shows?.[0], episodes ?? [], watchedEpisodes ?? []);
+  const record = createDashboardRecord(
+    userShow,
+    shows?.[0],
+    (episodes ?? []).map(mapEpisodeRow),
+    (watchedEpisodes ?? []).map(mapWatchedEpisodeRow),
+  );
   const nextEpisode = getContinueWatchingNextEpisode(record);
 
   if (!nextEpisode) {

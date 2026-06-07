@@ -14,6 +14,9 @@ import {
   deriveTrackingStatusAfterProgressChange,
   getReleasedEpisodes,
   getReleasedTrackableEpisodes,
+  loadEpisodesByShowIds,
+  loadWatchedEpisodesByShowIds,
+  mapEpisodeRow,
 } from "../tracking";
 
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgress } from "./types";
@@ -24,7 +27,6 @@ type SeasonRow = Database["public"]["Tables"]["seasons"]["Row"];
 type ShowRow = Database["public"]["Tables"]["shows"]["Row"];
 type UserShowRow = Database["public"]["Tables"]["user_shows"]["Row"];
 type WatchedEpisodeInsert = Database["public"]["Tables"]["watched_episodes"]["Insert"];
-type WatchedEpisodeRow = Database["public"]["Tables"]["watched_episodes"]["Row"];
 
 export class ShowDataError extends Error {
   constructor(message: string) {
@@ -39,51 +41,23 @@ function throwDataError(error: { message?: string } | null, fallbackMessage: str
   }
 }
 
-function groupBySeasonNumber(rows: EpisodeRow[]) {
-  return rows.reduce((groups, row) => {
-    const currentRows = groups.get(row.season_number) ?? [];
-    currentRows.push(row);
-    groups.set(row.season_number, currentRows);
+function groupBySeasonNumber(episodes: Episode[]) {
+  return episodes.reduce((groups, episode) => {
+    const currentEpisodes = groups.get(episode.seasonNumber) ?? [];
+    currentEpisodes.push(episode);
+    groups.set(episode.seasonNumber, currentEpisodes);
     return groups;
-  }, new Map<number, EpisodeRow[]>());
-}
-
-function mapEpisode(row: EpisodeRow): Episode {
-  return {
-    airDate: row.air_date,
-    episodeNumber: row.episode_number,
-    metadata: {},
-    overview: row.overview,
-    runtimeMinutes: row.runtime_minutes,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    stillPath: row.still_path,
-    title: row.title,
-    tmdbId: row.tmdb_id,
-  };
-}
-
-function mapWatchedEpisode(row: WatchedEpisodeRow): WatchedEpisode {
-  return {
-    episodeNumber: row.episode_number,
-    id: row.id,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    userId: row.user_id,
-    watchedAt: row.watched_at,
-  };
+  }, new Map<number, Episode[]>());
 }
 
 function getProgress(
   status: TrackingStatus,
-  episodes: EpisodeRow[],
-  watchedEpisodes: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
   tmdbStatus?: string | null,
 ): ShowProgress {
-  const mappedEpisodes = episodes.map(mapEpisode);
-  const mappedWatchedEpisodes = watchedEpisodes.map(mapWatchedEpisode);
-  const totalEpisodeCount = calculateTotalEpisodeCount(mappedEpisodes);
-  const watchedEpisodeCount = calculateWatchedEpisodeCount(mappedEpisodes, mappedWatchedEpisodes);
+  const totalEpisodeCount = calculateTotalEpisodeCount(episodes);
+  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes);
 
   return {
     displayStatus: deriveDisplayStatus({
@@ -104,14 +78,12 @@ function getProgress(
 
 function getSeasonProgress(
   status: TrackingStatus,
-  episodes: EpisodeRow[],
-  watchedEpisodes: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
   tmdbStatus?: string | null,
 ): ShowProgress {
-  const mappedEpisodes = episodes.map(mapEpisode);
-  const mappedWatchedEpisodes = watchedEpisodes.map(mapWatchedEpisode);
-  const totalEpisodeCount = calculateReleasedEpisodeCount(mappedEpisodes);
-  const watchedEpisodeCount = calculateReleasedWatchedEpisodeCount(mappedEpisodes, mappedWatchedEpisodes);
+  const totalEpisodeCount = calculateReleasedEpisodeCount(episodes);
+  const watchedEpisodeCount = calculateReleasedWatchedEpisodeCount(episodes, watchedEpisodes);
 
   return {
     displayStatus: deriveDisplayStatus({
@@ -130,16 +102,16 @@ function getSeasonProgress(
   };
 }
 
-function createEpisodeDetail(row: EpisodeRow, watchedEpisodeKeys: Set<string>): ShowDetailEpisode {
+function createEpisodeDetail(episode: Episode, watchedEpisodeKeys: Set<string>): ShowDetailEpisode {
   return {
-    airDate: row.air_date,
-    episodeNumber: row.episode_number,
-    overview: row.overview,
-    runtimeMinutes: row.runtime_minutes,
-    seasonNumber: row.season_number,
-    stillPath: row.still_path,
-    title: row.title,
-    watched: watchedEpisodeKeys.has(buildEpisodeKey(mapEpisode(row))),
+    airDate: episode.airDate,
+    episodeNumber: episode.episodeNumber,
+    overview: episode.overview,
+    runtimeMinutes: episode.runtimeMinutes,
+    seasonNumber: episode.seasonNumber,
+    stillPath: episode.stillPath,
+    title: episode.title,
+    watched: watchedEpisodeKeys.has(buildEpisodeKey(episode)),
   };
 }
 
@@ -147,8 +119,8 @@ function createSeasonDetail(
   season: SeasonRow | undefined,
   seasonNumber: number,
   status: TrackingStatus,
-  episodes: EpisodeRow[],
-  watchedEpisodes: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
   watchedEpisodeKeys: Set<string>,
   tmdbStatus?: string | null,
 ): ShowDetailSeason {
@@ -168,20 +140,12 @@ function createShowDetail(
   userShow: UserShowRow,
   show: ShowRow | undefined,
   seasons: SeasonRow[],
-  episodes: EpisodeRow[],
-  watchedEpisodes: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
 ): ShowDetail {
   const episodesBySeason = groupBySeasonNumber(episodes);
   const seasonsByNumber = new Map(seasons.map((season) => [season.season_number, season]));
-  const watchedEpisodeKeys = new Set(
-    watchedEpisodes.map((episode) =>
-      buildEpisodeKey({
-        episodeNumber: episode.episode_number,
-        seasonNumber: episode.season_number,
-        showTmdbId: episode.show_tmdb_id,
-      }),
-    ),
-  );
+  const watchedEpisodeKeys = new Set(watchedEpisodes.map(buildEpisodeKey));
   const seasonNumbers = Array.from(new Set([...seasonsByNumber.keys(), ...episodesBySeason.keys()])).sort(
     (left, right) => left - right,
   );
@@ -195,7 +159,7 @@ function createShowDetail(
     progress: getProgress(userShow.status, episodes, watchedEpisodes, show?.tmdb_status ?? null),
     seasons: seasonNumbers.map((seasonNumber) => {
       const seasonEpisodes = episodesBySeason.get(seasonNumber) ?? [];
-      const seasonWatchedEpisodes = watchedEpisodes.filter((episode) => episode.season_number === seasonNumber);
+      const seasonWatchedEpisodes = watchedEpisodes.filter((episode) => episode.seasonNumber === seasonNumber);
 
       return createSeasonDetail(
         seasonsByNumber.get(seasonNumber),
@@ -249,32 +213,38 @@ async function getShowEpisodes(supabase: EpisodicSupabaseClient, tmdbId: number,
   return data ?? [];
 }
 
-async function getWatchedEpisodes(supabase: EpisodicSupabaseClient, userId: string, tmdbId: number) {
-  const { data, error } = await supabase
-    .from("watched_episodes")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("show_tmdb_id", tmdbId);
+async function getFullShowEpisodes(supabase: EpisodicSupabaseClient, tmdbId: number) {
+  try {
+    const episodesByShowId = await loadEpisodesByShowIds(supabase, [tmdbId]);
 
-  throwDataError(error, "Unable to load watched progress.");
+    return episodesByShowId.get(tmdbId) ?? [];
+  } catch {
+    throw new ShowDataError("Unable to load episodes.");
+  }
+}
 
-  return data ?? [];
+async function getFullShowWatchedEpisodes(supabase: EpisodicSupabaseClient, userId: string, tmdbId: number) {
+  try {
+    const watchedByShowId = await loadWatchedEpisodesByShowIds(supabase, userId, [tmdbId]);
+
+    return watchedByShowId.get(tmdbId) ?? [];
+  } catch {
+    throw new ShowDataError("Unable to load watched progress.");
+  }
 }
 
 async function updateUserShowStatusFromProgress(
   supabase: EpisodicSupabaseClient,
   userShow: UserShowRow,
-  watchedEpisodes?: WatchedEpisodeRow[],
+  watchedEpisodes?: WatchedEpisode[],
 ) {
-  const episodes = await getShowEpisodes(supabase, userShow.show_tmdb_id);
+  const episodes = await getFullShowEpisodes(supabase, userShow.show_tmdb_id);
   const currentWatchedEpisodes =
-    watchedEpisodes ?? (await getWatchedEpisodes(supabase, userShow.user_id, userShow.show_tmdb_id));
-  const mappedEpisodes = episodes.map(mapEpisode);
-  const mappedWatchedEpisodes = currentWatchedEpisodes.map(mapWatchedEpisode);
+    watchedEpisodes ?? (await getFullShowWatchedEpisodes(supabase, userShow.user_id, userShow.show_tmdb_id));
   const nextStatus = deriveTrackingStatusAfterProgressChange({
-    totalEpisodeCount: calculateTotalEpisodeCount(mappedEpisodes),
+    totalEpisodeCount: calculateTotalEpisodeCount(episodes),
     trackingStatus: userShow.status,
-    watchedEpisodeCount: calculateWatchedEpisodeCount(mappedEpisodes, mappedWatchedEpisodes),
+    watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, currentWatchedEpisodes),
   });
 
   if (nextStatus === userShow.status) {
@@ -299,16 +269,19 @@ function watchedEpisodeInsertFromEpisode(row: EpisodeRow, userId: string): Watch
   };
 }
 
-function getReleasedEpisodeRows(episodes: EpisodeRow[]) {
-  const trackableKeys = new Set(getReleasedEpisodes(episodes.map(mapEpisode)).map(buildEpisodeKey));
-
-  return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisode(episode))));
+function watchedEpisodeInsertFromTrackedEpisode(episode: Episode, userId: string): WatchedEpisodeInsert {
+  return {
+    episode_number: episode.episodeNumber,
+    season_number: episode.seasonNumber,
+    show_tmdb_id: episode.showTmdbId,
+    user_id: userId,
+  };
 }
 
-function getReleasedTrackableEpisodeRows(episodes: EpisodeRow[]) {
-  const trackableKeys = new Set(getReleasedTrackableEpisodes(episodes.map(mapEpisode)).map(buildEpisodeKey));
+function getReleasedEpisodeRows(episodes: EpisodeRow[]) {
+  const trackableKeys = new Set(getReleasedEpisodes(episodes.map(mapEpisodeRow)).map(buildEpisodeKey));
 
-  return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisode(episode))));
+  return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisodeRow(episode))));
 }
 
 export async function getUserShowDetail(
@@ -325,26 +298,19 @@ export async function getUserShowDetail(
   const [
     { data: shows, error: showError },
     { data: seasons, error: seasonsError },
-    { data: episodes, error: episodesError },
-    { data: watchedEpisodes, error: watchedEpisodesError },
+    episodes,
+    watchedEpisodes,
   ] = await Promise.all([
     supabase.from("shows").select("*").eq("tmdb_id", tmdbId).limit(1),
     supabase.from("seasons").select("*").eq("show_tmdb_id", tmdbId).order("season_number", { ascending: true }),
-    supabase
-      .from("episodes")
-      .select("*")
-      .eq("show_tmdb_id", tmdbId)
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true }),
-    supabase.from("watched_episodes").select("*").eq("user_id", userId).eq("show_tmdb_id", tmdbId),
+    getFullShowEpisodes(supabase, tmdbId),
+    getFullShowWatchedEpisodes(supabase, userId, tmdbId),
   ]);
 
   throwDataError(showError, "Unable to load show details.");
   throwDataError(seasonsError, "Unable to load seasons.");
-  throwDataError(episodesError, "Unable to load episodes.");
-  throwDataError(watchedEpisodesError, "Unable to load watched progress.");
 
-  return createShowDetail(userShow, shows?.[0], seasons ?? [], episodes ?? [], watchedEpisodes ?? []);
+  return createShowDetail(userShow, shows?.[0], seasons ?? [], episodes, watchedEpisodes);
 }
 
 export async function setEpisodeWatched(
@@ -458,13 +424,13 @@ export async function markShowWatched(
     throw new ShowDataError("This show is not in your library.");
   }
 
-  const episodes = await getShowEpisodes(supabase, tmdbId);
+  const episodes = await getFullShowEpisodes(supabase, tmdbId);
 
   if (episodes.length === 0) {
     throw new ShowDataError("No episodes found for this show.");
   }
 
-  const trackableEpisodes = getReleasedTrackableEpisodeRows(episodes);
+  const trackableEpisodes = getReleasedTrackableEpisodes(episodes);
 
   if (trackableEpisodes.length === 0) {
     throw new ShowDataError("No released episodes found for this show.");
@@ -472,7 +438,7 @@ export async function markShowWatched(
 
   const { error } = await supabase
     .from("watched_episodes")
-    .upsert(trackableEpisodes.map((episode) => watchedEpisodeInsertFromEpisode(episode, userId)), {
+    .upsert(trackableEpisodes.map((episode) => watchedEpisodeInsertFromTrackedEpisode(episode, userId)), {
       onConflict: "user_id,show_tmdb_id,season_number,episode_number",
     });
 

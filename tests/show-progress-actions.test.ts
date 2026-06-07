@@ -6,7 +6,7 @@ import {
   setEpisodeWatched,
   setSeasonWatched,
 } from "../features/shows/data";
-import type { TrackingStatus } from "../features/tracking";
+import { MULTI_SHOW_EPISODE_PAGE_SIZE, type TrackingStatus } from "../features/tracking";
 
 type SupabaseTestClient = Parameters<typeof markShowWatched>[0];
 
@@ -57,10 +57,17 @@ type WatchedEpisodeRow = WatchedEpisodeInsert & {
 
 type TableName = "episodes" | "shows" | "user_shows" | "watched_episodes";
 
-type QueryFilter = {
-  column: string;
-  value: unknown;
-};
+type QueryFilter =
+  | {
+    column: string;
+    kind: "eq";
+    value: unknown;
+  }
+  | {
+    column: string;
+    kind: "in";
+    values: unknown[];
+  };
 
 type QueryResponse = {
   data: unknown[] | null;
@@ -184,7 +191,12 @@ class FakeQuery {
   }
 
   eq(column: string, value: unknown) {
-    this.filters.push({ column, value });
+    this.filters.push({ column, kind: "eq", value });
+    return this;
+  }
+
+  in(column: string, values: unknown[]) {
+    this.filters.push({ column, kind: "in", values });
     return this;
   }
 
@@ -201,6 +213,10 @@ class FakeQuery {
   select() {
     this.operation = "select";
     return this;
+  }
+
+  range(rangeStart: number, rangeEnd: number) {
+    return Promise.resolve(this.execute(rangeStart, rangeEnd));
   }
 
   update(values: Record<string, unknown>) {
@@ -222,7 +238,7 @@ class FakeQuery {
     return Promise.resolve(this.execute()).then(onfulfilled, onrejected);
   }
 
-  private execute(): QueryResponse {
+  private execute(rangeStart?: number, rangeEnd?: number): QueryResponse {
     if (this.operation === "delete") {
       this.db.deleteRows(this.table, this.filters);
       return { data: null, error: null };
@@ -254,6 +270,10 @@ class FakeQuery {
       rows = rows.slice(0, this.limitCount);
     }
 
+    if (rangeStart !== undefined && rangeEnd !== undefined) {
+      rows = rows.slice(rangeStart, rangeEnd + 1);
+    }
+
     return { data: rows, error: null };
   }
 }
@@ -278,7 +298,15 @@ function getColumnValue(row: object, column: string) {
 }
 
 function matchesFilters(row: object, filters: QueryFilter[]) {
-  return filters.every((filter) => getColumnValue(row, filter.column) === filter.value);
+  return filters.every((filter) => {
+    const value = getColumnValue(row, filter.column);
+
+    if (filter.kind === "eq") {
+      return value === filter.value;
+    }
+
+    return filter.values.includes(value);
+  });
 }
 
 function watchedEpisodeKeys(db: FakeSupabase) {
@@ -298,6 +326,56 @@ describe("show progress actions", () => {
     await markShowWatched(client(db), USER_ID, SHOW_TMDB_ID);
 
     expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
+    expect(db.userShows[0]?.status).toBe("watched");
+  });
+
+  it("marks show watched across paginated full-show episodes while excluding specials", async () => {
+    const db = new FakeSupabase();
+    db.episodes = [
+      episodeRow(0, 1),
+      ...Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE + 1 }, (_, index) => episodeRow(1, index + 1)),
+    ];
+
+    await markShowWatched(client(db), USER_ID, SHOW_TMDB_ID);
+
+    expect(db.watchedEpisodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 1);
+    expect(db.watchedEpisodes).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          season_number: 0,
+        }),
+      ]),
+    );
+    expect(db.watchedEpisodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          episode_number: MULTI_SHOW_EPISODE_PAGE_SIZE + 1,
+          season_number: 1,
+        }),
+      ]),
+    );
+    expect(db.userShows[0]?.status).toBe("watched");
+  });
+
+  it("updates status from progress using complete paginated full-show episode data", async () => {
+    const db = new FakeSupabase();
+    db.episodes = Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE + 1 }, (_, index) =>
+      episodeRow(1, index + 1),
+    );
+    db.upsertWatchedEpisodes(
+      db.episodes
+        .slice(0, MULTI_SHOW_EPISODE_PAGE_SIZE)
+        .map((episode) => ({
+          episode_number: episode.episode_number,
+          season_number: episode.season_number,
+          show_tmdb_id: episode.show_tmdb_id,
+          user_id: USER_ID,
+        })),
+    );
+
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, MULTI_SHOW_EPISODE_PAGE_SIZE + 1, true);
+
+    expect(db.watchedEpisodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 1);
     expect(db.userShows[0]?.status).toBe("watched");
   });
 

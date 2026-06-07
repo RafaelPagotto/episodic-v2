@@ -1,23 +1,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/types";
+
 import {
   calculateProgressPercentage,
   calculateTotalEpisodeCount,
   calculateWatchedEpisodeCount,
   deriveDisplayStatus,
   deriveTrackingStatusAfterProgressChange,
-} from "@/features/tracking";
-import type { Episode, WatchedEpisode } from "@/features/tracking";
-import type { Database } from "@/lib/supabase/types";
+  loadEpisodesByShowIds,
+  loadWatchedEpisodesByShowIds,
+  mapEpisodeRow,
+  mapWatchedEpisodeRow,
+} from "../tracking";
+import type { Episode, WatchedEpisode } from "../tracking";
 
 import type { LibraryShowCard } from "./types";
 
 type EpisodicSupabaseClient = SupabaseClient<Database>;
-type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
 type ShowRow = Database["public"]["Tables"]["shows"]["Row"];
 type UserShowRow = Database["public"]["Tables"]["user_shows"]["Row"];
 type UserShowUpdate = Database["public"]["Tables"]["user_shows"]["Update"];
-type WatchedEpisodeRow = Database["public"]["Tables"]["watched_episodes"]["Row"];
 
 export class LibraryDataError extends Error {
   constructor(message: string) {
@@ -32,51 +35,14 @@ function throwDataError(error: { message?: string } | null, fallbackMessage: str
   }
 }
 
-function groupByShowTmdbId<TRow extends { show_tmdb_id: number }>(rows: TRow[]) {
-  return rows.reduce((groups, row) => {
-    const currentRows = groups.get(row.show_tmdb_id) ?? [];
-    currentRows.push(row);
-    groups.set(row.show_tmdb_id, currentRows);
-    return groups;
-  }, new Map<number, TRow[]>());
-}
-
-function mapEpisode(row: EpisodeRow): Episode {
-  return {
-    airDate: row.air_date,
-    episodeNumber: row.episode_number,
-    metadata: {},
-    overview: row.overview,
-    runtimeMinutes: row.runtime_minutes,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    stillPath: row.still_path,
-    title: row.title,
-    tmdbId: row.tmdb_id,
-  };
-}
-
-function mapWatchedEpisode(row: WatchedEpisodeRow): WatchedEpisode {
-  return {
-    episodeNumber: row.episode_number,
-    id: row.id,
-    seasonNumber: row.season_number,
-    showTmdbId: row.show_tmdb_id,
-    userId: row.user_id,
-    watchedAt: row.watched_at,
-  };
-}
-
 function createLibraryCard(
   userShow: UserShowRow,
   show: ShowRow | undefined,
-  episodes: EpisodeRow[],
-  watchedEpisodes: WatchedEpisodeRow[],
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
 ): LibraryShowCard {
-  const mappedEpisodes = episodes.map(mapEpisode);
-  const mappedWatchedEpisodes = watchedEpisodes.map(mapWatchedEpisode);
-  const totalEpisodeCount = calculateTotalEpisodeCount(mappedEpisodes);
-  const watchedEpisodeCount = calculateWatchedEpisodeCount(mappedEpisodes, mappedWatchedEpisodes);
+  const totalEpisodeCount = calculateTotalEpisodeCount(episodes);
+  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes);
   const progressPercentage = calculateProgressPercentage({
     totalEpisodeCount,
     watchedEpisodeCount,
@@ -104,6 +70,26 @@ function createLibraryCard(
   };
 }
 
+async function getLibraryEpisodesByShowId(supabase: EpisodicSupabaseClient, showIds: number[]) {
+  try {
+    return await loadEpisodesByShowIds(supabase, showIds);
+  } catch {
+    throw new LibraryDataError("Unable to load episode details.");
+  }
+}
+
+async function getLibraryWatchedEpisodesByShowId(
+  supabase: EpisodicSupabaseClient,
+  userId: string,
+  showIds: number[],
+) {
+  try {
+    return await loadWatchedEpisodesByShowIds(supabase, userId, showIds);
+  } catch {
+    throw new LibraryDataError("Unable to load watched progress.");
+  }
+}
+
 export async function getUserLibraryShows(supabase: EpisodicSupabaseClient, userId: string) {
   const { data: userShows, error: userShowsError } = await supabase
     .from("user_shows")
@@ -121,21 +107,17 @@ export async function getUserLibraryShows(supabase: EpisodicSupabaseClient, user
 
   const [
     { data: shows, error: showsError },
-    { data: episodes, error: episodesError },
-    { data: watchedEpisodes, error: watchedEpisodesError },
+    episodesByShowId,
+    watchedByShowId,
   ] = await Promise.all([
     supabase.from("shows").select("*").in("tmdb_id", showIds),
-    supabase.from("episodes").select("*").in("show_tmdb_id", showIds),
-    supabase.from("watched_episodes").select("*").eq("user_id", userId).in("show_tmdb_id", showIds),
+    getLibraryEpisodesByShowId(supabase, showIds),
+    getLibraryWatchedEpisodesByShowId(supabase, userId, showIds),
   ]);
 
   throwDataError(showsError, "Unable to load show details.");
-  throwDataError(episodesError, "Unable to load episode details.");
-  throwDataError(watchedEpisodesError, "Unable to load watched progress.");
 
   const showsById = new Map((shows ?? []).map((show) => [show.tmdb_id, show]));
-  const episodesByShowId = groupByShowTmdbId(episodes ?? []);
-  const watchedByShowId = groupByShowTmdbId(watchedEpisodes ?? []);
 
   return userShows.map((userShow) =>
     createLibraryCard(
@@ -208,8 +190,8 @@ async function getStoredStatusAfterResume(
   throwDataError(episodesError, "Unable to load episode details.");
   throwDataError(watchedEpisodesError, "Unable to load watched progress.");
 
-  const episodes = (episodeRows ?? []).map(mapEpisode);
-  const watchedEpisodes = (watchedEpisodeRows ?? []).map(mapWatchedEpisode);
+  const episodes = (episodeRows ?? []).map(mapEpisodeRow);
+  const watchedEpisodes = (watchedEpisodeRows ?? []).map(mapWatchedEpisodeRow);
 
   return deriveTrackingStatusAfterProgressChange({
     totalEpisodeCount: calculateTotalEpisodeCount(episodes),
