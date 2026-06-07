@@ -30,6 +30,14 @@ export function buildEpisodeKey({ episodeNumber, seasonNumber, showTmdbId }: Epi
   return `${showTmdbId}:${seasonNumber}:${episodeNumber}`;
 }
 
+export function isMainSeriesEpisode(episode: Pick<Episode, "seasonNumber">) {
+  return episode.seasonNumber > 0;
+}
+
+export function isSpecialEpisode(episode: Pick<Episode, "seasonNumber">) {
+  return episode.seasonNumber === 0;
+}
+
 function uniqueEpisodes(episodes: Episode[]) {
   const seenEpisodeKeys = new Set<string>();
 
@@ -76,12 +84,24 @@ export function isEpisodeTrackable(episode: Episode, options: EpisodeCalculation
   return airDateValue <= getReferenceDateValue(options.referenceDate);
 }
 
-export function getTrackableEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function getReleasedEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
   return uniqueEpisodes(episodes).filter((episode) => isEpisodeTrackable(episode, options));
 }
 
+export function getReleasedTrackableEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+  return getReleasedEpisodes(episodes, options).filter(isMainSeriesEpisode);
+}
+
+export function getReleasedSpecialEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+  return getReleasedEpisodes(episodes, options).filter(isSpecialEpisode);
+}
+
+export function getTrackableEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+  return getReleasedTrackableEpisodes(episodes, options);
+}
+
 export function calculateTotalEpisodeCount(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
-  return getTrackableEpisodes(episodes, options).length;
+  return getReleasedTrackableEpisodes(episodes, options).length;
 }
 
 export function calculateWatchedEpisodeCount(
@@ -89,7 +109,24 @@ export function calculateWatchedEpisodeCount(
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {
-  const episodeKeys = new Set(getTrackableEpisodes(episodes, options).map((episode) => buildEpisodeKey(episode)));
+  const episodeKeys = new Set(
+    getReleasedTrackableEpisodes(episodes, options).map((episode) => buildEpisodeKey(episode)),
+  );
+  const watchedKeys = watchedEpisodeKeySet(watchedEpisodes);
+
+  return Array.from(watchedKeys).filter((episodeKey) => episodeKeys.has(episodeKey)).length;
+}
+
+export function calculateReleasedEpisodeCount(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+  return getReleasedEpisodes(episodes, options).length;
+}
+
+export function calculateReleasedWatchedEpisodeCount(
+  episodes: Episode[],
+  watchedEpisodes: WatchedEpisode[],
+  options: EpisodeCalculationOptions = {},
+) {
+  const episodeKeys = new Set(getReleasedEpisodes(episodes, options).map((episode) => buildEpisodeKey(episode)));
   const watchedKeys = watchedEpisodeKeySet(watchedEpisodes);
 
   return Array.from(watchedKeys).filter((episodeKey) => episodeKeys.has(episodeKey)).length;
@@ -113,7 +150,7 @@ export function getNextEpisodeToWatch(
 ) {
   const watchedKeys = watchedEpisodeKeySet(watchedEpisodes);
 
-  return getTrackableEpisodes(episodes, options)
+  return getReleasedTrackableEpisodes(episodes, options)
     .sort((left, right) => {
       if (left.showTmdbId !== right.showTmdbId) return left.showTmdbId - right.showTmdbId;
       if (left.seasonNumber !== right.seasonNumber) return left.seasonNumber - right.seasonNumber;

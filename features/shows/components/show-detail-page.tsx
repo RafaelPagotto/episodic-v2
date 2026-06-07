@@ -7,6 +7,7 @@ import type { ShowDetail } from "../types";
 import { ShowDetailView } from "./show-detail-view";
 
 type ShowDetailPageContentProps = {
+  seasonQueryParam?: string | null;
   tmdbId: number;
 };
 
@@ -58,7 +59,7 @@ async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageSta
   }
 }
 
-export async function ShowDetailPageContent({ tmdbId }: ShowDetailPageContentProps) {
+export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }: ShowDetailPageContentProps) {
   const { errorMessage, show } = await getShowDetailPageState(tmdbId);
 
   if (errorMessage || !show) {
@@ -73,5 +74,5 @@ export async function ShowDetailPageContent({ tmdbId }: ShowDetailPageContentPro
     );
   }
 
-  return <ShowDetailView show={show} />;
+  return <ShowDetailView initialSeasonParam={seasonQueryParam} show={show} />;
 }

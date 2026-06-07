@@ -1,15 +1,21 @@
-import { CheckCircle2, CircleSlash, Heart, ListChecks, ListPlus, Play, Star } from "lucide-react";
+"use client";
+
+import { Check, CheckCircle2, CircleSlash, Heart, ListChecks, ListPlus, Loader2, Play, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ComponentType } from "react";
+import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Notice } from "@/components/ui/notice";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
 
+import { markContinueWatchingEpisodeWatchedAction } from "../actions";
 import type { ContinueWatchingItem, DashboardData } from "../types";
 
 type DashboardViewProps = {
@@ -20,6 +26,11 @@ type SummaryCardProps = {
   icon: ComponentType<{ className?: string }>;
   label: string;
   value: number;
+};
+
+type ActionMessage = {
+  message: string;
+  status: "error" | "success";
 };
 
 function SummaryCard({ icon: Icon, label, value }: SummaryCardProps) {
@@ -61,7 +72,23 @@ function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
   );
 }
 
-function ContinueWatchingCard({ item }: { item: ContinueWatchingItem }) {
+function getContinueWatchingActionKey(item: ContinueWatchingItem) {
+  return `${item.tmdbId}:${item.nextEpisode.seasonNumber}:${item.nextEpisode.episodeNumber}`;
+}
+
+function ContinueWatchingCard({
+  disabled,
+  item,
+  onMarkNextWatched,
+  pending,
+}: {
+  disabled: boolean;
+  item: ContinueWatchingItem;
+  onMarkNextWatched: (item: ContinueWatchingItem) => void;
+  pending: boolean;
+}) {
+  const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
+
   return (
     <Card className={cn("overflow-hidden", item.isFaded && "opacity-60")}>
       <CardContent className="flex gap-4 p-4 sm:p-5">
@@ -75,12 +102,24 @@ function ContinueWatchingCard({ item }: { item: ContinueWatchingItem }) {
                 {item.nextEpisode.title}
               </p>
             </div>
-            <Button asChild className="w-full gap-2 sm:w-auto md:w-32">
-              <Link href={`/shows/${item.tmdbId}`}>
-                <Play className="size-4" />
-                Continue
-              </Link>
-            </Button>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row md:justify-end">
+              <Button
+                aria-label={`Mark ${item.title} ${nextEpisodeLabel} watched`}
+                className="w-full gap-2 sm:w-auto"
+                disabled={disabled || pending}
+                onClick={() => onMarkNextWatched(item)}
+                type="button"
+              >
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                Mark {nextEpisodeLabel} watched
+              </Button>
+              <Button asChild className="w-full gap-2 sm:w-auto md:w-32" variant="outline">
+                <Link href={`/shows/${item.tmdbId}`}>
+                  <Play className="size-4" />
+                  Details
+                </Link>
+              </Button>
+            </div>
           </div>
           <div className="mt-5">
             <ProgressBar
@@ -131,7 +170,46 @@ function EmptyContinueWatchingState({
 }
 
 export function DashboardView({ data }: DashboardViewProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [message, setMessage] = useState<ActionMessage | null>(null);
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
   const hasShows = data.summary.totalShows > 0;
+
+  function handleMarkNextWatched(item: ContinueWatchingItem) {
+    const actionKey = getContinueWatchingActionKey(item);
+
+    setMessage(null);
+    setPendingAction(actionKey);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await markContinueWatchingEpisodeWatchedAction({
+            episodeNumber: item.nextEpisode.episodeNumber,
+            seasonNumber: item.nextEpisode.seasonNumber,
+            tmdbId: item.tmdbId,
+          });
+
+          setMessage({
+            message: result.message,
+            status: result.status,
+          });
+
+          if (result.status === "success") {
+            router.refresh();
+          }
+        } catch {
+          setMessage({
+            message: "Unable to update this episode right now.",
+            status: "error",
+          });
+        } finally {
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -161,6 +239,10 @@ export function DashboardView({ data }: DashboardViewProps) {
           </p>
         </div>
 
+        {message ? (
+          <Notice tone={message.status === "error" ? "error" : "success"}>{message.message}</Notice>
+        ) : null}
+
         {data.continueWatching.length === 0 ? (
           <EmptyContinueWatchingState
             hasHiddenItems={data.hiddenContinueWatchingCount > 0}
@@ -169,7 +251,13 @@ export function DashboardView({ data }: DashboardViewProps) {
         ) : (
           <div className="grid gap-3">
             {data.continueWatching.map((item) => (
-              <ContinueWatchingCard key={item.tmdbId} item={item} />
+              <ContinueWatchingCard
+                key={item.tmdbId}
+                disabled={isPending || pendingAction !== null}
+                item={item}
+                onMarkNextWatched={handleMarkNextWatched}
+                pending={pendingAction === getContinueWatchingActionKey(item)}
+              />
             ))}
           </div>
         )}

@@ -7,6 +7,10 @@ import {
   deriveDisplayStatus,
   deriveTrackingStatusAfterProgressChange,
   getNextEpisodeToWatch,
+  getReleasedSpecialEpisodes,
+  getReleasedTrackableEpisodes,
+  isMainSeriesEpisode,
+  isSpecialEpisode,
   isTrackingStatus,
   isShowCompleted,
 } from "../features/tracking";
@@ -59,6 +63,17 @@ describe("tracking progress helpers", () => {
     expect(calculateWatchedEpisodeCount(episodes, [watched(1, 1), watched(1, 3)], options)).toBe(1);
   });
 
+  it("classifies specials and excludes season 0 from main progress counts", () => {
+    const episodes = [episode(0, 1), episode(1, 1), episode(1, 2)];
+
+    expect(isSpecialEpisode(episodes[0])).toBe(true);
+    expect(isMainSeriesEpisode(episodes[1])).toBe(true);
+    expect(getReleasedSpecialEpisodes(episodes)).toEqual([episodes[0]]);
+    expect(getReleasedTrackableEpisodes(episodes)).toEqual([episodes[1], episodes[2]]);
+    expect(calculateTotalEpisodeCount(episodes)).toBe(2);
+    expect(calculateWatchedEpisodeCount(episodes, [watched(0, 1), watched(1, 1)])).toBe(1);
+  });
+
   it("calculates rounded progress and clamps invalid counts", () => {
     expect(calculateProgressPercentage({ totalEpisodeCount: 0, watchedEpisodeCount: 5 })).toBe(0);
     expect(calculateProgressPercentage({ totalEpisodeCount: 3, watchedEpisodeCount: 1 })).toBe(33);
@@ -71,6 +86,16 @@ describe("tracking progress helpers", () => {
 
     expect(nextEpisode).toMatchObject({
       episodeNumber: 2,
+      seasonNumber: 1,
+    });
+  });
+
+  it("ignores specials when finding the next main episode to watch", () => {
+    const episodes = [episode(0, 1), episode(1, 1), episode(1, 2)];
+    const nextEpisode = getNextEpisodeToWatch(episodes, []);
+
+    expect(nextEpisode).toMatchObject({
+      episodeNumber: 1,
       seasonNumber: 1,
     });
   });
@@ -161,6 +186,39 @@ describe("tracking progress helpers", () => {
         watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, afterRelease),
       }),
     ).toBe("watching");
+  });
+
+  it("does not let unwatched specials prevent completed or caught up statuses", () => {
+    const episodes = [episode(0, 1), episode(1, 1), episode(1, 2)];
+    const watchedEpisodes = [watched(1, 1), watched(1, 2)];
+    const totalEpisodeCount = calculateTotalEpisodeCount(episodes);
+    const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes);
+
+    expect(isShowCompleted(episodes, watchedEpisodes)).toBe(true);
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Ended",
+        totalEpisodeCount,
+        trackingStatus: "watching",
+        watchedEpisodeCount,
+      }),
+    ).toBe("completed");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount,
+        trackingStatus: "watching",
+        watchedEpisodeCount,
+      }),
+    ).toBe("caught_up");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Ended",
+        totalEpisodeCount,
+        trackingStatus: "dropped",
+        watchedEpisodeCount,
+      }),
+    ).toBe("dropped");
   });
 
   it("derives stored tracking status after progress changes", () => {

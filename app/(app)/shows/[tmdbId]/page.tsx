@@ -6,10 +6,17 @@ type ShowDetailPageProps = {
   params: Promise<{
     tmdbId: string;
   }>;
+  searchParams?: Promise<{
+    season?: string | string[];
+  }>;
 };
 
-export default async function ShowDetailPage({ params }: ShowDetailPageProps) {
+export default async function ShowDetailPage({ params, searchParams }: ShowDetailPageProps) {
   const { tmdbId } = await params;
+  const queryParams = await searchParams;
+  const seasonQueryParam = Array.isArray(queryParams?.season)
+    ? queryParams.season[0] ?? null
+    : queryParams?.season ?? null;
   const numericTmdbId = Number(tmdbId);
 
   if (!Number.isInteger(numericTmdbId) || numericTmdbId < 1) {
@@ -24,5 +31,5 @@ export default async function ShowDetailPage({ params }: ShowDetailPageProps) {
     );
   }
 
-  return <ShowDetailPageContent tmdbId={numericTmdbId} />;
+  return <ShowDetailPageContent seasonQueryParam={seasonQueryParam} tmdbId={numericTmdbId} />;
 }

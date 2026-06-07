@@ -49,12 +49,14 @@ function watched(
 }
 
 function record({
+  episodes,
   favourite = false,
   showTmdbId,
   status,
   tmdbStatus = "Returning Series",
   watchedEpisodes = [],
 }: {
+  episodes?: Episode[];
   favourite?: boolean;
   showTmdbId: number;
   status: TrackingStatus;
@@ -63,7 +65,7 @@ function record({
 }): DashboardShowRecord {
   return {
     addedAt: "2026-05-29T00:00:00.000Z",
-    episodes: [episode(showTmdbId, 1, 1), episode(showTmdbId, 1, 2), episode(showTmdbId, 1, 3)],
+    episodes: episodes ?? [episode(showTmdbId, 1, 1), episode(showTmdbId, 1, 2), episode(showTmdbId, 1, 3)],
     favourite,
     posterPath: null,
     title: `Show ${showTmdbId}`,
@@ -114,6 +116,34 @@ describe("dashboard view model", () => {
     });
   });
 
+  it("exposes the next released unwatched main-series episode and ignores specials", () => {
+    const records = [
+      record({
+        episodes: [
+          episode(6, 0, 1),
+          episode(6, 1, 1),
+          episode(6, 1, 2),
+        ],
+        showTmdbId: 6,
+        status: "watching",
+        watchedEpisodes: [watched(6, 0, 1), watched(6, 1, 1)],
+      }),
+    ];
+    const items = getContinueWatchingItems(records, preferences());
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      progressPercentage: 50,
+      totalEpisodeCount: 2,
+      watchedEpisodeCount: 1,
+    });
+    expect(items[0]?.nextEpisode).toMatchObject({
+      episodeNumber: 2,
+      seasonNumber: 1,
+      title: "S1E2",
+    });
+  });
+
   it("excludes dropped shows from Continue Watching by default", () => {
     const records = [
       record({ showTmdbId: 1, status: "watchlist" }),
@@ -154,6 +184,34 @@ describe("dashboard view model", () => {
       title: "S1E2",
     });
     expect(getContinueWatchingItems(records, preferences({ hideDropped: true })).map((item) => item.tmdbId)).toEqual([2]);
+  });
+
+  it("excludes dropped, caught-up, completed, and watchlist-only shows from Continue Watching", () => {
+    const records = [
+      record({
+        showTmdbId: 6,
+        status: "watchlist",
+        watchedEpisodes: [watched(6, 0, 1)],
+      }),
+      record({
+        showTmdbId: 7,
+        status: "dropped",
+        watchedEpisodes: [watched(7, 1, 1)],
+      }),
+      record({
+        showTmdbId: 8,
+        status: "watched",
+        watchedEpisodes: [watched(8, 1, 1), watched(8, 1, 2), watched(8, 1, 3)],
+      }),
+      record({
+        showTmdbId: 9,
+        status: "watched",
+        tmdbStatus: "Ended",
+        watchedEpisodes: [watched(9, 1, 1), watched(9, 1, 2), watched(9, 1, 3)],
+      }),
+    ];
+
+    expect(getContinueWatchingItems(records, preferences())).toEqual([]);
   });
 
   it("keeps summary counts full-library while preferences filter Continue Watching", () => {

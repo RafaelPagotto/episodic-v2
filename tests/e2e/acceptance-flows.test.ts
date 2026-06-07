@@ -146,6 +146,133 @@ describe("Episodic critical acceptance flows", () => {
     });
   });
 
+  it("keeps specials optional while allowing intentional special tracking", () => {
+    const app = new AcceptanceTestApp();
+    app.signUp("specials@example.com", "specials-password");
+    app.addShowToLibrary(100);
+
+    app.markEpisodeWatched(100, 0, 1);
+    expect(app.getProgress(100)).toEqual({
+      nextEpisode: expect.objectContaining({
+        episodeNumber: 1,
+        seasonNumber: 1,
+      }),
+      progressPercentage: 0,
+      storedStatus: "watchlist",
+      status: "watchlist",
+      totalEpisodeCount: 4,
+      watchedEpisodeCount: 0,
+    });
+    expect(app.exportUserData().watchedEpisodes).toEqual([
+      expect.objectContaining({
+        episodeNumber: 1,
+        seasonNumber: 0,
+        showTmdbId: 100,
+      }),
+    ]);
+
+    app.markEpisodeWatched(100, 0, 1, false);
+    expect(app.exportUserData().watchedEpisodes).toEqual([]);
+
+    app.markShowWatched(100);
+    expect(app.getProgress(100)).toEqual({
+      nextEpisode: null,
+      progressPercentage: 100,
+      storedStatus: "watched",
+      status: "caught_up",
+      totalEpisodeCount: 4,
+      watchedEpisodeCount: 4,
+    });
+    expect(app.exportUserData().watchedEpisodes).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          seasonNumber: 0,
+        }),
+      ]),
+    );
+
+    app.markSeasonWatched(100, 0);
+    expect(app.exportUserData().watchedEpisodes).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          episodeNumber: 1,
+          seasonNumber: 0,
+          showTmdbId: 100,
+        }),
+      ]),
+    );
+    expect(app.getProgress(100)).toEqual(
+      expect.objectContaining({
+        progressPercentage: 100,
+        status: "caught_up",
+        totalEpisodeCount: 4,
+        watchedEpisodeCount: 4,
+      }),
+    );
+  });
+
+  it("marks the Continue Watching next episode, advances, and removes completed items", () => {
+    const app = new AcceptanceTestApp();
+    app.signUp("continue@example.com", "continue-password");
+    app.addShowToLibrary(100);
+
+    expect(app.getContinueWatching()).toEqual([]);
+
+    app.markEpisodeWatched(100, 0, 1);
+    expect(app.getContinueWatching()).toEqual([]);
+
+    app.markEpisodeWatched(100, 1, 1);
+    expect(app.getContinueWatching()).toEqual([
+      expect.objectContaining({
+        tmdbId: 100,
+        totalEpisodeCount: 4,
+        watchedEpisodeCount: 1,
+        nextEpisode: expect.objectContaining({
+          episodeNumber: 2,
+          seasonNumber: 1,
+        }),
+      }),
+    ]);
+
+    app.markContinueWatchingNextEpisodeWatched(100);
+    expect(app.getContinueWatching()).toEqual([
+      expect.objectContaining({
+        watchedEpisodeCount: 2,
+        nextEpisode: expect.objectContaining({
+          episodeNumber: 1,
+          seasonNumber: 2,
+        }),
+      }),
+    ]);
+
+    app.markContinueWatchingNextEpisodeWatched(100);
+    expect(app.getContinueWatching()).toEqual([
+      expect.objectContaining({
+        watchedEpisodeCount: 3,
+        nextEpisode: expect.objectContaining({
+          episodeNumber: 2,
+          seasonNumber: 2,
+        }),
+      }),
+    ]);
+
+    app.markContinueWatchingNextEpisodeWatched(100);
+    expect(app.getContinueWatching()).toEqual([]);
+    expect(app.getProgress(100)).toEqual(
+      expect.objectContaining({
+        status: "caught_up",
+        totalEpisodeCount: 4,
+        watchedEpisodeCount: 4,
+      }),
+    );
+
+    app.addShowToLibrary(200);
+    app.markEpisodeWatched(200, 1, 1);
+    app.dropShow(200);
+    expect(app.getContinueWatching()).toEqual([]);
+    expect(() => app.markContinueWatchingNextEpisodeWatched(200)).toThrow("No Continue Watching item found.");
+  });
+
   it("persists favourite and drop/resume without clearing progress", () => {
     const app = new AcceptanceTestApp();
     app.signUp("status@example.com", "status-password");

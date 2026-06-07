@@ -1,12 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Episode, WatchedEpisode } from "@/features/tracking";
-import { DEFAULT_USER_PREFERENCES } from "@/features/preferences/defaults";
-import type { UserPreferences } from "@/features/preferences/types";
 import type { Database } from "@/lib/supabase/types";
 
+import { DEFAULT_USER_PREFERENCES } from "../preferences/defaults";
+import type { UserPreferences } from "../preferences/types";
+import { setEpisodeWatched } from "../shows/data";
+import type { Episode, WatchedEpisode } from "../tracking";
 import type { DashboardShowRecord } from "./types";
-import { createDashboardData } from "./view-model";
+import { createDashboardData, getContinueWatchingNextEpisode } from "./view-model";
 
 type EpisodicSupabaseClient = SupabaseClient<Database>;
 type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
@@ -136,4 +137,62 @@ export async function getUserDashboardData(
   );
 
   return createDashboardData(records, preferences);
+}
+
+export async function markContinueWatchingNextEpisodeWatched(
+  supabase: EpisodicSupabaseClient,
+  userId: string,
+  tmdbId: number,
+  seasonNumber: number,
+  episodeNumber: number,
+) {
+  const [
+    { data: userShows, error: userShowsError },
+    { data: shows, error: showsError },
+    { data: episodes, error: episodesError },
+    { data: watchedEpisodes, error: watchedEpisodesError },
+  ] = await Promise.all([
+    supabase
+      .from("user_shows")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("show_tmdb_id", tmdbId)
+      .limit(1),
+    supabase.from("shows").select("*").eq("tmdb_id", tmdbId).limit(1),
+    supabase
+      .from("episodes")
+      .select("*")
+      .eq("show_tmdb_id", tmdbId)
+      .order("season_number", { ascending: true })
+      .order("episode_number", { ascending: true }),
+    supabase
+      .from("watched_episodes")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("show_tmdb_id", tmdbId),
+  ]);
+
+  throwDataError(userShowsError, "Unable to load this show from your library.");
+  throwDataError(showsError, "Unable to load show details.");
+  throwDataError(episodesError, "Unable to load episodes.");
+  throwDataError(watchedEpisodesError, "Unable to load watched progress.");
+
+  const userShow = userShows?.[0];
+
+  if (!userShow) {
+    throw new DashboardDataError("This show is not in your library.");
+  }
+
+  const record = createDashboardRecord(userShow, shows?.[0], episodes ?? [], watchedEpisodes ?? []);
+  const nextEpisode = getContinueWatchingNextEpisode(record);
+
+  if (!nextEpisode) {
+    throw new DashboardDataError("No main-series episode is currently available to continue.");
+  }
+
+  if (nextEpisode.seasonNumber !== seasonNumber || nextEpisode.episodeNumber !== episodeNumber) {
+    throw new DashboardDataError("The next episode has changed. Refresh and try again.");
+  }
+
+  await setEpisodeWatched(supabase, userId, tmdbId, seasonNumber, episodeNumber, true);
 }

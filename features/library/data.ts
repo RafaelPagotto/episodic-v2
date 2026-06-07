@@ -92,6 +92,7 @@ function createLibraryCard(
     addedAt: userShow.added_at,
     displayStatus,
     favourite: userShow.favourite,
+    firstAirDate: show?.first_air_date ?? null,
     posterPath: show?.poster_path ?? null,
     progressPercentage,
     status: userShow.status,

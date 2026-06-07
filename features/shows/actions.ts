@@ -59,6 +59,7 @@ async function getActionContext(): Promise<ShowActionContext> {
 }
 
 function revalidateShow(tmdbId: number) {
+  revalidatePath("/dashboard");
   revalidatePath(`/shows/${tmdbId}`);
   revalidatePath("/library");
   revalidatePath("/progress");

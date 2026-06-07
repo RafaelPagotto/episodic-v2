@@ -1,9 +1,9 @@
 "use client";
 
-import { Check, CircleSlash, Loader2, Play, RotateCcw, Star } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RotateCcw, Star } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,10 +24,16 @@ import {
   setEpisodeWatchedAction,
   setSeasonWatchedAction,
 } from "../actions";
-import { getShowDetailActionLabels } from "../view-model";
+import {
+  getSeasonLabel,
+  getShowDetailActionLabels,
+  getShowDetailSeasonNavigation,
+  SPECIALS_OPTIONAL_NOTE,
+} from "../view-model";
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActionResult } from "../types";
 
 type ShowDetailViewProps = {
+  initialSeasonParam?: string | null;
   show: ShowDetail;
 };
 
@@ -162,7 +168,7 @@ function SeasonPanel({
       <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between md:space-y-0">
         <div className="min-w-0">
           <CardTitle>
-            {season.seasonNumber === 0 ? "Specials" : season.name}
+            {getSeasonLabel(season)}
             {airDate ? <span className="ml-2 text-sm font-normal text-muted-foreground">{airDate}</span> : null}
           </CardTitle>
           {season.overview ? <p className="mt-2 text-sm text-muted-foreground">{season.overview}</p> : null}
@@ -179,7 +185,13 @@ function SeasonPanel({
         </Button>
       </CardHeader>
       <CardContent className="space-y-4">
+        {season.seasonNumber === 0 ? (
+          <Notice className="border-primary/30 bg-primary/10 text-foreground">
+            {SPECIALS_OPTIONAL_NOTE}
+          </Notice>
+        ) : null}
         <ProgressBar
+          label={season.seasonNumber === 0 ? "Specials watched" : undefined}
           progressPercentage={season.progress.progressPercentage}
           totalEpisodeCount={season.progress.totalEpisodeCount}
           watchedEpisodeCount={season.progress.watchedEpisodeCount}
@@ -208,11 +220,22 @@ function SeasonPanel({
   );
 }
 
-export function ShowDetailView({ show }: ShowDetailViewProps) {
+export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<ActionMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [activeSeasonNumber, setActiveSeasonNumber] = useState(
+    () => getShowDetailSeasonNavigation(show, initialSeasonParam).activeSeasonNumber,
+  );
+
+  const seasonNavigation = getShowDetailSeasonNavigation(show, activeSeasonNumber);
+
+  useEffect(() => {
+    if (activeSeasonNumber !== seasonNavigation.activeSeasonNumber) {
+      setActiveSeasonNumber(seasonNavigation.activeSeasonNumber);
+    }
+  }, [activeSeasonNumber, seasonNavigation.activeSeasonNumber]);
 
   function runAction(
     actionId: string,
@@ -315,6 +338,18 @@ export function ShowDetailView({ show }: ShowDetailViewProps) {
     runAction("show:reset", () => resetShowProgressAction(show.tmdbId));
   }
 
+  function updateActiveSeason(seasonNumber: number | null) {
+    if (seasonNumber === null || seasonNumber === activeSeasonNumber) {
+      return;
+    }
+
+    setActiveSeasonNumber(seasonNumber);
+
+    const params = new URLSearchParams(window.location.search);
+    params.set("season", String(seasonNumber));
+    window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+  }
+
   const showComplete =
     show.progress.totalEpisodeCount > 0
     && show.progress.watchedEpisodeCount >= show.progress.totalEpisodeCount;
@@ -324,7 +359,7 @@ export function ShowDetailView({ show }: ShowDetailViewProps) {
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <Card>
-        <CardContent className="flex flex-col gap-6 p-5 md:flex-row">
+        <CardContent className="flex flex-col gap-6 p-5 pt-5 sm:p-6 sm:pt-6 md:flex-row">
           <ShowPoster show={show} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -410,6 +445,7 @@ export function ShowDetailView({ show }: ShowDetailViewProps) {
 
             <div className="mt-6">
               <ProgressBar
+                label="Main progress"
                 progressPercentage={show.progress.progressPercentage}
                 totalEpisodeCount={show.progress.totalEpisodeCount}
                 watchedEpisodeCount={show.progress.watchedEpisodeCount}
@@ -443,16 +479,63 @@ export function ShowDetailView({ show }: ShowDetailViewProps) {
         />
       ) : (
         <div className="grid gap-4">
-          {show.seasons.map((season) => (
+          <Card>
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+              <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                Season
+                <select
+                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs"
+                  onChange={(event) => updateActiveSeason(Number(event.target.value))}
+                  value={seasonNavigation.activeSeasonNumber ?? ""}
+                >
+                  {seasonNavigation.seasonOptions.map((seasonOption) => (
+                    <option key={seasonOption.seasonNumber} value={seasonOption.seasonNumber}>
+                      {seasonOption.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
+                <Button
+                  className="gap-2"
+                  disabled={seasonNavigation.previousSeasonNumber === null}
+                  onClick={() => updateActiveSeason(seasonNavigation.previousSeasonNumber)}
+                  type="button"
+                  variant="outline"
+                >
+                  <ChevronLeft className="size-4" />
+                  Previous
+                </Button>
+                <Button
+                  className="gap-2"
+                  disabled={seasonNavigation.nextSeasonNumber === null}
+                  onClick={() => updateActiveSeason(seasonNavigation.nextSeasonNumber)}
+                  type="button"
+                  variant="outline"
+                >
+                  Next
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {seasonNavigation.activeSeason ? (
             <SeasonPanel
-              key={season.seasonNumber}
+              key={seasonNavigation.activeSeason.seasonNumber}
               disabled={isPending}
               onSeasonToggle={handleSeasonToggle}
               onToggleEpisode={handleEpisodeToggle}
               pendingAction={pendingAction}
-              season={season}
+              season={seasonNavigation.activeSeason}
             />
-          ))}
+          ) : (
+            <EmptyState
+              description="TMDB has not provided season or episode metadata for this show yet."
+              title="No season selected"
+            />
+          )}
         </div>
       )}
     </section>

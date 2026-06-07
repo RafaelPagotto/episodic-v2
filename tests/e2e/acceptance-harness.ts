@@ -1,6 +1,8 @@
 import { DEFAULT_USER_PREFERENCES } from "../../features/preferences/defaults";
 import type { UserPreferences } from "../../features/preferences/types";
 import { getStatusAfterClearingWatchedHistory } from "../../features/profile/history";
+import { createDashboardData } from "../../features/dashboard/view-model";
+import type { DashboardShowRecord } from "../../features/dashboard/types";
 import {
   calculateProgressPercentage,
   calculateTotalEpisodeCount,
@@ -8,7 +10,8 @@ import {
   deriveDisplayStatus,
   deriveTrackingStatusAfterProgressChange,
   getNextEpisodeToWatch,
-  getTrackableEpisodes,
+  getReleasedEpisodes,
+  getReleasedTrackableEpisodes,
 } from "../../features/tracking";
 import type {
   DisplayStatus,
@@ -91,11 +94,13 @@ function showFixture(tmdbId: number, title: string, firstAirDate: string, tmdbSt
 }
 
 function seasonFixture(showTmdbId: number, seasonNumber: number, episodeCount: number): Season {
+  const month = String(Math.max(1, Math.min(seasonNumber, 12))).padStart(2, "0");
+
   return {
-    airDate: `2024-0${seasonNumber}-01`,
+    airDate: `2024-${month}-01`,
     episodeCount,
     metadata: {},
-    name: `Season ${seasonNumber}`,
+    name: seasonNumber === 0 ? "Specials" : `Season ${seasonNumber}`,
     overview: null,
     posterPath: null,
     seasonNumber,
@@ -110,8 +115,10 @@ function episodeFixture(
   episodeNumber: number,
   title: string,
 ): Episode {
+  const month = String(Math.max(1, Math.min(seasonNumber, 12))).padStart(2, "0");
+
   return {
-    airDate: `2024-0${seasonNumber}-${String(episodeNumber).padStart(2, "0")}`,
+    airDate: `2024-${month}-${String(episodeNumber).padStart(2, "0")}`,
     episodeNumber,
     metadata: {},
     overview: null,
@@ -133,12 +140,17 @@ function createTmdbFixtures() {
       arcane.tmdbId,
       {
         episodes: [
+          episodeFixture(arcane.tmdbId, 0, 1, "Bridging the Rift"),
           episodeFixture(arcane.tmdbId, 1, 1, "Welcome to the Playground"),
           episodeFixture(arcane.tmdbId, 1, 2, "Some Mysteries Are Better Left Unsolved"),
           episodeFixture(arcane.tmdbId, 2, 1, "Heavy Is the Crown"),
           episodeFixture(arcane.tmdbId, 2, 2, "Watch It All Burn"),
         ],
-        seasons: [seasonFixture(arcane.tmdbId, 1, 2), seasonFixture(arcane.tmdbId, 2, 2)],
+        seasons: [
+          seasonFixture(arcane.tmdbId, 0, 1),
+          seasonFixture(arcane.tmdbId, 1, 2),
+          seasonFixture(arcane.tmdbId, 2, 2),
+        ],
         show: arcane,
       },
     ],
@@ -364,7 +376,7 @@ export class AcceptanceTestApp {
       throw new Error("Season has no episodes.");
     }
 
-    const episodesToUpdate = watched ? getTrackableEpisodes(seasonEpisodes) : seasonEpisodes;
+    const episodesToUpdate = watched ? getReleasedEpisodes(seasonEpisodes) : seasonEpisodes;
 
     for (const episode of episodesToUpdate) {
       this.setWatchedEpisode(user.id, episode, watched);
@@ -382,7 +394,7 @@ export class AcceptanceTestApp {
       throw new Error("Show has no episodes.");
     }
 
-    for (const episode of getTrackableEpisodes(showEpisodes)) {
+    for (const episode of getReleasedTrackableEpisodes(showEpisodes)) {
       this.setWatchedEpisode(user.id, episode, true);
     }
 
@@ -457,6 +469,39 @@ export class AcceptanceTestApp {
       totalEpisodeCount,
       watchedEpisodeCount,
     };
+  }
+
+  getContinueWatching() {
+    const user = this.currentUser();
+    const records: DashboardShowRecord[] = Array.from(this.userShows.values())
+      .filter((userShow) => userShow.userId === user.id)
+      .map((userShow) => {
+        const show = this.shows.get(userShow.showTmdbId);
+
+        return {
+          addedAt: userShow.addedAt,
+          episodes: this.getEpisodes(userShow.showTmdbId),
+          favourite: userShow.favourite,
+          posterPath: show?.posterPath ?? null,
+          title: show?.title ?? `Show ${userShow.showTmdbId}`,
+          tmdbId: userShow.showTmdbId,
+          tmdbStatus: show?.tmdbStatus ?? null,
+          trackingStatus: userShow.status,
+          watchedEpisodes: this.getWatchedEpisodes(user.id, userShow.showTmdbId),
+        };
+      });
+
+    return createDashboardData(records, this.getPreferences()).continueWatching;
+  }
+
+  markContinueWatchingNextEpisodeWatched(tmdbId: number) {
+    const item = this.getContinueWatching().find((continueItem) => continueItem.tmdbId === tmdbId);
+
+    if (!item) {
+      throw new Error("No Continue Watching item found.");
+    }
+
+    this.markEpisodeWatched(tmdbId, item.nextEpisode.seasonNumber, item.nextEpisode.episodeNumber);
   }
 
   updatePreferences(preferences: Partial<UserPreferences>) {

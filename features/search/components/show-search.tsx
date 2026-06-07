@@ -47,27 +47,44 @@ function getYear(date: string | null) {
   return date ? date.slice(0, 4) : null;
 }
 
-function ShowPoster({ show }: { show: NormalizedTmdbSearchResult }) {
-  const posterUrl = getTmdbImageUrl(show.posterPath, "w185");
+function ShowPoster({
+  detailHref,
+  isAdded,
+  show,
+}: {
+  detailHref: string;
+  isAdded: boolean;
+  show: NormalizedTmdbSearchResult;
+}) {
+  const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
+  const content = posterUrl ? (
+    <Image
+      alt={`${show.title} poster`}
+      className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
+      height={513}
+      sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
+      src={posterUrl}
+      width={342}
+    />
+  ) : (
+    <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
+      {show.title.charAt(0)}
+    </div>
+  );
 
-  if (!posterUrl) {
+  if (isAdded) {
     return (
-      <div className="flex aspect-[2/3] w-24 shrink-0 items-center justify-center rounded-md bg-secondary text-xl font-semibold text-muted-foreground">
-        {show.title.charAt(0)}
-      </div>
+      <Link
+        aria-label={`Track episodes for ${show.title}`}
+        className="group block overflow-hidden rounded-md bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        href={detailHref}
+      >
+        {content}
+      </Link>
     );
   }
 
-  return (
-    <Image
-      alt={`${show.title} poster`}
-      className="aspect-[2/3] w-24 shrink-0 rounded-md object-cover"
-      height={278}
-      sizes="96px"
-      src={posterUrl}
-      width={185}
-    />
-  );
+  return <div className="group overflow-hidden rounded-md bg-secondary">{content}</div>;
 }
 
 export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps) {
@@ -220,7 +237,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
       ) : null}
 
       {status === "success" && visibleResults.length > 0 ? (
-        <div className="grid gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
           {visibleResults.map((show) => {
             const isAdded = addedShowIds.has(show.tmdbId);
             const isAdding = pendingTmdbId === show.tmdbId;
@@ -233,21 +250,50 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                 key={show.tmdbId}
                 className={cn("overflow-hidden", shouldFadeAddedForPreferences(isAdded, preferences) && "opacity-60")}
               >
-                <CardContent className="flex gap-4 p-4 sm:p-5">
-                  <ShowPoster show={show} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <h2 className="truncate text-base font-semibold">
-                          {show.title}
-                          {year ? <span className="ml-2 text-sm font-normal text-muted-foreground">{year}</span> : null}
-                        </h2>
-                        {show.originalTitle && show.originalTitle !== show.title ? (
-                          <p className="mt-1 truncate text-sm text-muted-foreground">{show.originalTitle}</p>
+                <CardContent className="flex h-full flex-col gap-3 p-3 sm:p-4">
+                  <ShowPoster detailHref={detailHref} isAdded={isAdded} show={show} />
+                  <div className="flex min-h-0 flex-1 flex-col gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-sm font-semibold leading-tight sm:text-base">
+                        {isAdded ? (
+                          <Link
+                            aria-label={`Track episodes for ${show.title}`}
+                            className="line-clamp-2 rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            href={detailHref}
+                          >
+                            {show.title}
+                          </Link>
+                        ) : (
+                          <span className="line-clamp-2">{show.title}</span>
+                        )}
+                      </h2>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                        {year ? <span className="rounded-full border px-2 py-1">{year}</span> : null}
+                        {show.originalLanguage ? (
+                          <span className="rounded-full border px-2 py-1">{show.originalLanguage.toUpperCase()}</span>
                         ) : null}
                       </div>
+                    </div>
+
+                    <p className="line-clamp-3 text-xs text-muted-foreground sm:text-sm">
+                      {show.overview || "No overview available."}
+                    </p>
+
+                    {cardMessage ? (
+                      <p
+                        className={cn(
+                          "text-sm",
+                          cardMessage.status === "error" ? "text-destructive" : "text-primary",
+                        )}
+                        role={cardMessage.status === "error" ? "alert" : "status"}
+                      >
+                        {cardMessage.message}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-auto">
                       {isAdded ? (
-                        <Button asChild className="w-full gap-2 sm:w-32">
+                        <Button asChild className="w-full gap-2" size="sm">
                           <Link
                             aria-label={`Track episodes for ${show.title}`}
                             href={detailHref}
@@ -258,9 +304,10 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                         </Button>
                       ) : (
                         <Button
-                          className="w-full gap-2 sm:w-28"
+                          className="w-full gap-2"
                           disabled={isAdding}
                           onClick={() => handleAddShow(show.tmdbId)}
+                          size="sm"
                           type="button"
                         >
                           {isAdding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
@@ -268,24 +315,6 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                         </Button>
                       )}
                     </div>
-                    <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">
-                      {show.overview || "No overview available."}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      {show.originalLanguage ? <span>{show.originalLanguage.toUpperCase()}</span> : null}
-                      {show.voteAverage ? <span>{show.voteAverage.toFixed(1)} rating</span> : null}
-                    </div>
-                    {cardMessage ? (
-                      <p
-                        className={cn(
-                          "mt-3 text-sm",
-                          cardMessage.status === "error" ? "text-destructive" : "text-primary",
-                        )}
-                        role={cardMessage.status === "error" ? "alert" : "status"}
-                      >
-                        {cardMessage.message}
-                      </p>
-                    ) : null}
                   </div>
                 </CardContent>
               </Card>

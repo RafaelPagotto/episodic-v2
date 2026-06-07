@@ -1,16 +1,20 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { Database } from "@/lib/supabase/types";
+
+import type { Episode, TrackingStatus, WatchedEpisode } from "../tracking";
 import {
   buildEpisodeKey,
   calculateProgressPercentage,
+  calculateReleasedEpisodeCount,
+  calculateReleasedWatchedEpisodeCount,
   calculateTotalEpisodeCount,
   calculateWatchedEpisodeCount,
   deriveDisplayStatus,
   deriveTrackingStatusAfterProgressChange,
-  getTrackableEpisodes,
-} from "@/features/tracking";
-import type { Episode, TrackingStatus, WatchedEpisode } from "@/features/tracking";
-import type { Database } from "@/lib/supabase/types";
+  getReleasedEpisodes,
+  getReleasedTrackableEpisodes,
+} from "../tracking";
 
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgress } from "./types";
 
@@ -98,6 +102,34 @@ function getProgress(
   };
 }
 
+function getSeasonProgress(
+  status: TrackingStatus,
+  episodes: EpisodeRow[],
+  watchedEpisodes: WatchedEpisodeRow[],
+  tmdbStatus?: string | null,
+): ShowProgress {
+  const mappedEpisodes = episodes.map(mapEpisode);
+  const mappedWatchedEpisodes = watchedEpisodes.map(mapWatchedEpisode);
+  const totalEpisodeCount = calculateReleasedEpisodeCount(mappedEpisodes);
+  const watchedEpisodeCount = calculateReleasedWatchedEpisodeCount(mappedEpisodes, mappedWatchedEpisodes);
+
+  return {
+    displayStatus: deriveDisplayStatus({
+      tmdbStatus,
+      totalEpisodeCount,
+      trackingStatus: status,
+      watchedEpisodeCount,
+    }),
+    progressPercentage: calculateProgressPercentage({
+      totalEpisodeCount,
+      watchedEpisodeCount,
+    }),
+    status,
+    totalEpisodeCount,
+    watchedEpisodeCount,
+  };
+}
+
 function createEpisodeDetail(row: EpisodeRow, watchedEpisodeKeys: Set<string>): ShowDetailEpisode {
   return {
     airDate: row.air_date,
@@ -127,7 +159,7 @@ function createSeasonDetail(
     name: season?.name ?? `Season ${seasonNumber}`,
     overview: season?.overview ?? null,
     posterPath: season?.poster_path ?? null,
-    progress: getProgress(status, episodes, watchedEpisodes, tmdbStatus),
+    progress: getSeasonProgress(status, episodes, watchedEpisodes, tmdbStatus),
     seasonNumber,
   };
 }
@@ -267,8 +299,14 @@ function watchedEpisodeInsertFromEpisode(row: EpisodeRow, userId: string): Watch
   };
 }
 
-function getTrackableEpisodeRows(episodes: EpisodeRow[]) {
-  const trackableKeys = new Set(getTrackableEpisodes(episodes.map(mapEpisode)).map(buildEpisodeKey));
+function getReleasedEpisodeRows(episodes: EpisodeRow[]) {
+  const trackableKeys = new Set(getReleasedEpisodes(episodes.map(mapEpisode)).map(buildEpisodeKey));
+
+  return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisode(episode))));
+}
+
+function getReleasedTrackableEpisodeRows(episodes: EpisodeRow[]) {
+  const trackableKeys = new Set(getReleasedTrackableEpisodes(episodes.map(mapEpisode)).map(buildEpisodeKey));
 
   return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisode(episode))));
 }
@@ -382,7 +420,7 @@ export async function setSeasonWatched(
   }
 
   if (watched) {
-    const trackableEpisodes = getTrackableEpisodeRows(episodes);
+    const trackableEpisodes = getReleasedEpisodeRows(episodes);
 
     if (trackableEpisodes.length === 0) {
       throw new ShowDataError("No released episodes found for this season.");
@@ -426,7 +464,7 @@ export async function markShowWatched(
     throw new ShowDataError("No episodes found for this show.");
   }
 
-  const trackableEpisodes = getTrackableEpisodeRows(episodes);
+  const trackableEpisodes = getReleasedTrackableEpisodeRows(episodes);
 
   if (trackableEpisodes.length === 0) {
     throw new ShowDataError("No released episodes found for this show.");

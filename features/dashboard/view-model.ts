@@ -45,7 +45,7 @@ function getLatestWatchedAt(record: DashboardShowRecord) {
   }, null);
 }
 
-function getProgress(record: DashboardShowRecord) {
+export function getDashboardShowProgress(record: DashboardShowRecord) {
   const totalEpisodeCount = calculateTotalEpisodeCount(record.episodes);
   const watchedEpisodeCount = calculateWatchedEpisodeCount(record.episodes, record.watchedEpisodes);
 
@@ -65,9 +65,29 @@ function getProgress(record: DashboardShowRecord) {
   };
 }
 
+export function getContinueWatchingNextEpisode(record: DashboardShowRecord) {
+  return getContinueWatchingState(record)?.nextEpisode ?? null;
+}
+
+function getContinueWatchingState(record: DashboardShowRecord) {
+  const progress = getDashboardShowProgress(record);
+  const nextEpisode = getNextEpisodeToWatch(record.episodes, record.watchedEpisodes);
+
+  if (
+    !nextEpisode
+    || progress.displayStatus !== "watching"
+    || progress.watchedEpisodeCount === 0
+    || progress.watchedEpisodeCount >= progress.totalEpisodeCount
+  ) {
+    return null;
+  }
+
+  return { nextEpisode, progress };
+}
+
 export function createDashboardSummary(records: DashboardShowRecord[]): DashboardSummary {
   return records.reduce<DashboardSummary>((summary, record) => {
-    const progress = getProgress(record);
+    const progress = getDashboardShowProgress(record);
 
     return {
       caughtUpCount: summary.caughtUpCount + (progress.displayStatus === "caught_up" ? 1 : 0),
@@ -84,17 +104,13 @@ export function createDashboardSummary(records: DashboardShowRecord[]): Dashboar
 function getContinueWatchingCandidates(records: DashboardShowRecord[]): ContinueWatchingCandidate[] {
   return records
     .map((record) => {
-      const progress = getProgress(record);
-      const nextEpisode = getNextEpisodeToWatch(record.episodes, record.watchedEpisodes);
+      const continueWatchingState = getContinueWatchingState(record);
 
-      if (
-        !nextEpisode
-        || progress.displayStatus !== "watching"
-        || progress.watchedEpisodeCount === 0
-        || progress.watchedEpisodeCount >= progress.totalEpisodeCount
-      ) {
+      if (!continueWatchingState) {
         return null;
       }
+
+      const { nextEpisode, progress } = continueWatchingState;
 
       const candidate: ContinueWatchingCandidate = {
         displayStatus: progress.displayStatus,
