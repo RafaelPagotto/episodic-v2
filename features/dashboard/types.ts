@@ -42,8 +42,30 @@ export type ContinueWatchingItem = {
   watchedEpisodeCount: number;
 };
 
+export type UpcomingEpisodeItem = {
+  airDate: string;
+  detailHref: string;
+  episodeNumber: number;
+  episodeTitle: string;
+  seasonNumber: number;
+  showTitle: string;
+  tmdbId: number;
+};
+
+export type StartWatchingItem = {
+  detailHref: string;
+  episodeNumber: number;
+  episodeTitle: string;
+  posterPath: string | null;
+  seasonNumber: number;
+  showTitle: string;
+  tmdbId: number;
+};
+
 export type DashboardData = {
   continueWatching: ContinueWatchingItem[];
   hiddenContinueWatchingCount: number;
+  startWatching: StartWatchingItem[];
   summary: DashboardSummary;
+  upcomingEpisodes: UpcomingEpisodeItem[];
 };
