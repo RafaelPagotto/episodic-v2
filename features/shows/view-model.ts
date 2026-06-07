@@ -83,6 +83,13 @@ export function getShowDetailSeasonNavigation(
   };
 }
 
+export function getShowDetailSeasonUrl(pathname: string, search: string, seasonNumber: number) {
+  const params = new URLSearchParams(search);
+  params.set("season", String(seasonNumber));
+
+  return `${pathname}?${params.toString()}`;
+}
+
 function parseSeasonQueryParam(value: unknown) {
   if (typeof value === "number" && Number.isInteger(value)) {
     return value;

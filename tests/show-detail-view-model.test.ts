@@ -4,6 +4,7 @@ import {
   getSeasonLabel,
   getShowDetailActionLabels,
   getShowDetailSeasonNavigation,
+  getShowDetailSeasonUrl,
   SHOW_DETAIL_STATUS_LABELS,
   SPECIALS_OPTIONAL_NOTE,
 } from "../features/shows";
@@ -141,6 +142,14 @@ describe("show detail view model", () => {
     });
 
     expect(getShowDetailSeasonNavigation(show, "2").activeSeasonNumber).toBe(2);
+  });
+
+  it("builds a season query URL while preserving other query params", () => {
+    expect(getShowDetailSeasonUrl("/shows/100", "", 2)).toBe("/shows/100?season=2");
+    expect(getShowDetailSeasonUrl("/shows/100", "?tab=episodes", 2)).toBe("/shows/100?tab=episodes&season=2");
+    expect(getShowDetailSeasonUrl("/shows/100", "?season=1&tab=episodes", 2)).toBe(
+      "/shows/100?season=2&tab=episodes",
+    );
   });
 
   it("falls back from an invalid season query param to the computed default", () => {

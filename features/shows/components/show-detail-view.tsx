@@ -28,6 +28,7 @@ import {
   getSeasonLabel,
   getShowDetailActionLabels,
   getShowDetailSeasonNavigation,
+  getShowDetailSeasonUrl,
   SPECIALS_OPTIONAL_NOTE,
 } from "../view-model";
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActionResult } from "../types";
@@ -345,9 +346,11 @@ export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailVi
 
     setActiveSeasonNumber(seasonNumber);
 
-    const params = new URLSearchParams(window.location.search);
-    params.set("season", String(seasonNumber));
-    window.history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
+    window.history.replaceState(
+      null,
+      "",
+      getShowDetailSeasonUrl(window.location.pathname, window.location.search, seasonNumber),
+    );
   }
 
   const showComplete =
