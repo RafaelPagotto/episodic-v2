@@ -4,14 +4,19 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { signInAction } from "@/features/auth/actions";
+import type { AuthFormState } from "@/features/auth/state";
 import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
 
 import { AuthField } from "./auth-field";
 import { AuthFormMessage } from "./auth-form-message";
 import { AuthSubmitButton } from "./auth-submit-button";
 
-export function SignInForm() {
-  const [state, formAction] = useActionState(signInAction, INITIAL_AUTH_FORM_STATE);
+type SignInFormProps = {
+  initialState?: AuthFormState;
+};
+
+export function SignInForm({ initialState = INITIAL_AUTH_FORM_STATE }: SignInFormProps) {
+  const [state, formAction] = useActionState(signInAction, initialState);
 
   return (
     <form action={formAction} className="space-y-5">

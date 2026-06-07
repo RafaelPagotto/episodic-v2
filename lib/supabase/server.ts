@@ -9,7 +9,28 @@ type SupabasePublicEnv = {
   supabaseAnonKey: string;
 };
 
-async function createServerClientWithEnv({ supabaseAnonKey, supabaseUrl }: SupabasePublicEnv) {
+type CookieWriteMode = "read-tolerant" | "write-required";
+
+export const SUPABASE_AUTH_COOKIE_WRITE_ERROR_MESSAGE = "Supabase auth cookie write failed.";
+
+export function isSupabaseAuthCookieWriteError(error: unknown) {
+  return error instanceof Error && error.message === SUPABASE_AUTH_COOKIE_WRITE_ERROR_MESSAGE;
+}
+
+function createCookieWriteError() {
+  return new Error(SUPABASE_AUTH_COOKIE_WRITE_ERROR_MESSAGE);
+}
+
+function logCookieWriteFailure(mode: CookieWriteMode) {
+  if (mode === "write-required") {
+    console.error("[auth] Failed to write Supabase auth cookies.");
+  }
+}
+
+async function createServerClientWithEnv(
+  { supabaseAnonKey, supabaseUrl }: SupabasePublicEnv,
+  cookieWriteMode: CookieWriteMode,
+) {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
@@ -19,6 +40,16 @@ async function createServerClientWithEnv({ supabaseAnonKey, supabaseUrl }: Supab
       },
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value, options }) => {
+          if (cookieWriteMode === "write-required") {
+            try {
+              cookieStore.set(name, value, options);
+            } catch {
+              logCookieWriteFailure(cookieWriteMode);
+              throw createCookieWriteError();
+            }
+            return;
+          }
+
           try {
             cookieStore.set(name, value, options);
           } catch {
@@ -31,11 +62,17 @@ async function createServerClientWithEnv({ supabaseAnonKey, supabaseUrl }: Supab
   });
 }
 
-// Server-side Supabase client for Server Components, Route Handlers, and
-// Server Actions. It still uses the public anon key so RLS remains enforced.
-// Never import or use SUPABASE_SERVICE_ROLE_KEY here.
+async function createWriteRequiredServerClientWithEnv(env: SupabasePublicEnv) {
+  const client = await createServerClientWithEnv(env, "write-required");
+
+  return client;
+}
+
+// Read-tolerant server-side Supabase client for Server Components and route
+// guards. It can ignore cookie write failures because middleware refreshes
+// auth cookies before rendering.
 export async function createSupabaseServerClient() {
-  return createServerClientWithEnv(getSupabasePublicEnv());
+  return createServerClientWithEnv(getSupabasePublicEnv(), "read-tolerant");
 }
 
 // Optional server client for layouts that must still render while local
@@ -47,5 +84,21 @@ export async function createOptionalSupabaseServerClient() {
     return null;
   }
 
-  return createServerClientWithEnv(env);
+  return createServerClientWithEnv(env, "read-tolerant");
+}
+
+// Write-required server-side Supabase client for Server Actions and Route
+// Handlers that must persist auth cookies before redirecting.
+export async function createSupabaseCookieWriteRequiredServerClient() {
+  return createWriteRequiredServerClientWithEnv(getSupabasePublicEnv());
+}
+
+export async function createOptionalSupabaseCookieWriteRequiredServerClient() {
+  const env = getOptionalSupabasePublicEnv();
+
+  if (!env) {
+    return null;
+  }
+
+  return createWriteRequiredServerClientWithEnv(env);
 }

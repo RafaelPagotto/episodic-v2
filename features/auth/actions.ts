@@ -2,7 +2,11 @@
 
 import { redirect } from "next/navigation";
 
-import { createOptionalSupabaseServerClient, createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createOptionalSupabaseCookieWriteRequiredServerClient,
+  createSupabaseCookieWriteRequiredServerClient,
+  isSupabaseAuthCookieWriteError,
+} from "@/lib/supabase/server";
 
 import type { AuthFormState } from "./state";
 import {
@@ -40,10 +44,22 @@ function authSuccess(message: string): AuthFormState {
 
 async function getConfiguredSupabaseClient() {
   try {
-    return await createSupabaseServerClient();
+    return await createSupabaseCookieWriteRequiredServerClient();
   } catch {
     return null;
   }
+}
+
+function authOperationError(
+  error: unknown,
+  fallbackMessage: string,
+  cookieWriteMessage = "Unable to persist your sign-in session. Please try again.",
+) {
+  if (isSupabaseAuthCookieWriteError(error)) {
+    return authError(cookieWriteMessage);
+  }
+
+  return authError(fallbackMessage);
 }
 
 export async function signInAction(_state: AuthFormState, formData: FormData): Promise<AuthFormState> {
@@ -66,13 +82,17 @@ export async function signInAction(_state: AuthFormState, formData: FormData): P
     return authError("Supabase authentication is not configured yet.");
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  if (error) {
-    return authError(error.message || "Unable to sign in.");
+    if (error) {
+      return authError(error.message || "Unable to sign in.");
+    }
+  } catch (error) {
+    return authOperationError(error, "Unable to sign in.");
   }
 
   redirect("/library");
@@ -109,22 +129,30 @@ export async function signUpAction(_state: AuthFormState, formData: FormData): P
     return authError("Supabase authentication is not configured yet.");
   }
 
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        display_name: name,
-      },
-      emailRedirectTo: getAuthCallbackUrl("/library"),
-    },
-  });
+  let hasSession = false;
 
-  if (error) {
-    return authError(error.message || "Unable to create account.");
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          display_name: name,
+        },
+        emailRedirectTo: getAuthCallbackUrl("/library"),
+      },
+    });
+
+    if (error) {
+      return authError(error.message || "Unable to create account.");
+    }
+
+    hasSession = Boolean(data.session);
+  } catch (error) {
+    return authOperationError(error, "Unable to create account.");
   }
 
-  if (data.session) {
+  if (hasSession) {
     redirect("/library");
   }
 
@@ -147,12 +175,20 @@ export async function forgotPasswordAction(
     return authError("Supabase authentication is not configured yet.");
   }
 
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: getAuthCallbackUrl("/reset-password"),
-  });
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: getAuthCallbackUrl("/reset-password"),
+    });
 
-  if (error) {
-    return authError(error.message || "Unable to send reset link.");
+    if (error) {
+      return authError(error.message || "Unable to send reset link.");
+    }
+  } catch (error) {
+    return authOperationError(
+      error,
+      "Unable to send reset link.",
+      "Unable to prepare password reset. Please try again.",
+    );
   }
 
   return authSuccess("Password reset link sent. Check your email.");
@@ -184,19 +220,27 @@ export async function resetPasswordAction(
     return authError("Supabase authentication is not configured yet.");
   }
 
-  const { error } = await supabase.auth.updateUser({
-    password,
-  });
+  try {
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
 
-  if (error) {
-    return authError(error.message || "Unable to update password.");
+    if (error) {
+      return authError(error.message || "Unable to update password.");
+    }
+  } catch (error) {
+    return authOperationError(
+      error,
+      "Unable to update password.",
+      "Unable to persist your updated session. Please try again.",
+    );
   }
 
   return authSuccess("Password updated. You can continue to the app.");
 }
 
 export async function signOutAction() {
-  const supabase = await createOptionalSupabaseServerClient();
+  const supabase = await createOptionalSupabaseCookieWriteRequiredServerClient();
 
   if (supabase) {
     await supabase.auth.signOut();
