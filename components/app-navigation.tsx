@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
+import { BrandLogo } from "@/components/brand-logo";
 import { signOutAction } from "@/features/auth/actions";
 import { APP_NAME, APP_NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -92,8 +93,9 @@ export function AppNavigation({ userEmail }: AppNavigationProps) {
       </header>
 
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-card px-5 py-6 md:block">
-        <Link className="block text-xl font-semibold tracking-tight" href="/dashboard">
-          {APP_NAME}
+        <Link className="inline-flex items-center gap-3 text-xl font-semibold tracking-tight" href="/dashboard">
+          <BrandLogo className="size-8" />
+          <span>{APP_NAME}</span>
         </Link>
         <nav aria-label="Primary navigation" className="mt-8 flex flex-col gap-1">
           {APP_NAV_ITEMS.map((item) => {
