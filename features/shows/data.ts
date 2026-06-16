@@ -177,7 +177,7 @@ function createShowDetail(
   };
 }
 
-async function getOwnedUserShow(
+export async function getOwnedUserShow(
   supabase: EpisodicSupabaseClient,
   userId: string,
   tmdbId: number,

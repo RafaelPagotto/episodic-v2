@@ -8,13 +8,18 @@ import {
   isSeasonWatchedActionInput,
   isShowTmdbId,
 } from "@/features/tracking/action-validation";
+import { upsertTmdbShowMetadata } from "@/features/search/data";
+import { createOptionalSupabaseServiceRoleClient } from "@/lib/supabase/admin";
 import type {
   EpisodeWatchedActionInput,
   SeasonWatchedActionInput,
 } from "@/features/tracking/action-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { consumeTmdbRateLimit } from "@/lib/tmdb/rate-limit";
+import { getFullTmdbShowDetails } from "@/lib/tmdb/server";
 
 import {
+  getOwnedUserShow,
   markShowWatched,
   resetShowProgress,
   setEpisodeWatched,
@@ -39,7 +44,7 @@ function showActionError(message: string): ShowProgressActionResult {
   };
 }
 
-async function getActionContext(): Promise<ShowActionContext> {
+async function getActionContext(authErrorMessage = "Sign in to update progress."): Promise<ShowActionContext> {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -48,7 +53,7 @@ async function getActionContext(): Promise<ShowActionContext> {
 
   if (error || !user) {
     return {
-      error: showActionError("Sign in to update progress."),
+      error: showActionError(authErrorMessage),
     };
   }
 
@@ -174,5 +179,52 @@ export async function resetShowProgressAction(tmdbId: number): Promise<ShowProgr
     console.error("[Reset show progress failed]", error);
 
     return showActionError("Unable to reset this show right now.");
+  }
+}
+
+export async function refreshShowMetadataAction(tmdbId: number): Promise<ShowProgressActionResult> {
+  if (!isShowTmdbId(tmdbId)) {
+    return showActionError("Invalid request.");
+  }
+
+  try {
+    const context = await getActionContext("Sign in to refresh metadata.");
+
+    if ("error" in context) {
+      return context.error;
+    }
+
+    const userShow = await getOwnedUserShow(context.supabase, context.user.id, tmdbId);
+
+    if (!userShow) {
+      return showActionError("This show is not in your library.");
+    }
+
+    const rateLimitResult = consumeTmdbRateLimit("refresh-show", context.user.id);
+
+    if (!rateLimitResult.allowed) {
+      return showActionError("Too many requests. Try again shortly.");
+    }
+
+    const metadataClient = createOptionalSupabaseServiceRoleClient();
+
+    if (!metadataClient) {
+      console.error("[Refresh show metadata failed] Shared metadata writes are not configured.");
+      return showActionError("Unable to refresh metadata right now.");
+    }
+
+    const tmdbShow = await getFullTmdbShowDetails(tmdbId);
+
+    await upsertTmdbShowMetadata({ metadataClient, tmdbShow });
+    revalidateShow(tmdbId);
+
+    return {
+      message: `Refreshed metadata for ${tmdbShow.show.title}.`,
+      status: "success",
+    };
+  } catch (error) {
+    console.error("[Refresh show metadata failed]", error);
+
+    return showActionError("Unable to refresh metadata right now.");
   }
 }

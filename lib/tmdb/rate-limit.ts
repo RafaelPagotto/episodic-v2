@@ -1,6 +1,6 @@
 import "server-only";
 
-type TmdbRateLimitScope = "add-show" | "details" | "search";
+type TmdbRateLimitScope = "add-show" | "details" | "refresh-show" | "search";
 
 type RateLimitConfig = {
   limit: number;
@@ -26,6 +26,7 @@ const RATE_LIMIT_SWEEP_INTERVAL_MS = 60_000;
 const TMDB_RATE_LIMITS: Record<TmdbRateLimitScope, RateLimitConfig> = {
   "add-show": { limit: 10, windowMs: 60_000 },
   details: { limit: 10, windowMs: 60_000 },
+  "refresh-show": { limit: 5, windowMs: 60_000 },
   search: { limit: 30, windowMs: 60_000 },
 };
 
