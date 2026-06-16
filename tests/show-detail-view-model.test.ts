@@ -15,6 +15,7 @@ function showDetail(overrides: Partial<ShowDetail>): ShowDetail {
     backdropPath: null,
     favourite: false,
     firstAirDate: null,
+    lastSyncedAt: null,
     overview: null,
     posterPath: null,
     progress: {

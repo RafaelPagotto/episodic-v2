@@ -291,6 +291,7 @@ describe("show detail data loading", () => {
       totalEpisodeCount: MULTI_SHOW_EPISODE_PAGE_SIZE + 1,
       watchedEpisodeCount: MULTI_SHOW_EPISODE_PAGE_SIZE + 1,
     });
+    expect(show?.lastSyncedAt).toBe("2026-01-02T00:00:00.000Z");
     expect(show?.seasons[0]?.episodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 1);
   });
 

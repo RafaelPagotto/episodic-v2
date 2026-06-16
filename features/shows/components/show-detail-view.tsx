@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RotateCcw, Star } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RefreshCw, RotateCcw, Star } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 
 import {
   markShowWatchedAction,
+  refreshShowMetadataAction,
   resetShowProgressAction,
   setEpisodeWatchedAction,
   setSeasonWatchedAction,
@@ -339,6 +340,14 @@ export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailVi
     runAction("show:reset", () => resetShowProgressAction(show.tmdbId));
   }
 
+  function handleRefreshMetadata() {
+    runAction(
+      "show:refresh",
+      () => refreshShowMetadataAction(show.tmdbId),
+      "Unable to refresh metadata right now.",
+    );
+  }
+
   function updateActiveSeason(seasonNumber: number | null) {
     if (seasonNumber === null || seasonNumber === activeSeasonNumber) {
       return;
@@ -358,6 +367,7 @@ export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailVi
     && show.progress.watchedEpisodeCount >= show.progress.totalEpisodeCount;
   const controls = getShowDetailActionLabels(show);
   const firstAirDate = formatDate(show.firstAirDate);
+  const lastSyncedAt = formatDate(show.lastSyncedAt);
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -441,10 +451,28 @@ export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailVi
                   )}
                   Reset
                 </Button>
+                <Button
+                  aria-label={`Refresh metadata for ${show.title}`}
+                  className="w-full gap-2 sm:w-44"
+                  disabled={isPending || pendingAction === "show:refresh"}
+                  onClick={handleRefreshMetadata}
+                  type="button"
+                  variant="outline"
+                >
+                  {pendingAction === "show:refresh" ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )}
+                  {pendingAction === "show:refresh" ? "Refreshing" : "Refresh metadata"}
+                </Button>
               </div>
             </div>
 
             {show.overview ? <p className="mt-5 max-w-3xl text-sm text-muted-foreground">{show.overview}</p> : null}
+            {lastSyncedAt ? (
+              <p className="mt-3 text-xs text-muted-foreground">Metadata last refreshed {lastSyncedAt}</p>
+            ) : null}
 
             <div className="mt-6">
               <ProgressBar

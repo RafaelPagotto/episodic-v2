@@ -34,6 +34,7 @@ export type ShowDetail = {
   backdropPath: string | null;
   firstAirDate: string | null;
   favourite: boolean;
+  lastSyncedAt: string | null;
   overview: string | null;
   posterPath: string | null;
   progress: ShowProgress;

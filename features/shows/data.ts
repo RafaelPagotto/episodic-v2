@@ -154,6 +154,7 @@ function createShowDetail(
     backdropPath: show?.backdrop_path ?? null,
     favourite: userShow.favourite,
     firstAirDate: show?.first_air_date ?? null,
+    lastSyncedAt: show?.last_synced_at ?? null,
     overview: show?.overview ?? null,
     posterPath: show?.poster_path ?? null,
     progress: getProgress(userShow.status, episodes, watchedEpisodes, show?.tmdb_status ?? null),
