@@ -18,10 +18,24 @@ type AddShowToLibraryInput = {
   userId: string;
 };
 
+type UpsertTmdbShowMetadataInput = {
+  lastSyncedAt?: string;
+  metadataClient: EpisodicSupabaseClient;
+  tmdbShow: NormalizedTmdbFullShow;
+};
+
 export type AddShowToLibraryResult = {
   episodeCount: number;
   seasonCount: number;
   status: "added" | "duplicate";
+  tmdbId: number;
+  title: string;
+};
+
+export type UpsertTmdbShowMetadataResult = {
+  episodeCount: number;
+  lastSyncedAt: string;
+  seasonCount: number;
   tmdbId: number;
   title: string;
 };
@@ -54,26 +68,11 @@ export async function getUserLibraryShowIds(supabase: EpisodicSupabaseClient, us
   return data?.map((row) => row.show_tmdb_id) ?? [];
 }
 
-export async function addTmdbShowToLibrary({
+export async function upsertTmdbShowMetadata({
+  lastSyncedAt = new Date().toISOString(),
   metadataClient,
   tmdbShow,
-  userClient,
-  userId,
-}: AddShowToLibraryInput): Promise<AddShowToLibraryResult> {
-  const tmdbId = tmdbShow.show.tmdbId;
-  const existingShowIds = await getUserLibraryShowIds(userClient, userId);
-
-  if (existingShowIds.includes(tmdbId)) {
-    return {
-      episodeCount: tmdbShow.episodes.length,
-      seasonCount: tmdbShow.seasons.length,
-      status: "duplicate",
-      title: tmdbShow.show.title,
-      tmdbId,
-    };
-  }
-
-  const lastSyncedAt = new Date().toISOString();
+}: UpsertTmdbShowMetadataInput): Promise<UpsertTmdbShowMetadataResult> {
   const { error: showError } = await metadataClient
     .from("shows")
     .upsert(mapTmdbShowToShowInsert(tmdbShow, lastSyncedAt), { onConflict: "tmdb_id" });
@@ -102,14 +101,25 @@ export async function addTmdbShowToLibrary({
     throwDataError(episodesError, "Unable to save episode metadata.");
   }
 
-  const { error: userShowError } = await userClient.from("user_shows").insert({
-    favourite: false,
-    show_tmdb_id: tmdbId,
-    status: "watchlist",
-    user_id: userId,
-  });
+  return {
+    episodeCount: tmdbShow.episodes.length,
+    lastSyncedAt,
+    seasonCount: tmdbShow.seasons.length,
+    title: tmdbShow.show.title,
+    tmdbId: tmdbShow.show.tmdbId,
+  };
+}
 
-  if (isUniqueViolation(userShowError)) {
+export async function addTmdbShowToLibrary({
+  metadataClient,
+  tmdbShow,
+  userClient,
+  userId,
+}: AddShowToLibraryInput): Promise<AddShowToLibraryResult> {
+  const tmdbId = tmdbShow.show.tmdbId;
+  const existingShowIds = await getUserLibraryShowIds(userClient, userId);
+
+  if (existingShowIds.includes(tmdbId)) {
     return {
       episodeCount: tmdbShow.episodes.length,
       seasonCount: tmdbShow.seasons.length,
@@ -119,13 +129,32 @@ export async function addTmdbShowToLibrary({
     };
   }
 
+  const metadataResult = await upsertTmdbShowMetadata({ metadataClient, tmdbShow });
+
+  const { error: userShowError } = await userClient.from("user_shows").insert({
+    favourite: false,
+    show_tmdb_id: tmdbId,
+    status: "watchlist",
+    user_id: userId,
+  });
+
+  if (isUniqueViolation(userShowError)) {
+    return {
+      episodeCount: metadataResult.episodeCount,
+      seasonCount: metadataResult.seasonCount,
+      status: "duplicate",
+      title: metadataResult.title,
+      tmdbId: metadataResult.tmdbId,
+    };
+  }
+
   throwDataError(userShowError, "Unable to add show to your library.");
 
   return {
-    episodeCount: tmdbShow.episodes.length,
-    seasonCount: tmdbShow.seasons.length,
+    episodeCount: metadataResult.episodeCount,
+    seasonCount: metadataResult.seasonCount,
     status: "added",
-    title: tmdbShow.show.title,
-    tmdbId,
+    title: metadataResult.title,
+    tmdbId: metadataResult.tmdbId,
   };
 }
