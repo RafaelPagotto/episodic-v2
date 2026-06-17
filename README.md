@@ -1,38 +1,54 @@
-# Episodic v2
+# Episodic
 
-Episodic v2 is the Next.js rebuild of the personal TV show tracking app.
+Episodic is a focused TV tracking app for people who want to know exactly what to watch next.
 
-This clean repository uses the repository root as the Next.js app root. Legacy v1 code and data migration are out of scope for this app.
+Build a personal library from TMDB, follow episode-by-episode progress, keep favourites close, and let the dashboard surface the shows that need attention. Episodic is designed around the everyday viewing loop: add a show, track what you have watched, pick up from the next episode, and keep the rest of the library clean.
 
-## Stack
+## What It Does
+
+### A Dashboard For Your Next Episode
+
+Episodic opens on a practical command center for your library. It highlights in-progress shows, shows the next unwatched episode, surfaces upcoming episodes from saved metadata, and gives quick totals across watchlist, watching, caught up, completed, dropped, and favourite shows.
+
+### Search, Save, And Organize
+
+Search TMDB directly from the app, review poster art and show summaries, and add shows to your private library. Once saved, shows can be browsed in grid or list view, filtered by tracking status, sorted by title, date added, or progress, and marked as favourites.
+
+### Episode-Level Progress
+
+Every show has a dedicated tracking page with season navigation, episode rows, air dates, runtimes, overviews, and progress bars. Mark a single episode, an entire season, or the whole show as watched. Reset progress, refresh TMDB metadata, drop a show without losing history, and resume it when you are ready.
+
+### Preferences That Keep The Library Quiet
+
+Episodic includes display preferences for hiding or fading dropped, completed, and already-added shows. The result is a library that can stay comprehensive without becoming noisy.
+
+### Account And Data Control
+
+Each account owns its own library and watch history. Profile tools include library statistics, preference management, JSON export, watched-history cleanup, full library reset, and account deletion with confirmation safeguards.
+
+## Product Highlights
+
+- Private TV library backed by Supabase Auth and Row Level Security.
+- TMDB-powered show search, metadata, posters, seasons, and episodes.
+- Continue Watching flow based on the next unwatched episode.
+- Watchlist, watching, caught up, completed, dropped, and favourite states.
+- Episode, season, and whole-show watched controls.
+- Grid and list library views with filters, sorting, progress, and quick actions.
+- Upcoming episode and Start Watching dashboard sections.
+- User preferences for a cleaner tracking experience.
+- User-owned export and destructive data controls.
+
+## Tech Stack
 
 - Next.js App Router
+- React 19
 - TypeScript
 - Tailwind CSS
 - Supabase Auth and Postgres
-- shadcn/ui-style component organization
-- TMDB API through server-side route handlers
+- TMDB API through server-side route handlers and server actions
+- Vitest test coverage for data, validation, view models, and acceptance flows
 
-## Implemented Features
-
-- Supabase authentication: sign up, sign in, sign out, password recovery, reset password, and session restore.
-- Protected app area with dashboard, search, library, progress, show detail, and profile pages.
-- TMDB TV search and full show detail loading through server-side API routes.
-- Add shows to a user-owned library, including shared show, season, and episode metadata.
-- Remove shows from the library and prevent duplicate additions.
-- Library filtering and sorting by status, favourites, title, date added, and progress.
-- Derived show status display: `watchlist`, `watching`, `caught_up`, `completed`, and `dropped`.
-- Manual Drop and Resume controls for the dropped override.
-- Favourite and unfavourite controls.
-- Episode watched/unwatched tracking.
-- Season watched/unwatched actions.
-- Whole-show watched and progress reset actions.
-- Dashboard summary, progress dashboard, and Continue Watching.
-- User preferences for hiding/fading dropped, completed, and already-added shows.
-- User data export, clear watched history, reset library data, and delete account controls.
-- TMDB attribution on TMDB-powered views.
-
-## Local Setup
+## Run Locally
 
 ```bash
 npm install
@@ -42,26 +58,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-Local Supabase and TMDB calls require real values in `.env.local`; placeholder values are only useful for rendering non-integrated states.
+Authenticated flows, TMDB search, library writes, and profile data controls require real Supabase and TMDB values in `.env.local`. Placeholder values are only useful for rendering non-integrated states.
 
 ## Environment Variables
 
-Use `.env.local` for local development and the deployment provider environment settings for production.
+Use `.env.local` for local development and your deployment provider's environment settings for production.
 
 Public browser-safe values:
 
-- `NEXT_PUBLIC_APP_URL`: local or deployed app URL, such as `http://localhost:3000` or `https://your-domain.example`.
+- `NEXT_PUBLIC_APP_URL`: local or deployed app URL, such as `http://localhost:3000`.
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase anon key. This is browser-safe only with Row Level Security configured.
 
 Server-only values:
 
-- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service-role key for trusted server-side metadata writes and account deletion. Never expose through `NEXT_PUBLIC_*`.
-- `TMDB_API_KEY`: TMDB v3 API key. The app sends this as the server-side `api_key` query parameter. Do not use a TMDB v4 Read Access Token here.
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service-role key for trusted metadata writes and account deletion. Never expose this through `NEXT_PUBLIC_*`.
+- `TMDB_API_KEY`: TMDB v3 API key. The app sends this from server-side code only.
 
 ## Supabase Setup
 
-Episodic v2 expects a clean v2 Supabase project. Do not apply these migrations to the legacy v1 Supabase project.
+Episodic expects a clean v2 Supabase project. Do not apply these migrations to a legacy v1 Supabase project.
 
 Apply migrations in order:
 
@@ -69,15 +85,13 @@ Apply migrations in order:
 2. `supabase/migrations/20260604000200_enable_rls_and_policies.sql`
 3. `supabase/migrations/20260604000300_add_supporting_indexes.sql`
 
-The migrations create the schema, helper functions, triggers, Row Level Security policies, and supporting indexes.
-
 After applying migrations, regenerate Supabase TypeScript types from the v2 project:
 
 ```bash
 supabase gen types typescript --project-id <v2-project-id> --schema public > lib/supabase/types.ts
 ```
 
-See [database/README.md](database/README.md) and [supabase/README.md](supabase/README.md) for more detail.
+See [database/README.md](database/README.md), [supabase/README.md](supabase/README.md), and [docs/deployment.md](docs/deployment.md) for the full database and deployment path.
 
 ## Auth Redirect URLs
 
@@ -93,10 +107,9 @@ For production, configure:
 
 `NEXT_PUBLIC_APP_URL` should match the active environment URL because auth actions use it for email redirects.
 
-## Useful Commands
+## Quality Checks
 
 ```bash
-npm run dev
 npm run lint
 npm run typecheck
 npm run test
@@ -104,31 +117,21 @@ npm run test:e2e
 npm run build
 ```
 
-## Tracking Status Model
-
-Episodic v2 derives user-facing tracking status from watched episode progress and show metadata. `watched_episodes` is the source of truth for progress, while `user_shows.status` is retained as a compatibility field where only `dropped` acts as a manual override.
-
-See [docs/tracking-status-model.md](docs/tracking-status-model.md) for the full model, including `caught_up` and `completed` display statuses.
-
-## Deployment
-
-See [docs/deployment.md](docs/deployment.md) for Vercel setup, environment variables, migration order, security notes, and known limitations.
-
-For Vercel deployments, use the default Root Directory so Vercel builds from the repository root. Do not set Root Directory to `v2`.
-
 ## Security Notes
 
-- Supabase access is split between browser-safe, server, middleware, and admin clients under `lib/supabase/`.
 - Browser code uses only `NEXT_PUBLIC_*` Supabase values.
-- The service-role key is read only by server-only modules and must never be exposed to the browser.
-- TMDB keys are server-only and used only through app API routes or server actions.
+- Service-role and TMDB keys are read only by server-side modules.
 - User-owned data relies on Supabase Row Level Security policies.
-- Destructive profile actions require client confirmation and server-side confirmation validation.
+- Destructive profile actions require client confirmation and server-side validation.
 - TMDB route handlers validate inputs and use in-memory rate limits.
 
-## Known Limitations
+## Current Scope
 
-- v1 data migration is out of scope for the initial v2 launch.
+- v1 data migration is out of scope for the v2 app.
 - TMDB rate limiting is in-memory and should be replaced or supplemented with persistent distributed rate limiting for scaled production deployments.
-- Current e2e acceptance tests use fixture-based flows rather than a browser-backed live Supabase stack.
+- E2E acceptance tests use fixture-based flows rather than a browser-backed live Supabase stack.
 - `npm audit --omit=dev` currently reports a documented moderate advisory through Next.js bundled PostCSS. See [docs/dependency-audit.md](docs/dependency-audit.md).
+
+## Attribution
+
+Show data and imagery are powered by TMDB. Episodic uses TMDB data through server-side routes and includes TMDB attribution on TMDB-powered views.
