@@ -18,9 +18,9 @@ Search TMDB directly from the app, review poster art and show summaries, and add
 
 Every show has a dedicated tracking page with season navigation, episode rows, air dates, runtimes, overviews, and progress bars. Mark a single episode, an entire season, or the whole show as watched. Reset progress, refresh TMDB metadata, drop a show without losing history, and resume it when you are ready.
 
-### Preferences That Keep The Library Quiet
+### Preferences That Keep The Library Clean
 
-Episodic includes display preferences for hiding or fading dropped, completed, and already-added shows. The result is a library that can stay comprehensive without becoming noisy.
+Episodic includes display preferences for hiding or fading dropped, completed, and already-added shows. The result is a library that can stay comprehensive without becoming cluttered.
 
 ### Account And Data Control
 
