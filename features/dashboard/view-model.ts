@@ -26,8 +26,8 @@ import type {
   UpcomingEpisodeItem,
 } from "./types";
 
-const START_WATCHING_LIMIT = 6;
-const UPCOMING_EPISODE_LIMIT = 6;
+const START_WATCHING_LIMIT = 12;
+const UPCOMING_EPISODE_LIMIT = 12;
 
 type ContinueWatchingCandidate = Omit<ContinueWatchingItem, "isFaded">;
 
