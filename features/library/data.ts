@@ -13,7 +13,7 @@ import {
   mapEpisodeRow,
   mapWatchedEpisodeRow,
 } from "../tracking";
-import type { Episode, WatchedEpisode } from "../tracking";
+import type { Episode, EpisodeCalculationOptions, WatchedEpisode } from "../tracking";
 
 import type { LibraryShowCard } from "./types";
 
@@ -40,9 +40,10 @@ function createLibraryCard(
   show: ShowRow | undefined,
   episodes: Episode[],
   watchedEpisodes: WatchedEpisode[],
+  options: EpisodeCalculationOptions,
 ): LibraryShowCard {
-  const totalEpisodeCount = calculateTotalEpisodeCount(episodes);
-  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes);
+  const totalEpisodeCount = calculateTotalEpisodeCount(episodes, options);
+  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes, options);
   const progressPercentage = calculateProgressPercentage({
     totalEpisodeCount,
     watchedEpisodeCount,
@@ -90,7 +91,11 @@ async function getLibraryWatchedEpisodesByShowId(
   }
 }
 
-export async function getUserLibraryShows(supabase: EpisodicSupabaseClient, userId: string) {
+export async function getUserLibraryShows(
+  supabase: EpisodicSupabaseClient,
+  userId: string,
+  options: EpisodeCalculationOptions = {},
+) {
   const { data: userShows, error: userShowsError } = await supabase
     .from("user_shows")
     .select("*")
@@ -125,6 +130,7 @@ export async function getUserLibraryShows(supabase: EpisodicSupabaseClient, user
       showsById.get(userShow.show_tmdb_id),
       episodesByShowId.get(userShow.show_tmdb_id) ?? [],
       watchedByShowId.get(userShow.show_tmdb_id) ?? [],
+      options,
     ),
   );
 }
@@ -178,6 +184,7 @@ async function getStoredStatusAfterResume(
   supabase: EpisodicSupabaseClient,
   userId: string,
   tmdbId: number,
+  options: EpisodeCalculationOptions,
 ): Promise<UserShowRow["status"]> {
   const [
     { data: episodeRows, error: episodesError },
@@ -194,9 +201,9 @@ async function getStoredStatusAfterResume(
   const watchedEpisodes = (watchedEpisodeRows ?? []).map(mapWatchedEpisodeRow);
 
   return deriveTrackingStatusAfterProgressChange({
-    totalEpisodeCount: calculateTotalEpisodeCount(episodes),
+    totalEpisodeCount: calculateTotalEpisodeCount(episodes, options),
     trackingStatus: "watchlist",
-    watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes),
+    watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, options),
   });
 }
 
@@ -205,8 +212,9 @@ export async function updateUserShowDropped(
   userId: string,
   tmdbId: number,
   dropped: boolean,
+  options: EpisodeCalculationOptions = {},
 ) {
-  const status = dropped ? "dropped" : await getStoredStatusAfterResume(supabase, userId, tmdbId);
+  const status = dropped ? "dropped" : await getStoredStatusAfterResume(supabase, userId, tmdbId, options);
 
   await updateOwnedUserShow(supabase, userId, tmdbId, { status });
 

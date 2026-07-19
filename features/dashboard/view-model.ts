@@ -6,7 +6,9 @@ import {
   deriveDisplayStatus,
   getNextEpisodeToWatch,
   isMainSeriesEpisode,
+  type EpisodeCalculationOptions,
 } from "../tracking";
+import { compareDateOnly, getReferenceDateOnly, isDateOnly } from "../../lib/date-only";
 import { DEFAULT_USER_PREFERENCES } from "../preferences/defaults";
 import type { UserPreferences } from "../preferences/types";
 import {
@@ -29,9 +31,7 @@ const UPCOMING_EPISODE_LIMIT = 6;
 
 type ContinueWatchingCandidate = Omit<ContinueWatchingItem, "isFaded">;
 
-type DashboardDateOptions = {
-  referenceDate?: Date | string;
-};
+type DashboardDateOptions = EpisodeCalculationOptions;
 
 function createEmptySummary(): DashboardSummary {
   return {
@@ -45,36 +45,12 @@ function createEmptySummary(): DashboardSummary {
   };
 }
 
-function getReferenceIsoDate(referenceDate: Date | string = new Date()) {
-  if (typeof referenceDate === "string") {
-    const datePart = referenceDate.match(/^(\d{4}-\d{2}-\d{2})/)?.[1];
-
-    if (datePart) {
-      return datePart;
-    }
-
-    const parsedDate = new Date(referenceDate);
-
-    if (!Number.isNaN(parsedDate.getTime())) {
-      return parsedDate.toISOString().slice(0, 10);
-    }
-
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  if (Number.isNaN(referenceDate.getTime())) {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  return referenceDate.toISOString().slice(0, 10);
-}
-
 function getUpcomingAirDate(airDate: string | null, referenceIsoDate: string) {
-  if (!airDate || !/^\d{4}-\d{2}-\d{2}$/.test(airDate)) {
+  if (!isDateOnly(airDate)) {
     return null;
   }
 
-  return airDate > referenceIsoDate ? airDate : null;
+  return compareDateOnly(airDate, referenceIsoDate) > 0 ? airDate : null;
 }
 
 function getLatestWatchedAt(record: DashboardShowRecord) {
@@ -109,8 +85,11 @@ export function getDashboardShowProgress(record: DashboardShowRecord, options: D
   };
 }
 
-export function getContinueWatchingNextEpisode(record: DashboardShowRecord) {
-  return getContinueWatchingState(record)?.nextEpisode ?? null;
+export function getContinueWatchingNextEpisode(
+  record: DashboardShowRecord,
+  options: DashboardDateOptions = {},
+) {
+  return getContinueWatchingState(record, options)?.nextEpisode ?? null;
 }
 
 function compareEpisodeOrder(left: { episodeNumber: number; seasonNumber: number }, right: { episodeNumber: number; seasonNumber: number }) {
@@ -167,7 +146,7 @@ export function getUpcomingEpisodeItems(
   records: DashboardShowRecord[],
   options: DashboardDateOptions = {},
 ): UpcomingEpisodeItem[] {
-  const referenceIsoDate = getReferenceIsoDate(options.referenceDate);
+  const referenceIsoDate = getReferenceDateOnly(options.referenceDate, options.timeZone);
 
   return records
     .map((record) => getUpcomingEpisodeCandidate(record, referenceIsoDate, options))
@@ -238,9 +217,9 @@ export function getStartWatchingItems(
     .slice(0, START_WATCHING_LIMIT);
 }
 
-function getContinueWatchingState(record: DashboardShowRecord) {
-  const progress = getDashboardShowProgress(record);
-  const nextEpisode = getNextEpisodeToWatch(record.episodes, record.watchedEpisodes);
+function getContinueWatchingState(record: DashboardShowRecord, options: DashboardDateOptions = {}) {
+  const progress = getDashboardShowProgress(record, options);
+  const nextEpisode = getNextEpisodeToWatch(record.episodes, record.watchedEpisodes, options);
 
   if (
     !nextEpisode
@@ -254,9 +233,12 @@ function getContinueWatchingState(record: DashboardShowRecord) {
   return { nextEpisode, progress };
 }
 
-export function createDashboardSummary(records: DashboardShowRecord[]): DashboardSummary {
+export function createDashboardSummary(
+  records: DashboardShowRecord[],
+  options: DashboardDateOptions = {},
+): DashboardSummary {
   return records.reduce<DashboardSummary>((summary, record) => {
-    const progress = getDashboardShowProgress(record);
+    const progress = getDashboardShowProgress(record, options);
 
     return {
       caughtUpCount: summary.caughtUpCount + (progress.displayStatus === "caught_up" ? 1 : 0),
@@ -270,10 +252,13 @@ export function createDashboardSummary(records: DashboardShowRecord[]): Dashboar
   }, createEmptySummary());
 }
 
-function getContinueWatchingCandidates(records: DashboardShowRecord[]): ContinueWatchingCandidate[] {
+function getContinueWatchingCandidates(
+  records: DashboardShowRecord[],
+  options: DashboardDateOptions = {},
+): ContinueWatchingCandidate[] {
   return records
     .map((record) => {
-      const continueWatchingState = getContinueWatchingState(record);
+      const continueWatchingState = getContinueWatchingState(record, options);
 
       if (!continueWatchingState) {
         return null;
@@ -325,23 +310,25 @@ function applyContinueWatchingPreferences(
 export function getContinueWatchingItems(
   records: DashboardShowRecord[],
   preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+  options: DashboardDateOptions = {},
 ): ContinueWatchingItem[] {
-  return applyContinueWatchingPreferences(getContinueWatchingCandidates(records), preferences);
+  return applyContinueWatchingPreferences(getContinueWatchingCandidates(records, options), preferences);
 }
 
 export function createDashboardData(
   records: DashboardShowRecord[],
   preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+  options: DashboardDateOptions = {},
 ): DashboardData {
-  const candidates = getContinueWatchingCandidates(records);
+  const candidates = getContinueWatchingCandidates(records, options);
   const continueWatching = applyContinueWatchingPreferences(candidates, preferences);
 
   return {
     continueWatching,
     hiddenContinueWatchingCount: candidates.length - continueWatching.length,
-    startWatching: getStartWatchingItems(records),
+    startWatching: getStartWatchingItems(records, options),
     // Summary tiles intentionally represent the full library, independent of display preferences.
-    summary: createDashboardSummary(records),
-    upcomingEpisodes: getUpcomingEpisodeItems(records),
+    summary: createDashboardSummary(records, options),
+    upcomingEpisodes: getUpcomingEpisodeItems(records, options),
   };
 }

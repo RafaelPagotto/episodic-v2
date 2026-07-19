@@ -3,6 +3,8 @@ import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
 import type { UserPreferences } from "@/features/preferences";
 import { DEFAULT_USER_PREFERENCES } from "@/features/preferences/defaults";
+import { getUserDateOptions } from "@/features/profile/timezone";
+import { DEFAULT_TIME_ZONE } from "@/lib/date-only";
 
 import { getUserLibraryShows, LibraryDataError } from "../data";
 import type { LibraryShowCard } from "../types";
@@ -12,6 +14,7 @@ type LibraryPageState = {
   errorMessage: string;
   preferences: UserPreferences;
   shows: LibraryShowCard[];
+  timeZone: string;
 };
 
 async function getLibraryPageState(): Promise<LibraryPageState> {
@@ -22,6 +25,7 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
       errorMessage: "Supabase is not configured yet.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
@@ -34,19 +38,22 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
       errorMessage: "Sign in to view your library.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
   try {
-    const [shows, preferences] = await Promise.all([
-      getUserLibraryShows(supabase, user.id),
+    const [preferences, dateOptions] = await Promise.all([
       getUserPreferences(supabase, user.id),
+      getUserDateOptions(supabase, user.id),
     ]);
+    const shows = await getUserLibraryShows(supabase, user.id, dateOptions);
 
     return {
       errorMessage: "",
       preferences,
       shows,
+      timeZone: dateOptions.timeZone,
     };
   } catch (error) {
     return {
@@ -56,12 +63,13 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
           : "Unable to load your library.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 }
 
 export async function LibraryPageContent() {
-  const { errorMessage, preferences, shows } = await getLibraryPageState();
+  const { errorMessage, preferences, shows, timeZone } = await getLibraryPageState();
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -69,7 +77,7 @@ export async function LibraryPageContent() {
         description="Your saved shows, progress, favourites, and watch status."
         title="Library"
       />
-      <LibraryView initialShows={shows} loadError={errorMessage} preferences={preferences} />
+      <LibraryView initialShows={shows} loadError={errorMessage} preferences={preferences} timeZone={timeZone} />
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/page-header";
 import { Notice } from "@/components/ui/notice";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
+import { getUserDateOptions } from "@/features/profile/timezone";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
 
 import { DashboardDataError, getUserDashboardData } from "../data";
@@ -34,10 +35,13 @@ async function getDashboardPageState(): Promise<DashboardPageState> {
   }
 
   try {
-    const preferences = await getUserPreferences(supabase, user.id);
+    const [preferences, dateOptions] = await Promise.all([
+      getUserPreferences(supabase, user.id),
+      getUserDateOptions(supabase, user.id),
+    ]);
 
     return {
-      data: await getUserDashboardData(supabase, user.id, preferences),
+      data: await getUserDashboardData(supabase, user.id, preferences, dateOptions),
       errorMessage: "",
     };
   } catch (error) {

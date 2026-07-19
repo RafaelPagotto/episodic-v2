@@ -211,6 +211,35 @@ describe("show detail view model", () => {
     ).toBe(2);
   });
 
+  it("moves the default season only when the next episode releases in the user's timezone", () => {
+    const show = showDetail({
+      progress: {
+        displayStatus: "caught_up",
+        progressPercentage: 100,
+        status: "watching",
+        totalEpisodeCount: 1,
+        watchedEpisodeCount: 1,
+      },
+      seasons: [
+        season(1, [episode(1, 1, { airDate: "2026-07-18", watched: true })]),
+        season(2, [episode(2, 1, { airDate: "2026-07-19" })]),
+      ],
+    });
+
+    expect(
+      getShowDetailSeasonNavigation(show, null, {
+        referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+        timeZone: "America/Sao_Paulo",
+      }).activeSeasonNumber,
+    ).toBe(1);
+    expect(
+      getShowDetailSeasonNavigation(show, null, {
+        referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+        timeZone: "America/Sao_Paulo",
+      }).activeSeasonNumber,
+    ).toBe(2);
+  });
+
   it("defaults caught up and completed shows to the latest released main season", () => {
     const caughtUpShow = showDetail({
       progress: {

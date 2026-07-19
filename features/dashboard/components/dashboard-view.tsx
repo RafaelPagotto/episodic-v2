@@ -25,6 +25,7 @@ import { Notice } from "@/components/ui/notice";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
+import { formatDateOnly } from "../../../lib/date-only";
 
 import { markContinueWatchingEpisodeWatchedAction } from "../actions";
 import type {
@@ -49,21 +50,8 @@ type ActionMessage = {
   status: "error" | "success";
 };
 
-const upcomingDateFormatter = new Intl.DateTimeFormat("en", {
-  day: "numeric",
-  month: "short",
-  timeZone: "UTC",
-  year: "numeric",
-});
-
 function formatUpcomingAirDate(airDate: string) {
-  const date = new Date(`${airDate}T00:00:00.000Z`);
-
-  if (Number.isNaN(date.getTime())) {
-    return airDate;
-  }
-
-  return upcomingDateFormatter.format(date);
+  return formatDateOnly(airDate) ?? airDate;
 }
 
 function SummaryCard({ icon: Icon, label, value }: SummaryCardProps) {

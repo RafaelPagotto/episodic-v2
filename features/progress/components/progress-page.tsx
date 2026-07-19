@@ -5,6 +5,7 @@ import { DEFAULT_USER_PREFERENCES } from "@/features/preferences/defaults";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
 import type { UserPreferences } from "@/features/preferences/types";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserDateOptions } from "@/features/profile/timezone";
 
 import { ProgressView } from "./progress-view";
 import type { LibraryShowCard } from "@/features/library/types";
@@ -39,10 +40,11 @@ async function getProgressPageState(): Promise<ProgressPageState> {
   }
 
   try {
-    const [shows, preferences] = await Promise.all([
-      getUserLibraryShows(supabase, user.id),
+    const [preferences, dateOptions] = await Promise.all([
       getUserPreferences(supabase, user.id),
+      getUserDateOptions(supabase, user.id),
     ]);
+    const shows = await getUserLibraryShows(supabase, user.id, dateOptions);
 
     return {
       errorMessage: "",

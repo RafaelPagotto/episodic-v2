@@ -278,9 +278,9 @@ class FakeQuery {
   }
 }
 
-function episodeRow(seasonNumber: number, episodeNumber: number): EpisodeRow {
+function episodeRow(seasonNumber: number, episodeNumber: number, airDate = "2026-01-01"): EpisodeRow {
   return {
-    air_date: "2026-01-01",
+    air_date: airDate,
     episode_number: episodeNumber,
     id: seasonNumber * 10 + episodeNumber,
     overview: null,
@@ -327,6 +327,47 @@ describe("show progress actions", () => {
 
     expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
     expect(db.userShows[0]?.status).toBe("watched");
+  });
+
+  it("excludes future episodes from Mark Show Watched until local midnight", async () => {
+    const beforeDb = new FakeSupabase();
+    beforeDb.episodes = [episodeRow(1, 1, "2026-07-18"), episodeRow(1, 2, "2026-07-19")];
+    const beforeRelease = {
+      referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    };
+
+    await markShowWatched(client(beforeDb), USER_ID, SHOW_TMDB_ID, beforeRelease);
+    expect(watchedEpisodeKeys(beforeDb)).toEqual(["1:1"]);
+
+    const releaseDb = new FakeSupabase();
+    releaseDb.episodes = [episodeRow(1, 1, "2026-07-18"), episodeRow(1, 2, "2026-07-19")];
+
+    await markShowWatched(client(releaseDb), USER_ID, SHOW_TMDB_ID, {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(watchedEpisodeKeys(releaseDb)).toEqual(["1:1", "1:2"]);
+  });
+
+  it("excludes future episodes from Mark Season Watched until local midnight", async () => {
+    const beforeDb = new FakeSupabase();
+    beforeDb.episodes = [episodeRow(1, 1, "2026-07-18"), episodeRow(1, 2, "2026-07-19")];
+
+    await setSeasonWatched(client(beforeDb), USER_ID, SHOW_TMDB_ID, 1, true, {
+      referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(watchedEpisodeKeys(beforeDb)).toEqual(["1:1"]);
+
+    const releaseDb = new FakeSupabase();
+    releaseDb.episodes = [episodeRow(1, 1, "2026-07-18"), episodeRow(1, 2, "2026-07-19")];
+
+    await setSeasonWatched(client(releaseDb), USER_ID, SHOW_TMDB_ID, 1, true, {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(watchedEpisodeKeys(releaseDb)).toEqual(["1:1", "1:2"]);
   });
 
   it("marks show watched across paginated full-show episodes while excluding specials", async () => {
@@ -400,6 +441,25 @@ describe("show progress actions", () => {
     expect(db.userShows[0]?.status).toBe("watchlist");
   });
 
+  it("does not mark an individual episode watched before local release", async () => {
+    const db = new FakeSupabase();
+    db.episodes = [episodeRow(1, 1, "2026-07-19")];
+
+    await expect(
+      setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true, {
+        referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+        timeZone: "America/Sao_Paulo",
+      }),
+    ).rejects.toThrow("This episode has not been released yet.");
+    expect(watchedEpisodeKeys(db)).toEqual([]);
+
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true, {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1"]);
+  });
+
   it("marks exactly the displayed Continue Watching next episode", async () => {
     const db = new FakeSupabase();
     db.episodes.push(episodeRow(1, 3));
@@ -443,5 +503,32 @@ describe("show progress actions", () => {
       "No main-series episode is currently available",
     );
     expect(watchedEpisodeKeys(db)).toEqual(["1:1"]);
+  });
+
+  it("does not let Continue Watching expose an episode before local release", async () => {
+    const db = new FakeSupabase();
+    db.episodes = [episodeRow(1, 1, "2026-07-18"), episodeRow(1, 2, "2026-07-19")];
+    db.upsertWatchedEpisodes([
+      {
+        episode_number: 1,
+        season_number: 1,
+        show_tmdb_id: SHOW_TMDB_ID,
+        user_id: USER_ID,
+      },
+    ]);
+
+    await expect(
+      markContinueWatchingNextEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, {
+        referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+        timeZone: "America/Sao_Paulo",
+      }),
+    ).rejects.toThrow("No main-series episode is currently available to continue.");
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1"]);
+
+    await markContinueWatchingNextEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    });
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
   });
 });

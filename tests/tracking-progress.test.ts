@@ -10,6 +10,7 @@ import {
   getReleasedSpecialEpisodes,
   getReleasedTrackableEpisodes,
   isMainSeriesEpisode,
+  isEpisodeTrackable,
   isSpecialEpisode,
   isTrackingStatus,
   isShowCompleted,
@@ -61,6 +62,81 @@ describe("tracking progress helpers", () => {
 
     expect(calculateTotalEpisodeCount(episodes, options)).toBe(2);
     expect(calculateWatchedEpisodeCount(episodes, [watched(1, 1), watched(1, 3)], options)).toBe(1);
+  });
+
+  it("changes release eligibility at local midnight in America/Sao_Paulo", () => {
+    const julyNineteenth = episode(1, 1, "2026-07-19");
+    const options = { timeZone: "America/Sao_Paulo" };
+
+    expect(
+      isEpisodeTrackable(julyNineteenth, {
+        ...options,
+        referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+      }),
+    ).toBe(false);
+    expect(
+      isEpisodeTrackable(julyNineteenth, {
+        ...options,
+        referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      }),
+    ).toBe(true);
+  });
+
+  it("changes release eligibility at local midnight in a positive-offset timezone", () => {
+    const julyNineteenth = episode(1, 1, "2026-07-19");
+    const options = { timeZone: "Pacific/Kiritimati" };
+
+    expect(
+      isEpisodeTrackable(julyNineteenth, {
+        ...options,
+        referenceDate: new Date("2026-07-18T09:30:00.000Z"),
+      }),
+    ).toBe(false);
+    expect(
+      isEpisodeTrackable(julyNineteenth, {
+        ...options,
+        referenceDate: new Date("2026-07-18T10:00:00.000Z"),
+      }),
+    ).toBe(true);
+  });
+
+  it("updates progress and display status only on the user's local release date", () => {
+    const episodes = [episode(1, 1, "2026-07-18"), episode(1, 2, "2026-07-19")];
+    const watchedEpisodes = [watched(1, 1)];
+    const beforeRelease = {
+      referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    };
+    const atRelease = {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    };
+    const beforeTotal = calculateTotalEpisodeCount(episodes, beforeRelease);
+    const afterTotal = calculateTotalEpisodeCount(episodes, atRelease);
+
+    expect(beforeTotal).toBe(1);
+    expect(afterTotal).toBe(2);
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount: beforeTotal,
+        trackingStatus: "watching",
+        watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, beforeRelease),
+      }),
+    ).toBe("caught_up");
+    expect(
+      deriveDisplayStatus({
+        tmdbStatus: "Returning Series",
+        totalEpisodeCount: afterTotal,
+        trackingStatus: "watching",
+        watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, watchedEpisodes, atRelease),
+      }),
+    ).toBe("watching");
+  });
+
+  it("preserves trackable behavior for null and invalid air dates", () => {
+    expect(isEpisodeTrackable(episode(1, 1, null), { referenceDate: "2026-07-18" })).toBe(true);
+    expect(isEpisodeTrackable(episode(1, 2, "2026-02-29"), { referenceDate: "2026-07-18" })).toBe(true);
   });
 
   it("classifies specials and excludes season 0 from main progress counts", () => {

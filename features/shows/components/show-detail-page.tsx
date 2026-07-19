@@ -1,6 +1,8 @@
 import { PageHeader } from "@/components/page-header";
 import { Notice } from "@/components/ui/notice";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserDateOptions } from "@/features/profile/timezone";
+import { DEFAULT_TIME_ZONE, getDateOnlyForTimeZone } from "@/lib/date-only";
 
 import { getUserShowDetail, ShowDataError } from "../data";
 import type { ShowDetail } from "../types";
@@ -13,7 +15,9 @@ type ShowDetailPageContentProps = {
 
 type ShowDetailPageState = {
   errorMessage: string;
+  referenceDate: string;
   show: ShowDetail | null;
+  timeZone: string;
 };
 
 async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageState> {
@@ -22,7 +26,9 @@ async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageSta
   if (!supabase) {
     return {
       errorMessage: "Supabase is not configured yet.",
+      referenceDate: getDateOnlyForTimeZone(),
       show: null,
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
@@ -33,34 +39,43 @@ async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageSta
   if (!user) {
     return {
       errorMessage: "Sign in to view this show.",
+      referenceDate: getDateOnlyForTimeZone(),
       show: null,
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
   try {
-    const show = await getUserShowDetail(supabase, user.id, tmdbId);
+    const dateOptions = await getUserDateOptions(supabase, user.id);
+    const show = await getUserShowDetail(supabase, user.id, tmdbId, dateOptions);
 
     if (!show) {
       return {
         errorMessage: "This show is not in your library.",
+        referenceDate: dateOptions.referenceDate,
         show: null,
+        timeZone: dateOptions.timeZone,
       };
     }
 
     return {
       errorMessage: "",
+      referenceDate: dateOptions.referenceDate,
       show,
+      timeZone: dateOptions.timeZone,
     };
   } catch (error) {
     return {
       errorMessage: error instanceof ShowDataError ? error.message : "Unable to load this show.",
+      referenceDate: getDateOnlyForTimeZone(),
       show: null,
+      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 }
 
 export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }: ShowDetailPageContentProps) {
-  const { errorMessage, show } = await getShowDetailPageState(tmdbId);
+  const { errorMessage, referenceDate, show, timeZone } = await getShowDetailPageState(tmdbId);
 
   if (errorMessage || !show) {
     return (
@@ -74,5 +89,12 @@ export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }:
     );
   }
 
-  return <ShowDetailView initialSeasonParam={seasonQueryParam} show={show} />;
+  return (
+    <ShowDetailView
+      initialSeasonParam={seasonQueryParam}
+      referenceDate={referenceDate}
+      show={show}
+      timeZone={timeZone}
+    />
+  );
 }

@@ -12,6 +12,7 @@ import {
   mapWatchedEpisodeRow,
 } from "../tracking";
 import type { Episode, WatchedEpisode } from "../tracking";
+import type { EpisodeCalculationOptions } from "../tracking";
 import type { DashboardShowRecord } from "./types";
 import { createDashboardData, getContinueWatchingNextEpisode } from "./view-model";
 
@@ -75,6 +76,7 @@ export async function getUserDashboardData(
   supabase: EpisodicSupabaseClient,
   userId: string,
   preferences: UserPreferences = DEFAULT_USER_PREFERENCES,
+  options: EpisodeCalculationOptions = {},
 ) {
   const { data: userShows, error: userShowsError } = await supabase
     .from("user_shows")
@@ -85,7 +87,7 @@ export async function getUserDashboardData(
   throwDataError(userShowsError, "Unable to load your dashboard.");
 
   if (!userShows || userShows.length === 0) {
-    return createDashboardData([], preferences);
+    return createDashboardData([], preferences, options);
   }
 
   const showIds = userShows.map((show) => show.show_tmdb_id);
@@ -112,7 +114,7 @@ export async function getUserDashboardData(
     ),
   );
 
-  return createDashboardData(records, preferences);
+  return createDashboardData(records, preferences, options);
 }
 
 export async function markContinueWatchingNextEpisodeWatched(
@@ -121,6 +123,7 @@ export async function markContinueWatchingNextEpisodeWatched(
   tmdbId: number,
   seasonNumber: number,
   episodeNumber: number,
+  options: EpisodeCalculationOptions = {},
 ) {
   const [
     { data: userShows, error: userShowsError },
@@ -165,7 +168,7 @@ export async function markContinueWatchingNextEpisodeWatched(
     (episodes ?? []).map(mapEpisodeRow),
     (watchedEpisodes ?? []).map(mapWatchedEpisodeRow),
   );
-  const nextEpisode = getContinueWatchingNextEpisode(record);
+  const nextEpisode = getContinueWatchingNextEpisode(record, options);
 
   if (!nextEpisode) {
     throw new DashboardDataError("No main-series episode is currently available to continue.");
@@ -175,5 +178,5 @@ export async function markContinueWatchingNextEpisodeWatched(
     throw new DashboardDataError("The next episode has changed. Refresh and try again.");
   }
 
-  await setEpisodeWatched(supabase, userId, tmdbId, seasonNumber, episodeNumber, true);
+  await setEpisodeWatched(supabase, userId, tmdbId, seasonNumber, episodeNumber, true, options);
 }

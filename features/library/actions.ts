@@ -12,6 +12,7 @@ import type {
   FavouriteActionInput,
 } from "@/features/tracking/action-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserDateOptions } from "../profile/timezone";
 
 import {
   removeShowFromUserLibrary,
@@ -129,7 +130,8 @@ export async function updateShowDroppedAction(
       return removeShowError("Sign in to manage your library.", tmdbId);
     }
 
-    const trackingStatus = await updateUserShowDropped(supabase, user.id, tmdbId, dropped);
+    const dateOptions = await getUserDateOptions(supabase, user.id);
+    const trackingStatus = await updateUserShowDropped(supabase, user.id, tmdbId, dropped, dateOptions);
     revalidateLibraryMutation(tmdbId);
 
     return {

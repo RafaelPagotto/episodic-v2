@@ -9,6 +9,7 @@ import {
   isShowTmdbId,
 } from "@/features/tracking/action-validation";
 import { upsertTmdbShowMetadata } from "@/features/search/data";
+import { getUserDateOptions } from "../profile/timezone";
 import { createOptionalSupabaseServiceRoleClient } from "@/lib/supabase/admin";
 import type {
   EpisodeWatchedActionInput,
@@ -86,7 +87,16 @@ export async function setEpisodeWatchedAction(
       return context.error;
     }
 
-    await setEpisodeWatched(context.supabase, context.user.id, tmdbId, seasonNumber, episodeNumber, watched);
+    const dateOptions = await getUserDateOptions(context.supabase, context.user.id);
+    await setEpisodeWatched(
+      context.supabase,
+      context.user.id,
+      tmdbId,
+      seasonNumber,
+      episodeNumber,
+      watched,
+      dateOptions,
+    );
     revalidateShow(tmdbId);
 
     return {
@@ -116,7 +126,8 @@ export async function setSeasonWatchedAction(
       return context.error;
     }
 
-    await setSeasonWatched(context.supabase, context.user.id, tmdbId, seasonNumber, watched);
+    const dateOptions = await getUserDateOptions(context.supabase, context.user.id);
+    await setSeasonWatched(context.supabase, context.user.id, tmdbId, seasonNumber, watched, dateOptions);
     revalidateShow(tmdbId);
 
     return {
@@ -142,7 +153,8 @@ export async function markShowWatchedAction(tmdbId: number): Promise<ShowProgres
       return context.error;
     }
 
-    await markShowWatched(context.supabase, context.user.id, tmdbId);
+    const dateOptions = await getUserDateOptions(context.supabase, context.user.id);
+    await markShowWatched(context.supabase, context.user.id, tmdbId, dateOptions);
     revalidateShow(tmdbId);
 
     return {
@@ -168,7 +180,8 @@ export async function resetShowProgressAction(tmdbId: number): Promise<ShowProgr
       return context.error;
     }
 
-    await resetShowProgress(context.supabase, context.user.id, tmdbId);
+    const dateOptions = await getUserDateOptions(context.supabase, context.user.id);
+    await resetShowProgress(context.supabase, context.user.id, tmdbId, dateOptions);
     revalidateShow(tmdbId);
 
     return {

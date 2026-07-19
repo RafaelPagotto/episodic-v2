@@ -80,6 +80,7 @@ describe("search mappers", () => {
       first_air_date: "2008-01-20",
       genres: [{ id: 18, name: "Drama" }],
       last_synced_at: syncedAt,
+      last_air_date: "2013-09-29",
       metadata: {
         episodeRunTime: [45],
         numberOfEpisodes: 62,
@@ -94,6 +95,7 @@ describe("search mappers", () => {
 
   it("maps normalized TMDB seasons and episodes into insert rows", () => {
     expect(mapTmdbSeasonToSeasonInsert(tmdbShow.seasons[0], syncedAt)).toMatchObject({
+      air_date: "2008-01-20",
       episode_count: 7,
       last_synced_at: syncedAt,
       name: "Season 1",
@@ -103,6 +105,7 @@ describe("search mappers", () => {
     });
 
     expect(mapTmdbEpisodeToEpisodeInsert(tmdbShow.episodes[0], syncedAt)).toMatchObject({
+      air_date: "2008-01-20",
       episode_number: 1,
       last_synced_at: syncedAt,
       runtime_minutes: 58,

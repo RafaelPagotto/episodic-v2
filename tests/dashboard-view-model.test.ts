@@ -303,6 +303,41 @@ describe("dashboard view model", () => {
     });
   });
 
+  it("keeps an episode in Upcoming and out of Continue Watching until local release", () => {
+    const records = [
+      record({
+        episodes: [
+          episode(99, 1, 1, { airDate: "2026-07-18" }),
+          episode(99, 1, 2, { airDate: "2026-07-19" }),
+        ],
+        showTmdbId: 99,
+        status: "watching",
+        watchedEpisodes: [watched(99, 1, 1)],
+      }),
+    ];
+    const beforeRelease = {
+      referenceDate: new Date("2026-07-19T02:30:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    };
+    const atRelease = {
+      referenceDate: new Date("2026-07-19T03:00:00.000Z"),
+      timeZone: "America/Sao_Paulo",
+    };
+
+    expect(getContinueWatchingItems(records, preferences(), beforeRelease)).toEqual([]);
+    expect(getUpcomingEpisodeItems(records, beforeRelease)).toEqual([
+      expect.objectContaining({ airDate: "2026-07-19", episodeNumber: 2, tmdbId: 99 }),
+    ]);
+
+    expect(getContinueWatchingItems(records, preferences(), atRelease)).toEqual([
+      expect.objectContaining({
+        nextEpisode: expect.objectContaining({ episodeNumber: 2 }),
+        tmdbId: 99,
+      }),
+    ]);
+    expect(getUpcomingEpisodeItems(records, atRelease)).toEqual([]);
+  });
+
   it("excludes specials, null dates, watched future episodes, and inactive shows", () => {
     const items = getUpcomingEpisodeItems(
       [

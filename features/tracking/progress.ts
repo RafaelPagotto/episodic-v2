@@ -1,4 +1,5 @@
 import type { DisplayStatus, Episode, TrackingStatus, WatchedEpisode } from "./types";
+import { compareDateOnly, getReferenceDateOnly, isDateOnly } from "../../lib/date-only";
 
 type EpisodeIdentity = Pick<Episode, "episodeNumber" | "seasonNumber" | "showTmdbId">;
 
@@ -9,8 +10,9 @@ type DisplayStatusInput = {
   watchedEpisodeCount: number;
 };
 
-type EpisodeCalculationOptions = {
+export type EpisodeCalculationOptions = {
   referenceDate?: Date | string;
+  timeZone?: string | null;
 };
 
 type ProgressInput = {
@@ -57,31 +59,14 @@ function watchedEpisodeKeySet(watchedEpisodes: WatchedEpisode[]) {
   return new Set(watchedEpisodes.map((episode) => buildEpisodeKey(episode)));
 }
 
-function getReferenceDateValue(referenceDate: EpisodeCalculationOptions["referenceDate"] = new Date()) {
-  const date = typeof referenceDate === "string" ? new Date(referenceDate) : referenceDate;
-
-  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
-}
-
-function getAirDateValue(airDate: string | null) {
-  if (!airDate) {
-    return null;
-  }
-
-  const parsedDate = new Date(`${airDate}T00:00:00.000Z`);
-  const timestamp = parsedDate.getTime();
-
-  return Number.isNaN(timestamp) ? null : timestamp;
-}
-
 export function isEpisodeTrackable(episode: Episode, options: EpisodeCalculationOptions = {}) {
-  const airDateValue = getAirDateValue(episode.airDate);
-
-  if (airDateValue === null) {
+  // Unknown or invalid TMDB dates preserve the existing behavior and remain trackable.
+  if (!isDateOnly(episode.airDate)) {
     return true;
   }
 
-  return airDateValue <= getReferenceDateValue(options.referenceDate);
+  const referenceDate = getReferenceDateOnly(options.referenceDate, options.timeZone);
+  return compareDateOnly(episode.airDate, referenceDate) <= 0;
 }
 
 export function getReleasedEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {

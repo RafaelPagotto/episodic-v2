@@ -1,4 +1,5 @@
 import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ShowDetailView } from "../features/shows/components/show-detail-view";
@@ -64,17 +65,17 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/card", () => ({
-  Card: function CardMock() {
-    return null;
+  Card: function CardMock({ children }: { children?: React.ReactNode }) {
+    return <div>{children}</div>;
   },
-  CardContent: function CardContentMock() {
-    return null;
+  CardContent: function CardContentMock({ children }: { children?: React.ReactNode }) {
+    return <div>{children}</div>;
   },
-  CardHeader: function CardHeaderMock() {
-    return null;
+  CardHeader: function CardHeaderMock({ children }: { children?: React.ReactNode }) {
+    return <div>{children}</div>;
   },
-  CardTitle: function CardTitleMock() {
-    return null;
+  CardTitle: function CardTitleMock({ children }: { children?: React.ReactNode }) {
+    return <div>{children}</div>;
   },
 }));
 
@@ -188,9 +189,9 @@ function showDetail(overrides: Partial<ShowDetail> = {}): ShowDetail {
   };
 }
 
-function renderShowDetail(show: ShowDetail = showDetail()) {
+function renderShowDetail(show: ShowDetail = showDetail(), timeZone = "UTC") {
   hookState.stateIndex = 0;
-  return ShowDetailView({ show });
+  return ShowDetailView({ show, timeZone });
 }
 
 function getText(node: React.ReactNode): string {
@@ -315,5 +316,21 @@ describe("ShowDetailView refresh metadata UI", () => {
     const tree = renderShowDetail();
 
     expect(hasText(/Metadata last refreshed .*2026/, tree)).toBe(true);
+  });
+
+  it("preserves episode, season, and show calendar dates in a negative-offset timezone", () => {
+    const show = showDetail({
+      firstAirDate: "2026-07-21",
+      lastSyncedAt: "2026-07-19T02:30:00.000Z",
+      seasons: [
+        season(1, [episode(1, 1, { airDate: "2026-07-19" })], { airDate: "2026-07-20" }),
+      ],
+    });
+    const markup = renderToStaticMarkup(renderShowDetail(show, "America/Sao_Paulo"));
+
+    expect(markup).toContain("Jul 19, 2026");
+    expect(markup).toContain("Jul 20, 2026");
+    expect(markup).toContain("Jul 21, 2026");
+    expect(markup).toContain("Metadata last refreshed Jul 18, 2026");
   });
 });

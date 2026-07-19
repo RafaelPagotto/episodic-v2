@@ -16,6 +16,7 @@ import { getShowDetailHref } from "@/features/shows";
 import { markShowWatchedAction } from "@/features/shows/actions";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
+import { formatTimestamp } from "../../../lib/date-time";
 
 import {
   removeShowFromLibraryAction,
@@ -50,6 +51,7 @@ type LibraryViewProps = {
   initialShows: LibraryShowCard[];
   loadError: string;
   preferences: UserPreferences;
+  timeZone?: string;
 };
 
 type LibraryMessage = {
@@ -57,12 +59,8 @@ type LibraryMessage = {
   status: "error" | "success";
 };
 
-function formatAddedDate(value: string) {
-  return new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
+function formatAddedDate(value: string, timeZone: string) {
+  return formatTimestamp(value, "en", { timeZone }) ?? value;
 }
 
 function LibraryPosterLink({ show }: { show: LibraryShowCard }) {
@@ -133,7 +131,7 @@ function LibraryStatusBadge({ show }: { show: LibraryShowCard }) {
   );
 }
 
-export function LibraryView({ initialShows, loadError, preferences }: LibraryViewProps) {
+export function LibraryView({ initialShows, loadError, preferences, timeZone = "UTC" }: LibraryViewProps) {
   const [filter, setFilter] = useState<LibraryFilter>("all");
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<LibraryMessage | null>(null);
@@ -549,7 +547,9 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                           <LibraryStatusBadge show={show} />
-                          <span className="rounded-full border px-2 py-1">Added {formatAddedDate(show.addedAt)}</span>
+                          <span className="rounded-full border px-2 py-1">
+                            Added {formatAddedDate(show.addedAt, timeZone)}
+                          </span>
                         </div>
                       </div>
 

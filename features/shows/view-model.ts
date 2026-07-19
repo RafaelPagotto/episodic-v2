@@ -3,6 +3,7 @@ import {
   isMainSeriesEpisode,
   type DisplayStatus,
   type Episode,
+  type EpisodeCalculationOptions,
 } from "../tracking";
 
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason } from "./types";
@@ -18,9 +19,7 @@ export const SHOW_DETAIL_STATUS_LABELS: Record<DisplayStatus, string> = {
 export const SPECIALS_OPTIONAL_NOTE =
   "Specials are optional extras and do not affect main progress or status.";
 
-type SeasonNavigationOptions = {
-  referenceDate?: Date | string;
-};
+type SeasonNavigationOptions = EpisodeCalculationOptions;
 
 export type ShowDetailSeasonOption = {
   label: string;

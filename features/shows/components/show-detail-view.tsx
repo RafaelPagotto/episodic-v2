@@ -17,6 +17,8 @@ import {
 } from "@/features/library/actions";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
+import { formatDateOnly } from "../../../lib/date-only";
+import { formatTimestamp } from "../../../lib/date-time";
 
 import {
   markShowWatchedAction,
@@ -36,25 +38,15 @@ import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActio
 
 type ShowDetailViewProps = {
   initialSeasonParam?: string | null;
+  referenceDate?: string;
   show: ShowDetail;
+  timeZone?: string;
 };
 
 type ActionMessage = {
   message: string;
   status: "error" | "success";
 };
-
-function formatDate(value: string | null) {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  }).format(new Date(value));
-}
 
 function getSeasonActionId(seasonNumber: number, watched: boolean) {
   return `season:${seasonNumber}:${watched ? "watch" : "unwatch"}`;
@@ -102,7 +94,7 @@ function EpisodeRow({
   const nextWatched = !episode.watched;
   const actionId = getEpisodeActionId(episode, nextWatched);
   const isPending = pendingAction === actionId;
-  const airDate = formatDate(episode.airDate);
+  const airDate = formatDateOnly(episode.airDate);
 
   return (
     <div className="grid gap-3 border-t py-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
@@ -163,7 +155,7 @@ function SeasonPanel({
   const nextWatched = !seasonComplete;
   const actionId = getSeasonActionId(season.seasonNumber, nextWatched);
   const isPending = pendingAction === actionId;
-  const airDate = formatDate(season.airDate);
+  const airDate = formatDateOnly(season.airDate);
 
   return (
     <Card>
@@ -222,16 +214,21 @@ function SeasonPanel({
   );
 }
 
-export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailViewProps) {
+export function ShowDetailView({
+  initialSeasonParam = null,
+  referenceDate,
+  show,
+  timeZone = "UTC",
+}: ShowDetailViewProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<ActionMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [activeSeasonNumber, setActiveSeasonNumber] = useState(
-    () => getShowDetailSeasonNavigation(show, initialSeasonParam).activeSeasonNumber,
+    () => getShowDetailSeasonNavigation(show, initialSeasonParam, { referenceDate, timeZone }).activeSeasonNumber,
   );
 
-  const seasonNavigation = getShowDetailSeasonNavigation(show, activeSeasonNumber);
+  const seasonNavigation = getShowDetailSeasonNavigation(show, activeSeasonNumber, { referenceDate, timeZone });
 
   useEffect(() => {
     if (activeSeasonNumber !== seasonNavigation.activeSeasonNumber) {
@@ -366,8 +363,8 @@ export function ShowDetailView({ initialSeasonParam = null, show }: ShowDetailVi
     show.progress.totalEpisodeCount > 0
     && show.progress.watchedEpisodeCount >= show.progress.totalEpisodeCount;
   const controls = getShowDetailActionLabels(show);
-  const firstAirDate = formatDate(show.firstAirDate);
-  const lastSyncedAt = formatDate(show.lastSyncedAt);
+  const firstAirDate = formatDateOnly(show.firstAirDate);
+  const lastSyncedAt = formatTimestamp(show.lastSyncedAt, "en", { timeZone });
 
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">

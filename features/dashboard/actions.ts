@@ -10,6 +10,7 @@ import {
 } from "../tracking/action-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isRecord } from "@/lib/validations/numbers";
+import { getUserDateOptions } from "../profile/timezone";
 
 import { DashboardDataError, markContinueWatchingNextEpisodeWatched } from "./data";
 
@@ -90,12 +91,14 @@ export async function markContinueWatchingEpisodeWatchedAction(
       return context.error;
     }
 
+    const dateOptions = await getUserDateOptions(context.supabase, context.user.id);
     await markContinueWatchingNextEpisodeWatched(
       context.supabase,
       context.user.id,
       input.tmdbId,
       input.seasonNumber,
       input.episodeNumber,
+      dateOptions,
     );
     revalidateDashboardTrackingPaths(input.tmdbId);
 

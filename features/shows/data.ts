@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/lib/supabase/types";
 
-import type { Episode, TrackingStatus, WatchedEpisode } from "../tracking";
+import type { Episode, EpisodeCalculationOptions, TrackingStatus, WatchedEpisode } from "../tracking";
 import {
   buildEpisodeKey,
   calculateProgressPercentage,
@@ -14,6 +14,7 @@ import {
   deriveTrackingStatusAfterProgressChange,
   getReleasedEpisodes,
   getReleasedTrackableEpisodes,
+  isEpisodeTrackable,
   loadEpisodesByShowIds,
   loadWatchedEpisodesByShowIds,
   mapEpisodeRow,
@@ -55,9 +56,10 @@ function getProgress(
   episodes: Episode[],
   watchedEpisodes: WatchedEpisode[],
   tmdbStatus?: string | null,
+  options: EpisodeCalculationOptions = {},
 ): ShowProgress {
-  const totalEpisodeCount = calculateTotalEpisodeCount(episodes);
-  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes);
+  const totalEpisodeCount = calculateTotalEpisodeCount(episodes, options);
+  const watchedEpisodeCount = calculateWatchedEpisodeCount(episodes, watchedEpisodes, options);
 
   return {
     displayStatus: deriveDisplayStatus({
@@ -81,9 +83,10 @@ function getSeasonProgress(
   episodes: Episode[],
   watchedEpisodes: WatchedEpisode[],
   tmdbStatus?: string | null,
+  options: EpisodeCalculationOptions = {},
 ): ShowProgress {
-  const totalEpisodeCount = calculateReleasedEpisodeCount(episodes);
-  const watchedEpisodeCount = calculateReleasedWatchedEpisodeCount(episodes, watchedEpisodes);
+  const totalEpisodeCount = calculateReleasedEpisodeCount(episodes, options);
+  const watchedEpisodeCount = calculateReleasedWatchedEpisodeCount(episodes, watchedEpisodes, options);
 
   return {
     displayStatus: deriveDisplayStatus({
@@ -123,6 +126,7 @@ function createSeasonDetail(
   watchedEpisodes: WatchedEpisode[],
   watchedEpisodeKeys: Set<string>,
   tmdbStatus?: string | null,
+  options: EpisodeCalculationOptions = {},
 ): ShowDetailSeason {
   return {
     airDate: season?.air_date ?? null,
@@ -131,7 +135,7 @@ function createSeasonDetail(
     name: season?.name ?? `Season ${seasonNumber}`,
     overview: season?.overview ?? null,
     posterPath: season?.poster_path ?? null,
-    progress: getSeasonProgress(status, episodes, watchedEpisodes, tmdbStatus),
+    progress: getSeasonProgress(status, episodes, watchedEpisodes, tmdbStatus, options),
     seasonNumber,
   };
 }
@@ -142,6 +146,7 @@ function createShowDetail(
   seasons: SeasonRow[],
   episodes: Episode[],
   watchedEpisodes: WatchedEpisode[],
+  options: EpisodeCalculationOptions,
 ): ShowDetail {
   const episodesBySeason = groupBySeasonNumber(episodes);
   const seasonsByNumber = new Map(seasons.map((season) => [season.season_number, season]));
@@ -157,7 +162,7 @@ function createShowDetail(
     lastSyncedAt: show?.last_synced_at ?? null,
     overview: show?.overview ?? null,
     posterPath: show?.poster_path ?? null,
-    progress: getProgress(userShow.status, episodes, watchedEpisodes, show?.tmdb_status ?? null),
+    progress: getProgress(userShow.status, episodes, watchedEpisodes, show?.tmdb_status ?? null, options),
     seasons: seasonNumbers.map((seasonNumber) => {
       const seasonEpisodes = episodesBySeason.get(seasonNumber) ?? [];
       const seasonWatchedEpisodes = watchedEpisodes.filter((episode) => episode.seasonNumber === seasonNumber);
@@ -170,6 +175,7 @@ function createShowDetail(
         seasonWatchedEpisodes,
         watchedEpisodeKeys,
         show?.tmdb_status ?? null,
+        options,
       );
     }),
     title: show?.title ?? `Show ${userShow.show_tmdb_id}`,
@@ -238,14 +244,15 @@ async function updateUserShowStatusFromProgress(
   supabase: EpisodicSupabaseClient,
   userShow: UserShowRow,
   watchedEpisodes?: WatchedEpisode[],
+  options: EpisodeCalculationOptions = {},
 ) {
   const episodes = await getFullShowEpisodes(supabase, userShow.show_tmdb_id);
   const currentWatchedEpisodes =
     watchedEpisodes ?? (await getFullShowWatchedEpisodes(supabase, userShow.user_id, userShow.show_tmdb_id));
   const nextStatus = deriveTrackingStatusAfterProgressChange({
-    totalEpisodeCount: calculateTotalEpisodeCount(episodes),
+    totalEpisodeCount: calculateTotalEpisodeCount(episodes, options),
     trackingStatus: userShow.status,
-    watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, currentWatchedEpisodes),
+    watchedEpisodeCount: calculateWatchedEpisodeCount(episodes, currentWatchedEpisodes, options),
   });
 
   if (nextStatus === userShow.status) {
@@ -279,8 +286,8 @@ function watchedEpisodeInsertFromTrackedEpisode(episode: Episode, userId: string
   };
 }
 
-function getReleasedEpisodeRows(episodes: EpisodeRow[]) {
-  const trackableKeys = new Set(getReleasedEpisodes(episodes.map(mapEpisodeRow)).map(buildEpisodeKey));
+function getReleasedEpisodeRows(episodes: EpisodeRow[], options: EpisodeCalculationOptions) {
+  const trackableKeys = new Set(getReleasedEpisodes(episodes.map(mapEpisodeRow), options).map(buildEpisodeKey));
 
   return episodes.filter((episode) => trackableKeys.has(buildEpisodeKey(mapEpisodeRow(episode))));
 }
@@ -289,6 +296,7 @@ export async function getUserShowDetail(
   supabase: EpisodicSupabaseClient,
   userId: string,
   tmdbId: number,
+  options: EpisodeCalculationOptions = {},
 ) {
   const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
 
@@ -311,7 +319,7 @@ export async function getUserShowDetail(
   throwDataError(showError, "Unable to load show details.");
   throwDataError(seasonsError, "Unable to load seasons.");
 
-  return createShowDetail(userShow, shows?.[0], seasons ?? [], episodes, watchedEpisodes);
+  return createShowDetail(userShow, shows?.[0], seasons ?? [], episodes, watchedEpisodes, options);
 }
 
 export async function setEpisodeWatched(
@@ -321,6 +329,7 @@ export async function setEpisodeWatched(
   seasonNumber: number,
   episodeNumber: number,
   watched: boolean,
+  options: EpisodeCalculationOptions = {},
 ) {
   const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
 
@@ -344,6 +353,10 @@ export async function setEpisodeWatched(
     throw new ShowDataError("Episode not found.");
   }
 
+  if (watched && !isEpisodeTrackable(mapEpisodeRow(episode), options)) {
+    throw new ShowDataError("This episode has not been released yet.");
+  }
+
   if (watched) {
     const { error } = await supabase
       .from("watched_episodes")
@@ -364,7 +377,7 @@ export async function setEpisodeWatched(
     throwDataError(error, "Unable to mark episode unwatched.");
   }
 
-  await updateUserShowStatusFromProgress(supabase, userShow);
+  await updateUserShowStatusFromProgress(supabase, userShow, undefined, options);
 }
 
 export async function setSeasonWatched(
@@ -373,6 +386,7 @@ export async function setSeasonWatched(
   tmdbId: number,
   seasonNumber: number,
   watched: boolean,
+  options: EpisodeCalculationOptions = {},
 ) {
   const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
 
@@ -387,7 +401,7 @@ export async function setSeasonWatched(
   }
 
   if (watched) {
-    const trackableEpisodes = getReleasedEpisodeRows(episodes);
+    const trackableEpisodes = getReleasedEpisodeRows(episodes, options);
 
     if (trackableEpisodes.length === 0) {
       throw new ShowDataError("No released episodes found for this season.");
@@ -411,13 +425,14 @@ export async function setSeasonWatched(
     throwDataError(error, "Unable to mark season unwatched.");
   }
 
-  await updateUserShowStatusFromProgress(supabase, userShow);
+  await updateUserShowStatusFromProgress(supabase, userShow, undefined, options);
 }
 
 export async function markShowWatched(
   supabase: EpisodicSupabaseClient,
   userId: string,
   tmdbId: number,
+  options: EpisodeCalculationOptions = {},
 ) {
   const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
 
@@ -431,7 +446,7 @@ export async function markShowWatched(
     throw new ShowDataError("No episodes found for this show.");
   }
 
-  const trackableEpisodes = getReleasedTrackableEpisodes(episodes);
+  const trackableEpisodes = getReleasedTrackableEpisodes(episodes, options);
 
   if (trackableEpisodes.length === 0) {
     throw new ShowDataError("No released episodes found for this show.");
@@ -445,13 +460,14 @@ export async function markShowWatched(
 
   throwDataError(error, "Unable to mark show watched.");
 
-  await updateUserShowStatusFromProgress(supabase, userShow);
+  await updateUserShowStatusFromProgress(supabase, userShow, undefined, options);
 }
 
 export async function resetShowProgress(
   supabase: EpisodicSupabaseClient,
   userId: string,
   tmdbId: number,
+  options: EpisodeCalculationOptions = {},
 ) {
   const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
 
@@ -467,5 +483,5 @@ export async function resetShowProgress(
 
   throwDataError(error, "Unable to reset show progress.");
 
-  await updateUserShowStatusFromProgress(supabase, userShow, []);
+  await updateUserShowStatusFromProgress(supabase, userShow, [], options);
 }

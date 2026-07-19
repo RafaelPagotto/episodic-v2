@@ -12,6 +12,7 @@ import type {
   LibrarySortOption,
   LibraryViewMode,
 } from "./types";
+import { compareDateOnly, isDateOnly } from "../../lib/date-only";
 
 export const LIBRARY_FILTERS: Array<{ label: string; value: LibraryFilter }> = [
   { label: "All", value: "all" },
@@ -128,7 +129,8 @@ export function sortLibraryShows(
     }
 
     if (sort === "release") {
-      return compareDates(left.firstAirDate, right.firstAirDate, direction) || left.title.localeCompare(right.title);
+      return compareDateOnlyValues(left.firstAirDate, right.firstAirDate, direction)
+        || left.title.localeCompare(right.title);
     }
 
     if (sort === "progress") {
@@ -178,6 +180,26 @@ function getDateSortValue(value: string | null) {
   const timestamp = new Date(value).getTime();
 
   return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+function compareDateOnlyValues(left: string | null, right: string | null, direction: LibrarySortDirection) {
+  const validLeft = isDateOnly(left) ? left : null;
+  const validRight = isDateOnly(right) ? right : null;
+
+  if (validLeft === null && validRight === null) {
+    return 0;
+  }
+
+  if (validLeft === null) {
+    return 1;
+  }
+
+  if (validRight === null) {
+    return -1;
+  }
+
+  const comparison = compareDateOnly(validLeft, validRight);
+  return direction === "asc" ? comparison : -comparison;
 }
 
 export function filterAndSortLibraryShows(
