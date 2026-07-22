@@ -3,21 +3,15 @@
 import {
   CalendarDays,
   Check,
-  CheckCircle2,
-  CircleSlash,
-  Heart,
-  ListChecks,
-  ListPlus,
   Loader2,
   Play,
-  Star,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ComponentType } from "react";
 import { useState, useTransition } from "react";
 
+import { LibrarySummaryTiles } from "@/components/library-summary-tiles";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -39,12 +33,6 @@ type DashboardViewProps = {
   data: DashboardData;
 };
 
-type SummaryCardProps = {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-};
-
 type ActionMessage = {
   message: string;
   status: "error" | "success";
@@ -52,25 +40,6 @@ type ActionMessage = {
 
 function formatUpcomingAirDate(airDate: string) {
   return formatDateOnly(airDate) ?? airDate;
-}
-
-function SummaryCard({ icon: Icon, label, value }: SummaryCardProps) {
-  return (
-    <Card className="flex h-full min-w-0 bg-card/80">
-      <CardContent className="flex min-h-16 min-w-0 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
-        <div
-          aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
-        >
-          <Icon className="size-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-xs text-muted-foreground">{label}</p>
-          <p className="mt-0.5 text-xl font-semibold leading-none">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
-  );
 }
 
 function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
@@ -322,15 +291,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             Full library totals, including shows hidden by display preferences.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
-          <SummaryCard icon={ListPlus} label="Total shows" value={data.summary.totalShows} />
-          <SummaryCard icon={Play} label="Watching" value={data.summary.watchingCount} />
-          <SummaryCard icon={ListChecks} label="Caught up" value={data.summary.caughtUpCount} />
-          <SummaryCard icon={CheckCircle2} label="Completed" value={data.summary.completedCount} />
-          <SummaryCard icon={Star} label="Watchlist" value={data.summary.watchlistCount} />
-          <SummaryCard icon={CircleSlash} label="Dropped" value={data.summary.droppedCount} />
-          <SummaryCard icon={Heart} label="Favourites" value={data.summary.favouriteCount} />
-        </div>
+        <LibrarySummaryTiles summary={data.summary} />
       </section>
 
       <section className="space-y-4">
