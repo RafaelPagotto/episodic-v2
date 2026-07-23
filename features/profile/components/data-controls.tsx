@@ -6,8 +6,11 @@ import type { FormEvent } from "react";
 import { useActionState, useEffect, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
 import {
   clearWatchedHistoryAction,
   deleteAccountAction,
@@ -39,7 +42,20 @@ function ActionMessage({ state }: { state: ProfileDataControlState }) {
     return null;
   }
 
-  return <Notice tone={state.status === "error" ? "error" : "success"}>{state.message}</Notice>;
+  return (
+    <ActionFeedback
+      autoDismissMs={
+        state.status === "success" && !state.redirectTo
+          ? ACTION_FEEDBACK_AUTO_DISMISS_MS
+          : undefined
+      }
+      dismissible
+      feedbackKey={state}
+      tone={state.status === "error" ? "error" : "success"}
+    >
+      {state.message}
+    </ActionFeedback>
+  );
 }
 
 function DeleteAccountButton() {

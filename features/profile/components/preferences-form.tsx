@@ -3,8 +3,11 @@
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
 
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
-import { Notice } from "@/components/ui/notice";
 import { updatePreferencesAction } from "@/features/preferences/actions";
 import { INITIAL_PREFERENCES_FORM_STATE } from "@/features/preferences/state";
 import type { UserPreferences } from "@/features/preferences/types";
@@ -30,7 +33,14 @@ export function PreferencesForm({ preferences }: PreferencesFormProps) {
   return (
     <form action={formAction} className="space-y-5">
       {state.status !== "idle" ? (
-        <Notice tone={state.status === "error" ? "error" : "success"}>{state.message}</Notice>
+        <ActionFeedback
+          autoDismissMs={state.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
+          dismissible
+          feedbackKey={state}
+          tone={state.status === "error" ? "error" : "success"}
+        >
+          {state.message}
+        </ActionFeedback>
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -5,6 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -364,7 +368,14 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
       </div>
 
       {message ? (
-        <Notice tone={message.status === "error" ? "error" : "success"}>{message.message}</Notice>
+        <ActionFeedback
+          autoDismissMs={message.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
+          dismissible
+          feedbackKey={message}
+          tone={message.status === "error" ? "error" : "success"}
+        >
+          {message.message}
+        </ActionFeedback>
       ) : null}
 
       {shows.length === 0 ? (

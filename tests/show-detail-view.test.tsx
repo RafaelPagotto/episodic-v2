@@ -64,6 +64,13 @@ vi.mock("@/components/ui/button", () => ({
   },
 }));
 
+vi.mock("@/components/ui/action-feedback", () => ({
+  ACTION_FEEDBACK_AUTO_DISMISS_MS: 5_000,
+  ActionFeedback: function ActionFeedbackMock() {
+    return null;
+  },
+}));
+
 vi.mock("@/components/ui/card", () => ({
   Card: function CardMock({ children }: { children?: React.ReactNode }) {
     return <div>{children}</div>;

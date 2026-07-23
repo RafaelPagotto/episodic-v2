@@ -12,10 +12,13 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { LibrarySummaryTiles } from "@/components/library-summary-tiles";
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Notice } from "@/components/ui/notice";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
@@ -303,7 +306,14 @@ export function DashboardView({ data }: DashboardViewProps) {
         </div>
 
         {message ? (
-          <Notice tone={message.status === "error" ? "error" : "success"}>{message.message}</Notice>
+          <ActionFeedback
+            autoDismissMs={message.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
+            dismissible
+            feedbackKey={message}
+            tone={message.status === "error" ? "error" : "success"}
+          >
+            {message.message}
+          </ActionFeedback>
         ) : null}
 
         {data.continueWatching.length === 0 ? (

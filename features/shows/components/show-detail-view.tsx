@@ -5,6 +5,10 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -497,7 +501,14 @@ export function ShowDetailView({
       <TmdbAttribution tmdbId={show.tmdbId} />
 
       {message ? (
-        <Notice tone={message.status === "error" ? "error" : "success"}>{message.message}</Notice>
+        <ActionFeedback
+          autoDismissMs={message.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
+          dismissible
+          feedbackKey={message}
+          tone={message.status === "error" ? "error" : "success"}
+        >
+          {message.message}
+        </ActionFeedback>
       ) : null}
 
       {show.seasons.length === 0 ? (

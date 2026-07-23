@@ -6,6 +6,10 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import { useState, useTransition } from "react";
 
+import {
+  ACTION_FEEDBACK_AUTO_DISMISS_MS,
+  ActionFeedback,
+} from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -280,15 +284,18 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                     </p>
 
                     {cardMessage ? (
-                      <p
-                        className={cn(
-                          "text-sm",
-                          cardMessage.status === "error" ? "text-destructive" : "text-primary",
-                        )}
-                        role={cardMessage.status === "error" ? "alert" : "status"}
+                      <ActionFeedback
+                        autoDismissMs={
+                          cardMessage.status === "success"
+                            ? ACTION_FEEDBACK_AUTO_DISMISS_MS
+                            : undefined
+                        }
+                        feedbackKey={cardMessage}
+                        presentation="inline"
+                        tone={cardMessage.status === "error" ? "error" : "success"}
                       >
                         {cardMessage.message}
-                      </p>
+                      </ActionFeedback>
                     ) : null}
 
                     <div className="mt-auto">
