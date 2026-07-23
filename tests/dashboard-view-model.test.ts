@@ -431,17 +431,16 @@ describe("dashboard view model", () => {
     ]);
   });
 
-  it("applies the six-item limit after grouping by show", () => {
-    const records = Array.from({ length: 7 }, (_, index) => {
+  it("applies the twelve-item limit after grouping by show", () => {
+    const records = Array.from({ length: 13 }, (_, index) => {
       const tmdbId = index + 1;
       const nearestDay = String(8 + index).padStart(2, "0");
-      const laterDay = String(20 + index).padStart(2, "0");
 
       return record({
         episodes: [
           episode(tmdbId, 1, 1, { airDate: "2026-06-01" }),
           episode(tmdbId, 1, 2, { airDate: `2026-06-${nearestDay}` }),
-          episode(tmdbId, 1, 3, { airDate: `2026-06-${laterDay}` }),
+          episode(tmdbId, 1, 3, { airDate: `2026-07-${nearestDay}` }),
         ],
         showTmdbId: tmdbId,
         status: "watching",
@@ -451,9 +450,9 @@ describe("dashboard view model", () => {
 
     const items = getUpcomingEpisodeItems(records, { referenceDate: "2026-06-07" });
 
-    expect(items).toHaveLength(6);
-    expect(new Set(items.map((item) => item.tmdbId)).size).toBe(6);
-    expect(items.map((item) => item.tmdbId)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(items).toHaveLength(12);
+    expect(new Set(items.map((item) => item.tmdbId)).size).toBe(12);
+    expect(items.map((item) => item.tmdbId)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
     expect(items.every((item) => item.episodeNumber === 2)).toBe(true);
   });
 
@@ -558,8 +557,8 @@ describe("dashboard view model", () => {
     expect(items.map((item) => item.tmdbId)).toEqual([42, 41, 40]);
   });
 
-  it("limits Start Watching to six shows", () => {
-    const records = Array.from({ length: 7 }, (_, index) =>
+  it("limits Start Watching to twelve shows", () => {
+    const records = Array.from({ length: 13 }, (_, index) =>
       record({
         addedAt: `2026-06-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
         showTmdbId: index + 50,
@@ -569,8 +568,10 @@ describe("dashboard view model", () => {
 
     const items = getStartWatchingItems(records, { referenceDate: "2026-06-07" });
 
-    expect(items).toHaveLength(6);
-    expect(items.map((item) => item.tmdbId)).toEqual([56, 55, 54, 53, 52, 51]);
+    expect(items).toHaveLength(12);
+    expect(items.map((item) => item.tmdbId)).toEqual([
+      62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51,
+    ]);
   });
 
   it("does not apply search-only added preferences to dashboard cards", () => {
