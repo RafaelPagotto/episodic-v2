@@ -6,6 +6,7 @@ import {
   getDateOnlyForTimeZone,
   isDateOnly,
   isDateOnlyShape,
+  normalizeTimeZone,
   resolveTimeZone,
 } from "../lib/date-only";
 import { formatTimestamp } from "../lib/date-time";
@@ -51,6 +52,10 @@ describe("date-only helpers", () => {
     expect(getDateOnlyForTimeZone(instant, "America/Sao_Paulo")).toBe("2026-07-18");
     expect(getDateOnlyForTimeZone(instant, "Pacific/Kiritimati")).toBe("2026-07-19");
     expect(resolveTimeZone("Invalid/Timezone")).toBe("UTC");
+    expect(normalizeTimeZone("America/Sao_Paulo")).toBe("America/Sao_Paulo");
+    expect(normalizeTimeZone("Invalid/Timezone")).toBeNull();
+    expect(normalizeTimeZone("+01:00")).toBeNull();
+    expect(normalizeTimeZone(null)).toBeNull();
     expect(getDateOnlyForTimeZone(instant, "Invalid/Timezone")).toBe("2026-07-19");
   });
 

@@ -35,16 +35,30 @@ export function isDateOnly(value: unknown): value is string {
   return year >= 1 && month >= 1 && month <= 12 && day >= 1 && day <= getDaysInMonth(year, month);
 }
 
-export function resolveTimeZone(value: string | null | undefined) {
-  if (!value) {
-    return DEFAULT_TIME_ZONE;
+export function normalizeTimeZone(value: unknown) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+
+  // ECMA-402 also accepts fixed offsets such as "+01:00", but account
+  // timezones must be named IANA zones so daylight-saving rules stay intact.
+  if (value.startsWith("+") || value.startsWith("-")) {
+    return null;
   }
 
   try {
     return new Intl.DateTimeFormat("en", { timeZone: value }).resolvedOptions().timeZone;
   } catch {
-    return DEFAULT_TIME_ZONE;
+    return null;
   }
+}
+
+export function isTimeZone(value: unknown): value is string {
+  return normalizeTimeZone(value) !== null;
+}
+
+export function resolveTimeZone(value: string | null | undefined) {
+  return normalizeTimeZone(value) ?? DEFAULT_TIME_ZONE;
 }
 
 function dateOnlyToUtcDate(value: string) {

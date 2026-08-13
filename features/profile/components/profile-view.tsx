@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProfilePageData } from "../types";
 import { DataControls } from "./data-controls";
 import { PreferencesForm } from "./preferences-form";
+import { TimeZoneForm } from "./timezone-form";
 
 type ProfileViewProps = {
   data: ProfilePageData;
@@ -19,6 +20,7 @@ export function ProfileView({ data }: ProfileViewProps) {
         <CardContent>
           <p className="text-sm text-muted-foreground">Signed in as</p>
           <p className="mt-1 break-all text-base font-medium">{data.email}</p>
+          <TimeZoneForm persistedTimeZone={data.persistedTimeZone} />
         </CardContent>
       </Card>
 

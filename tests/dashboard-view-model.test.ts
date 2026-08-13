@@ -11,6 +11,8 @@ import type { DashboardShowRecord } from "../features/dashboard/types";
 import { DEFAULT_USER_PREFERENCES } from "../features/preferences/defaults";
 import type { UserPreferences } from "../features/preferences/types";
 import type { Episode, TrackingStatus, WatchedEpisode } from "../features/tracking";
+import { calculateTotalEpisodeCount } from "../features/tracking";
+import { getDateOnlyForTimeZone } from "../lib/date-only";
 
 function preferences(overrides: Partial<UserPreferences> = {}): UserPreferences {
   return {
@@ -336,6 +338,47 @@ describe("dashboard view model", () => {
       }),
     ]);
     expect(getUpcomingEpisodeItems(records, atRelease)).toEqual([]);
+  });
+
+  it("uses a saved Sao Paulo timezone at the August release boundary", () => {
+    const episodes = [
+      episode(100, 3, 6, { airDate: "2026-08-06" }),
+      episode(100, 3, 7, { airDate: "2026-08-13", title: "Radio" }),
+    ];
+    const records = [
+      record({
+        episodes,
+        showTmdbId: 100,
+        status: "watching",
+        title: "Silo",
+        watchedEpisodes: [watched(100, 3, 6)],
+      }),
+    ];
+    const timeZone = "America/Sao_Paulo";
+    const beforeRelease = {
+      referenceDate: getDateOnlyForTimeZone(new Date("2026-08-13T00:23:00.000Z"), timeZone),
+      timeZone,
+    };
+    const atRelease = {
+      referenceDate: getDateOnlyForTimeZone(new Date("2026-08-13T03:00:00.000Z"), timeZone),
+      timeZone,
+    };
+
+    expect(beforeRelease.referenceDate).toBe("2026-08-12");
+    expect(getContinueWatchingItems(records, preferences(), beforeRelease)).toEqual([]);
+    expect(getUpcomingEpisodeItems(records, beforeRelease)).toEqual([
+      expect.objectContaining({ episodeNumber: 7, showTitle: "Silo" }),
+    ]);
+    expect(calculateTotalEpisodeCount(episodes, beforeRelease)).toBe(1);
+
+    expect(atRelease.referenceDate).toBe("2026-08-13");
+    expect(getContinueWatchingItems(records, preferences(), atRelease)).toEqual([
+      expect.objectContaining({
+        nextEpisode: expect.objectContaining({ episodeNumber: 7, title: "Radio" }),
+      }),
+    ]);
+    expect(getUpcomingEpisodeItems(records, atRelease)).toEqual([]);
+    expect(calculateTotalEpisodeCount(episodes, atRelease)).toBe(2);
   });
 
   it("excludes specials, null dates, watched future episodes, and inactive shows", () => {

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getUserDateOptions, getUserTimeZone } from "../features/profile/timezone";
+import {
+  getPersistedUserTimeZone,
+  getUserDateOptions,
+  getUserTimeZone,
+} from "../features/profile/timezone";
 
 type ProfileResult = {
   data: Array<{ timezone: string | null }> | null;
@@ -24,6 +28,21 @@ describe("profile timezone loading", () => {
     await expect(
       getUserTimeZone(client({ data: [{ timezone: "America/Sao_Paulo" }], error: null }), "user-1"),
     ).resolves.toBe("America/Sao_Paulo");
+  });
+
+  it("exposes only valid persisted values for initialization decisions", async () => {
+    await expect(
+      getPersistedUserTimeZone(
+        client({ data: [{ timezone: "America/Sao_Paulo" }], error: null }),
+        "user-1",
+      ),
+    ).resolves.toBe("America/Sao_Paulo");
+    await expect(
+      getPersistedUserTimeZone(
+        client({ data: [{ timezone: "Invalid/Legacy" }], error: null }),
+        "user-1",
+      ),
+    ).resolves.toBeNull();
   });
 
   it("captures one canonical date for the saved timezone", async () => {
