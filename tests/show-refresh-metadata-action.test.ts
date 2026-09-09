@@ -3,6 +3,8 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { refreshShowMetadataAction } from "../features/shows/actions";
 import { getUserShowDetail } from "../features/shows/data";
+import { refreshTmdbShowMetadata } from "../features/shows/metadata-refresh";
+import { upsertTmdbShowMetadata } from "../features/search/data";
 import type { Database } from "../lib/supabase/types";
 import type {
   NormalizedTmdbEpisode,
@@ -16,17 +18,27 @@ const createOptionalSupabaseServiceRoleClientMock = vi.hoisted(() => vi.fn());
 const consumeTmdbRateLimitMock = vi.hoisted(() => vi.fn());
 const getFullTmdbShowDetailsMock = vi.hoisted(() => vi.fn());
 
+vi.mock("server-only", () => ({}));
+
+vi.mock("../features/shows/metadata-refresh", async () => {
+  const actual = await vi.importActual<typeof import("../features/shows/metadata-refresh")>(
+    "../features/shows/metadata-refresh",
+  );
+
+  return { refreshTmdbShowMetadata: vi.fn(actual.refreshTmdbShowMetadata) };
+});
+
 vi.mock("@/features/tracking/action-validation", () => ({
   isEpisodeWatchedActionInput: vi.fn(() => true),
   isSeasonWatchedActionInput: vi.fn(() => true),
   isShowTmdbId: vi.fn((value: unknown) => Number.isSafeInteger(value) && Number(value) > 0),
 }));
 
-vi.mock("@/features/search/data", async () => {
+vi.mock("../features/search/data", async () => {
   const actual = await vi.importActual<typeof import("../features/search/data")>("../features/search/data");
 
   return {
-    upsertTmdbShowMetadata: actual.upsertTmdbShowMetadata,
+    upsertTmdbShowMetadata: vi.fn(actual.upsertTmdbShowMetadata),
   };
 });
 
@@ -46,7 +58,7 @@ vi.mock("@/lib/tmdb/rate-limit", () => ({
   consumeTmdbRateLimit: consumeTmdbRateLimitMock,
 }));
 
-vi.mock("@/lib/tmdb/server", () => ({
+vi.mock("../lib/tmdb/server", () => ({
   getFullTmdbShowDetails: getFullTmdbShowDetailsMock,
 }));
 
@@ -579,12 +591,89 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  vi.mocked(refreshTmdbShowMetadata).mockClear();
+  vi.mocked(upsertTmdbShowMetadata).mockClear();
   consoleErrorSpy.mockClear();
   revalidatePathMock.mockReset();
   createSupabaseServerClientMock.mockReset();
   createOptionalSupabaseServiceRoleClientMock.mockReset();
   consumeTmdbRateLimitMock.mockReset();
   getFullTmdbShowDetailsMock.mockReset();
+});
+
+describe("refreshTmdbShowMetadata", () => {
+  it("fetches full metadata and upserts it with the supplied client without user context or writes", async () => {
+    const db = new FakeDatabase();
+    seedLibraryShow(db, { favourite: true, status: "dropped" });
+    db.watchedEpisodes = [watchedEpisodeRow(1, 1)];
+    const userShowsBefore = structuredClone(db.userShows);
+    const watchedEpisodesBefore = structuredClone(db.watchedEpisodes);
+    const metadataClient = new FakeSupabase(db);
+    const tmdbShow = buildTmdbShow();
+    getFullTmdbShowDetailsMock.mockResolvedValue(tmdbShow);
+
+    const result = await refreshTmdbShowMetadata(SHOW_TMDB_ID, actionClient(metadataClient));
+
+    expect(getFullTmdbShowDetailsMock).toHaveBeenCalledTimes(1);
+    expect(getFullTmdbShowDetailsMock).toHaveBeenCalledWith(SHOW_TMDB_ID);
+    expect(upsertTmdbShowMetadata).toHaveBeenCalledTimes(1);
+    expect(upsertTmdbShowMetadata).toHaveBeenCalledWith({ metadataClient, tmdbShow });
+    expect(result).toEqual({
+      episodeCount: 2,
+      lastSyncedAt: expect.any(String),
+      seasonCount: 1,
+      title: "Breaking Bad",
+      tmdbId: SHOW_TMDB_ID,
+    });
+    expect(metadataClient.calls).toEqual([
+      { method: "upsert", onConflict: "tmdb_id", table: "shows" },
+      { method: "upsert", onConflict: "show_tmdb_id,season_number", table: "seasons" },
+      { method: "upsert", onConflict: "show_tmdb_id,season_number,episode_number", table: "episodes" },
+    ]);
+    for (const row of [...db.shows, ...db.seasons, ...db.episodes]) {
+      expect(row.last_synced_at).toBe(result.lastSyncedAt);
+    }
+    expect(db.userShows).toEqual(userShowsBefore);
+    expect(db.watchedEpisodes).toEqual(watchedEpisodesBefore);
+    expect(metadataClient.auth.getUser).not.toHaveBeenCalled();
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+    expect(createOptionalSupabaseServiceRoleClientMock).not.toHaveBeenCalled();
+    expect(consumeTmdbRateLimitMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, NaN, Infinity, 2_147_483_648])("rejects invalid ID %s before fetching or writing", async (tmdbId) => {
+    const metadataClient = new FakeSupabase(new FakeDatabase());
+
+    await expect(refreshTmdbShowMetadata(tmdbId, actionClient(metadataClient))).rejects.toThrow("Invalid TMDB show ID.");
+
+    expect(getFullTmdbShowDetailsMock).not.toHaveBeenCalled();
+    expect(upsertTmdbShowMetadata).not.toHaveBeenCalled();
+    expect(metadataClient.calls).toEqual([]);
+  });
+
+  it("propagates TMDB failure without writing metadata", async () => {
+    const metadataClient = new FakeSupabase(new FakeDatabase());
+    const failure = new Error("TMDB unavailable");
+    getFullTmdbShowDetailsMock.mockRejectedValue(failure);
+
+    await expect(refreshTmdbShowMetadata(SHOW_TMDB_ID, actionClient(metadataClient))).rejects.toBe(failure);
+
+    expect(upsertTmdbShowMetadata).not.toHaveBeenCalled();
+    expect(metadataClient.calls).toEqual([]);
+  });
+
+  it.each(["shows", "seasons", "episodes"] as const)("propagates %s upsert failure", async (table) => {
+    const db = new FakeDatabase();
+    db.failUpsertTable = table;
+    const metadataClient = new FakeSupabase(db);
+    getFullTmdbShowDetailsMock.mockResolvedValue(buildTmdbShow());
+
+    await expect(refreshTmdbShowMetadata(SHOW_TMDB_ID, actionClient(metadataClient))).rejects.toThrow(
+      /Unable to save .* metadata\./,
+    );
+    expect(metadataClient.calls.at(-1)?.table).toBe(table);
+  });
 });
 
 describe("refreshShowMetadataAction", () => {
@@ -598,6 +687,7 @@ describe("refreshShowMetadataAction", () => {
       status: "error",
     });
     expect(consumeTmdbRateLimitMock).not.toHaveBeenCalled();
+    expect(refreshTmdbShowMetadata).not.toHaveBeenCalled();
     expect(createOptionalSupabaseServiceRoleClientMock).not.toHaveBeenCalled();
     expect(getFullTmdbShowDetailsMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -613,6 +703,7 @@ describe("refreshShowMetadataAction", () => {
       status: "error",
     });
     expect(consumeTmdbRateLimitMock).not.toHaveBeenCalled();
+    expect(refreshTmdbShowMetadata).not.toHaveBeenCalled();
     expect(createOptionalSupabaseServiceRoleClientMock).not.toHaveBeenCalled();
     expect(getFullTmdbShowDetailsMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -631,6 +722,7 @@ describe("refreshShowMetadataAction", () => {
       status: "error",
     });
     expect(consumeTmdbRateLimitMock).toHaveBeenCalledWith("refresh-show", USER_ID);
+    expect(refreshTmdbShowMetadata).not.toHaveBeenCalled();
     expect(createOptionalSupabaseServiceRoleClientMock).not.toHaveBeenCalled();
     expect(getFullTmdbShowDetailsMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -677,6 +769,8 @@ describe("refreshShowMetadataAction", () => {
       status: "success",
     });
     expect(getFullTmdbShowDetailsMock).toHaveBeenCalledWith(SHOW_TMDB_ID);
+    expect(refreshTmdbShowMetadata).toHaveBeenCalledTimes(1);
+    expect(refreshTmdbShowMetadata).toHaveBeenCalledWith(SHOW_TMDB_ID, metadataClient);
     expect(createOptionalSupabaseServiceRoleClientMock).toHaveBeenCalledTimes(1);
     expect(consumeTmdbRateLimitMock).toHaveBeenCalledWith("refresh-show", USER_ID);
     expect(metadataClient.calls).toEqual([

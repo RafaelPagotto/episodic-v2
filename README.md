@@ -74,6 +74,7 @@ Server-only values:
 
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service-role key for trusted metadata writes and account deletion. Never expose this through `NEXT_PUBLIC_*`.
 - `TMDB_API_KEY`: TMDB v3 API key. The app sends this from server-side code only.
+- `CRON_SECRET`: strong random server-only secret required in Vercel Production for automatic metadata refresh. See [cron setup and production QA](docs/deployment.md#automatic-metadata-refresh).
 
 ## Supabase Setup
 

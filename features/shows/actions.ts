@@ -8,7 +8,6 @@ import {
   isSeasonWatchedActionInput,
   isShowTmdbId,
 } from "@/features/tracking/action-validation";
-import { upsertTmdbShowMetadata } from "@/features/search/data";
 import { getUserDateOptions } from "../profile/timezone";
 import { createOptionalSupabaseServiceRoleClient } from "@/lib/supabase/admin";
 import type {
@@ -17,7 +16,6 @@ import type {
 } from "@/features/tracking/action-validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { consumeTmdbRateLimit } from "@/lib/tmdb/rate-limit";
-import { getFullTmdbShowDetails } from "@/lib/tmdb/server";
 
 import {
   getOwnedUserShow,
@@ -26,6 +24,7 @@ import {
   setEpisodeWatched,
   setSeasonWatched,
 } from "./data";
+import { refreshTmdbShowMetadata } from "./metadata-refresh";
 import type { ShowProgressActionResult } from "./types";
 
 type SupabaseServerClient = Awaited<ReturnType<typeof createSupabaseServerClient>>;
@@ -226,13 +225,11 @@ export async function refreshShowMetadataAction(tmdbId: number): Promise<ShowPro
       return showActionError("Unable to refresh metadata right now.");
     }
 
-    const tmdbShow = await getFullTmdbShowDetails(tmdbId);
-
-    await upsertTmdbShowMetadata({ metadataClient, tmdbShow });
+    const metadataResult = await refreshTmdbShowMetadata(tmdbId, metadataClient);
     revalidateShow(tmdbId);
 
     return {
-      message: `Refreshed metadata for ${tmdbShow.show.title}.`,
+      message: `Refreshed metadata for ${metadataResult.title}.`,
       status: "success",
     };
   } catch (error) {
