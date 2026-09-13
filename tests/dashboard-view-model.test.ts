@@ -305,6 +305,72 @@ describe("dashboard view model", () => {
     });
   });
 
+  it("includes only future main-series episodes within the inclusive 90-day horizon", () => {
+    const upcomingRecord = (
+      showTmdbId: number,
+      airDate: string | null,
+      seasonNumber = 1,
+      title = `Show ${showTmdbId}`,
+    ) => record({
+      episodes: [
+        episode(showTmdbId, 1, 1, { airDate: "2026-09-01" }),
+        episode(showTmdbId, seasonNumber, 2, { airDate }),
+      ],
+      showTmdbId,
+      status: "watching",
+      title,
+      watchedEpisodes: [watched(showTmdbId, 1, 1)],
+    });
+    const silo = upcomingRecord(10, "2027-07-01", 4, "Silo");
+    const records = [
+      upcomingRecord(10_000, "2026-09-12"),
+      upcomingRecord(9, "2026-09-11"),
+      upcomingRecord(8, null),
+      upcomingRecord(7, "2026-02-29"),
+      silo,
+      upcomingRecord(6, "2026-12-12"),
+      upcomingRecord(5, "2026-12-12"),
+      upcomingRecord(4, "2026-12-11", 0),
+      upcomingRecord(3, "2026-12-11"),
+      upcomingRecord(2, "2026-12-10"),
+      upcomingRecord(1, "2026-09-13"),
+    ];
+
+    const items = getUpcomingEpisodeItems(records, { referenceDate: "2026-09-12" });
+
+    expect(items.map((item) => [item.tmdbId, item.airDate])).toEqual([
+      [1, "2026-09-13"],
+      [2, "2026-12-10"],
+      [3, "2026-12-11"],
+    ]);
+    expect(silo.episodes[1]).toMatchObject({
+      airDate: "2027-07-01",
+      seasonNumber: 4,
+      showTmdbId: 10,
+    });
+  });
+
+  it("derives the 90-day cutoff from the saved profile timezone", () => {
+    const records = [record({
+      episodes: [
+        episode(200, 1, 1, { airDate: "2026-09-01" }),
+        episode(200, 1, 2, { airDate: "2026-12-12" }),
+      ],
+      showTmdbId: 200,
+      status: "watching",
+      watchedEpisodes: [watched(200, 1, 1)],
+    })];
+    const instant = new Date("2026-09-13T02:30:00.000Z");
+
+    expect(getUpcomingEpisodeItems(records, { referenceDate: instant, timeZone: "UTC" })).toEqual([
+      expect.objectContaining({ airDate: "2026-12-12", tmdbId: 200 }),
+    ]);
+    expect(getUpcomingEpisodeItems(records, {
+      referenceDate: instant,
+      timeZone: "America/Sao_Paulo",
+    })).toEqual([]);
+  });
+
   it("keeps an episode in Upcoming and out of Continue Watching until local release", () => {
     const records = [
       record({
@@ -474,7 +540,7 @@ describe("dashboard view model", () => {
     ]);
   });
 
-  it("applies the twelve-item limit after grouping by show", () => {
+  it("applies the twelve-item limit after filtering the 90-day horizon and grouping by show", () => {
     const records = Array.from({ length: 13 }, (_, index) => {
       const tmdbId = index + 1;
       const nearestDay = String(8 + index).padStart(2, "0");
@@ -490,6 +556,26 @@ describe("dashboard view model", () => {
         watchedEpisodes: [watched(tmdbId, 1, 1)],
       });
     });
+    records.unshift(
+      record({
+        episodes: [
+          episode(100, 1, 1, { airDate: "2026-06-01" }),
+          episode(100, 1, 2, { airDate: "2027-01-01" }),
+        ],
+        showTmdbId: 100,
+        status: "watching",
+        watchedEpisodes: [watched(100, 1, 1)],
+      }),
+      record({
+        episodes: [
+          episode(101, 1, 1, { airDate: "2026-06-01" }),
+          episode(101, 1, 2, { airDate: "2026-09-06" }),
+        ],
+        showTmdbId: 101,
+        status: "watching",
+        watchedEpisodes: [watched(101, 1, 1)],
+      }),
+    );
 
     const items = getUpcomingEpisodeItems(records, { referenceDate: "2026-06-07" });
 

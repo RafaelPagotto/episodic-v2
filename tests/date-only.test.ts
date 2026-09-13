@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import {
+  addDateOnlyDays,
   compareDateOnly,
   formatDateOnly,
   getDateOnlyForTimeZone,
@@ -64,6 +65,17 @@ describe("date-only helpers", () => {
     expect(compareDateOnly("2026-07-19", "2026-07-19")).toBe(0);
     expect(compareDateOnly("2026-07-20", "2026-07-19")).toBe(1);
     expect(() => compareDateOnly("2026-02-29", "2026-03-01")).toThrow(RangeError);
+  });
+
+  it("adds calendar days without applying runtime timezone or timestamp semantics", () => {
+    expect(addDateOnlyDays("2026-09-12", 90)).toBe("2026-12-11");
+    expect(addDateOnlyDays("2024-02-28", 1)).toBe("2024-02-29");
+    expect(addDateOnlyDays("2024-02-28", 2)).toBe("2024-03-01");
+    expect(addDateOnlyDays("2026-01-01", -1)).toBe("2025-12-31");
+    expect(addDateOnlyDays("2026-01-01", 0)).toBe("2026-01-01");
+    expect(() => addDateOnlyDays("2026-02-29", 1)).toThrow(RangeError);
+    expect(() => addDateOnlyDays("2026-01-01", 1.5)).toThrow(RangeError);
+    expect(() => addDateOnlyDays("9999-12-31", 1)).toThrow(RangeError);
   });
 });
 

@@ -325,8 +325,8 @@ describe("dashboard data loading", () => {
     );
     const upcomingEpisodes = [
       episodeRow(2, 1, 1, "2026-01-01"),
-      episodeRow(2, 1, 2, "2099-01-01"),
-      episodeRow(2, 1, 3, "2099-02-01"),
+      episodeRow(2, 1, 2, "2026-06-08"),
+      episodeRow(2, 1, 3, "2026-06-09"),
     ];
 
     addShow(db, {
@@ -341,11 +341,13 @@ describe("dashboard data loading", () => {
       watchedEpisodes: [watchedEpisodeRow(2, 1, 1)],
     });
 
-    const dashboard = await getUserDashboardData(client(db), USER_ID);
+    const dashboard = await getUserDashboardData(client(db), USER_ID, undefined, {
+      referenceDate: "2026-06-07",
+    });
 
     expect(dashboard.upcomingEpisodes).toHaveLength(1);
     expect(dashboard.upcomingEpisodes[0]).toMatchObject({
-      airDate: "2099-01-01",
+      airDate: "2026-06-08",
       episodeNumber: 2,
       seasonNumber: 1,
       tmdbId: 2,

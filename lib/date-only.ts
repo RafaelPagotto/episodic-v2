@@ -126,3 +126,66 @@ export function compareDateOnly(left: string, right: string) {
 
   return left < right ? -1 : 1;
 }
+
+export function addDateOnlyDays(value: string, days: number) {
+  if (!isDateOnly(value) || !Number.isSafeInteger(days)) {
+    throw new RangeError("Date-only arithmetic requires a valid YYYY-MM-DD date and an integer day count.");
+  }
+
+  let [year, month, day] = value.split("-").map(Number);
+  let remainingDays = Math.abs(days);
+  const direction = Math.sign(days);
+
+  while (remainingDays > 0) {
+    if (direction > 0) {
+      const daysRemainingInMonth = getDaysInMonth(year, month) - day;
+
+      if (remainingDays <= daysRemainingInMonth) {
+        day += remainingDays;
+        remainingDays = 0;
+      } else {
+        remainingDays -= daysRemainingInMonth + 1;
+        day = 1;
+        month += 1;
+
+        if (month > 12) {
+          month = 1;
+          year += 1;
+
+          if (year > 9999) {
+            throw new RangeError("Date-only arithmetic result is outside the supported calendar range.");
+          }
+        }
+      }
+    } else {
+      const daysSinceMonthStart = day - 1;
+
+      if (remainingDays <= daysSinceMonthStart) {
+        day -= remainingDays;
+        remainingDays = 0;
+      } else {
+        remainingDays -= daysSinceMonthStart + 1;
+        month -= 1;
+
+        if (month < 1) {
+          month = 12;
+          year -= 1;
+        }
+
+        if (year < 1) {
+          throw new RangeError("Date-only arithmetic result is outside the supported calendar range.");
+        }
+
+        day = getDaysInMonth(year, month);
+      }
+    }
+  }
+
+  const result = `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+
+  if (!isDateOnly(result)) {
+    throw new RangeError("Date-only arithmetic result is outside the supported calendar range.");
+  }
+
+  return result;
+}

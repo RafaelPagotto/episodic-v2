@@ -8,7 +8,7 @@ import {
   isMainSeriesEpisode,
   type EpisodeCalculationOptions,
 } from "../tracking";
-import { compareDateOnly, getReferenceDateOnly, isDateOnly } from "../../lib/date-only";
+import { addDateOnlyDays, compareDateOnly, getReferenceDateOnly, isDateOnly } from "../../lib/date-only";
 import { DEFAULT_USER_PREFERENCES } from "../preferences/defaults";
 import type { UserPreferences } from "../preferences/types";
 import {
@@ -28,6 +28,7 @@ import type {
 
 const START_WATCHING_LIMIT = 12;
 const UPCOMING_EPISODE_LIMIT = 12;
+const UPCOMING_EPISODE_HORIZON_DAYS = 90;
 
 type ContinueWatchingCandidate = Omit<ContinueWatchingItem, "isFaded">;
 
@@ -45,12 +46,15 @@ function createEmptySummary(): DashboardSummary {
   };
 }
 
-function getUpcomingAirDate(airDate: string | null, referenceIsoDate: string) {
+function getUpcomingAirDate(airDate: string | null, referenceIsoDate: string, horizonIsoDate: string) {
   if (!isDateOnly(airDate)) {
     return null;
   }
 
-  return compareDateOnly(airDate, referenceIsoDate) > 0 ? airDate : null;
+  return compareDateOnly(airDate, referenceIsoDate) > 0
+    && compareDateOnly(airDate, horizonIsoDate) <= 0
+    ? airDate
+    : null;
 }
 
 function getLatestWatchedAt(record: DashboardShowRecord) {
@@ -99,6 +103,7 @@ function compareEpisodeOrder(left: { episodeNumber: number; seasonNumber: number
 function getUpcomingEpisodeCandidate(
   record: DashboardShowRecord,
   referenceIsoDate: string,
+  horizonIsoDate: string,
   options: DashboardDateOptions,
 ): UpcomingEpisodeItem | null {
   const progress = getDashboardShowProgress(record, options);
@@ -110,7 +115,7 @@ function getUpcomingEpisodeCandidate(
   const watchedEpisodeKeys = new Set(record.watchedEpisodes.map((episode) => buildEpisodeKey(episode)));
   const nextUpcomingEpisode = record.episodes
     .map((episode) => ({
-      airDate: getUpcomingAirDate(episode.airDate, referenceIsoDate),
+      airDate: getUpcomingAirDate(episode.airDate, referenceIsoDate, horizonIsoDate),
       episode,
     }))
     .filter(
@@ -147,9 +152,10 @@ export function getUpcomingEpisodeItems(
   options: DashboardDateOptions = {},
 ): UpcomingEpisodeItem[] {
   const referenceIsoDate = getReferenceDateOnly(options.referenceDate, options.timeZone);
+  const horizonIsoDate = addDateOnlyDays(referenceIsoDate, UPCOMING_EPISODE_HORIZON_DAYS);
 
   return records
-    .map((record) => getUpcomingEpisodeCandidate(record, referenceIsoDate, options))
+    .map((record) => getUpcomingEpisodeCandidate(record, referenceIsoDate, horizonIsoDate, options))
     .filter((item): item is UpcomingEpisodeItem => Boolean(item))
     .sort((left, right) => {
       return (
