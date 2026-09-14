@@ -108,7 +108,7 @@ function getUpcomingEpisodeCandidate(
 ): UpcomingEpisodeItem | null {
   const progress = getDashboardShowProgress(record, options);
 
-  if (progress.displayStatus !== "watching" && progress.displayStatus !== "caught_up") {
+  if (progress.displayStatus !== "caught_up") {
     return null;
   }
 

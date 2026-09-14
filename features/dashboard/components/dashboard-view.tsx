@@ -342,14 +342,14 @@ export function DashboardView({ data }: DashboardViewProps) {
             Upcoming Episodes
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Known future main-series episodes from your last TMDB import.
+            Upcoming main-series episodes for shows you&apos;re caught up on.
           </p>
         </div>
 
         {data.upcomingEpisodes.length === 0 ? (
           <Card className="border-dashed bg-card/60">
             <CardContent className="p-4 text-sm text-muted-foreground">
-              No known upcoming episodes for active shows right now.
+              No known upcoming episodes for shows you&apos;re caught up on right now.
             </CardContent>
           </Card>
         ) : (

@@ -260,33 +260,40 @@ describe("dashboard view model", () => {
     expect(dashboard.hiddenContinueWatchingCount).toBe(0);
   });
 
-  it("includes future main-series episodes for watching and caught-up shows", () => {
-    const items = getUpcomingEpisodeItems(
-      [
-        record({
-          episodes: [
-            episode(1, 1, 1, { airDate: "2026-06-01" }),
-            episode(1, 1, 2, { airDate: "2026-06-02" }),
-            episode(1, 1, 3, { airDate: "2026-06-10" }),
-          ],
-          showTmdbId: 1,
-          status: "watching",
-          watchedEpisodes: [watched(1, 1, 1)],
-        }),
-        record({
-          episodes: [
-            episode(2, 1, 1, { airDate: "2026-06-01" }),
-            episode(2, 1, 2, { airDate: "2026-06-08" }),
-          ],
-          showTmdbId: 2,
-          status: "watching",
-          watchedEpisodes: [watched(2, 1, 1)],
-        }),
-      ],
-      { referenceDate: "2026-06-07" },
-    );
+  it("omits a watching show with released backlog and includes a caught-up show", () => {
+    const records = [
+      record({
+        episodes: [
+          episode(1, 1, 1, { airDate: "2026-06-01" }),
+          episode(1, 1, 2, { airDate: "2026-06-02" }),
+          episode(1, 1, 3, { airDate: "2026-06-10" }),
+        ],
+        showTmdbId: 1,
+        status: "watching",
+        watchedEpisodes: [watched(1, 1, 1)],
+      }),
+      record({
+        episodes: [
+          episode(2, 1, 1, { airDate: "2026-06-01" }),
+          episode(2, 1, 2, { airDate: "2026-06-08" }),
+        ],
+        showTmdbId: 2,
+        status: "watching",
+        watchedEpisodes: [watched(2, 1, 1)],
+      }),
+    ];
+    const options = { referenceDate: "2026-06-07" };
 
-    expect(items).toHaveLength(2);
+    expect(getContinueWatchingItems(records, preferences(), options)).toEqual([
+      expect.objectContaining({
+        nextEpisode: expect.objectContaining({ episodeNumber: 2 }),
+        tmdbId: 1,
+      }),
+    ]);
+
+    const items = getUpcomingEpisodeItems(records, options);
+
+    expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({
       airDate: "2026-06-08",
       detailHref: "/shows/2?season=1",
@@ -296,13 +303,64 @@ describe("dashboard view model", () => {
       showTitle: "Show 2",
       tmdbId: 2,
     });
-    expect(items[1]).toMatchObject({
-      airDate: "2026-06-10",
-      detailHref: "/shows/1?season=1",
-      episodeNumber: 3,
-      seasonNumber: 1,
-      tmdbId: 1,
+  });
+
+  it("keeps a One Piece-style large backlog in Continue Watching and out of Upcoming", () => {
+    const showTmdbId = 37854;
+    const episodes = Array.from({ length: 1178 }, (_, index) =>
+      episode(showTmdbId, 23, index + 1, {
+        airDate: index === 1177 ? "2026-09-13" : "2026-09-01",
+      }),
+    );
+    const watchedEpisodes = Array.from({ length: 1088 }, (_, index) =>
+      watched(showTmdbId, 23, index + 1),
+    );
+    const records = [record({
+      episodes,
+      showTmdbId,
+      status: "watching",
+      title: "One Piece",
+      watchedEpisodes,
+    })];
+    const options = { referenceDate: "2026-09-12", timeZone: "America/Sao_Paulo" };
+
+    expect(getContinueWatchingItems(records, preferences(), options)).toEqual([
+      expect.objectContaining({
+        nextEpisode: expect.objectContaining({ episodeNumber: 1089, seasonNumber: 23 }),
+        title: "One Piece",
+        tmdbId: showTmdbId,
+        totalEpisodeCount: 1177,
+        watchedEpisodeCount: 1088,
+      }),
+    ]);
+    expect(getUpcomingEpisodeItems(records, options)).toEqual([]);
+  });
+
+  it("shows a future episode after the final released episode is watched", () => {
+    const showTmdbId = 3;
+    const episodes = [
+      episode(showTmdbId, 1, 1, { airDate: "2026-06-01" }),
+      episode(showTmdbId, 1, 2, { airDate: "2026-06-02" }),
+      episode(showTmdbId, 1, 3, { airDate: "2026-06-08" }),
+    ];
+    const behind = record({
+      episodes,
+      showTmdbId,
+      status: "watching",
+      watchedEpisodes: [watched(showTmdbId, 1, 1)],
     });
+    const caughtUp = record({
+      episodes,
+      showTmdbId,
+      status: "watched",
+      watchedEpisodes: [watched(showTmdbId, 1, 1), watched(showTmdbId, 1, 2)],
+    });
+    const options = { referenceDate: "2026-06-07" };
+
+    expect(getUpcomingEpisodeItems([behind], options)).toEqual([]);
+    expect(getUpcomingEpisodeItems([caughtUp], options)).toEqual([
+      expect.objectContaining({ episodeNumber: 3, tmdbId: showTmdbId }),
+    ]);
   });
 
   it("includes only future main-series episodes within the inclusive 90-day horizon", () => {
