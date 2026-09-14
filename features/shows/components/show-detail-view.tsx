@@ -36,6 +36,7 @@ import {
   getShowDetailActionLabels,
   getShowDetailSeasonNavigation,
   getShowDetailSeasonUrl,
+  isShowDetailEpisodeTrackable,
   SPECIALS_OPTIONAL_NOTE,
 } from "../view-model";
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActionResult } from "../types";
@@ -85,11 +86,13 @@ function ShowPoster({ show }: { show: ShowDetail }) {
 }
 
 function EpisodeRow({
+  canMarkWatched,
   disabled,
   episode,
   onToggle,
   pendingAction,
 }: {
+  canMarkWatched: boolean;
   disabled: boolean;
   episode: ShowDetailEpisode;
   onToggle: (episode: ShowDetailEpisode, watched: boolean) => void;
@@ -99,6 +102,10 @@ function EpisodeRow({
   const actionId = getEpisodeActionId(episode, nextWatched);
   const isPending = pendingAction === actionId;
   const airDate = formatDateOnly(episode.airDate);
+  const releaseAvailability = !episode.watched && !canMarkWatched && airDate
+    ? `Available ${airDate}`
+    : undefined;
+  const actionDisabled = disabled || isPending || (!episode.watched && !canMarkWatched);
 
   return (
     <div className="grid gap-3 border-t py-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
@@ -127,9 +134,15 @@ function EpisodeRow({
         </div>
       </div>
       <Button
+        aria-label={releaseAvailability ? `Mark watched — ${releaseAvailability}` : undefined}
         className="w-full gap-2 sm:w-auto md:w-36"
-        disabled={disabled || isPending}
-        onClick={() => onToggle(episode, nextWatched)}
+        disabled={actionDisabled}
+        onClick={() => {
+          if (!actionDisabled) {
+            onToggle(episode, nextWatched);
+          }
+        }}
+        title={releaseAvailability}
         type="button"
         variant={episode.watched ? "outline" : "default"}
       >
@@ -145,13 +158,19 @@ function SeasonPanel({
   onSeasonToggle,
   onToggleEpisode,
   pendingAction,
+  referenceDate,
   season,
+  showTmdbId,
+  timeZone,
 }: {
   disabled: boolean;
   onSeasonToggle: (season: ShowDetailSeason, watched: boolean) => void;
   onToggleEpisode: (episode: ShowDetailEpisode, watched: boolean) => void;
   pendingAction: string | null;
+  referenceDate?: string;
   season: ShowDetailSeason;
+  showTmdbId: number;
+  timeZone: string;
 }) {
   const seasonComplete =
     season.progress.totalEpisodeCount > 0
@@ -204,6 +223,7 @@ function SeasonPanel({
           <div>
             {season.episodes.map((episode) => (
               <EpisodeRow
+                canMarkWatched={isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone })}
                 key={`${episode.seasonNumber}-${episode.episodeNumber}`}
                 disabled={disabled}
                 episode={episode}
@@ -567,7 +587,10 @@ export function ShowDetailView({
               onSeasonToggle={handleSeasonToggle}
               onToggleEpisode={handleEpisodeToggle}
               pendingAction={pendingAction}
+              referenceDate={referenceDate}
               season={seasonNavigation.activeSeason}
+              showTmdbId={show.tmdbId}
+              timeZone={timeZone}
             />
           ) : (
             <EmptyState

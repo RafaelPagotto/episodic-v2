@@ -47,6 +47,14 @@ export function getSeasonLabel(season: Pick<ShowDetailSeason, "name" | "seasonNu
   return season.seasonNumber === 0 ? "Specials" : season.name;
 }
 
+export function isShowDetailEpisodeTrackable(
+  showTmdbId: number,
+  episode: ShowDetailEpisode,
+  options: EpisodeCalculationOptions = {},
+) {
+  return isEpisodeTrackable(toTrackingEpisode(showTmdbId, episode), options);
+}
+
 export function getShowDetailSeasonNavigation(
   show: ShowDetail,
   requestedSeason: unknown,
@@ -156,7 +164,7 @@ function getMainEpisodes(show: ShowDetail, options: SeasonNavigationOptions) {
   return show.seasons
     .flatMap((season) => season.episodes)
     .filter((episode) => isMainSeriesEpisode(episode))
-    .filter((episode) => isEpisodeTrackable(toTrackingEpisode(show.tmdbId, episode), options))
+    .filter((episode) => isShowDetailEpisodeTrackable(show.tmdbId, episode, options))
     .sort(compareEpisodes);
 }
 

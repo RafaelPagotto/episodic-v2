@@ -12,6 +12,7 @@ const hookState = vi.hoisted(() => ({
 }));
 const routerRefreshMock = vi.hoisted(() => vi.fn());
 const refreshShowMetadataActionMock = vi.hoisted(() => vi.fn());
+const setEpisodeWatchedActionMock = vi.hoisted(() => vi.fn());
 
 vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
@@ -119,7 +120,7 @@ vi.mock("../features/shows/actions", () => ({
   markShowWatchedAction: vi.fn(),
   refreshShowMetadataAction: refreshShowMetadataActionMock,
   resetShowProgressAction: vi.fn(),
-  setEpisodeWatchedAction: vi.fn(),
+  setEpisodeWatchedAction: setEpisodeWatchedActionMock,
   setSeasonWatchedAction: vi.fn(),
 }));
 
@@ -196,9 +197,13 @@ function showDetail(overrides: Partial<ShowDetail> = {}): ShowDetail {
   };
 }
 
-function renderShowDetail(show: ShowDetail = showDetail(), timeZone = "UTC") {
+function renderShowDetail(
+  show: ShowDetail = showDetail(),
+  timeZone = "UTC",
+  referenceDate?: string,
+) {
   hookState.stateIndex = 0;
-  return ShowDetailView({ show, timeZone });
+  return ShowDetailView({ referenceDate, show, timeZone });
 }
 
 function getText(node: React.ReactNode): string {
@@ -236,8 +241,15 @@ function findElements(
   const element = node as React.ReactElement<Record<string, unknown>>;
   const children = React.Children.toArray(element.props.children as React.ReactNode);
   const childMatches = children.flatMap((child) => findElements(child, predicate));
+  const elementMatches = predicate(element);
+  const renderedMatches = !elementMatches && typeof element.type === "function"
+    ? findElements(
+        (element.type as (props: Record<string, unknown>) => React.ReactNode)(element.props),
+        predicate,
+      )
+    : [];
 
-  return predicate(element) ? [element, ...childMatches] : childMatches;
+  return elementMatches ? [element, ...childMatches] : [...childMatches, ...renderedMatches];
 }
 
 function findButton(text: string, tree: React.ReactNode) {
@@ -250,6 +262,24 @@ function findButton(text: string, tree: React.ReactNode) {
 
   if (!button) {
     throw new Error(`Button not found: ${text}`);
+  }
+
+  return button;
+}
+
+function findEpisodeButton(text: string, tree: React.ReactNode, title?: string) {
+  const button = findElements(
+    tree,
+    (element) =>
+      typeof element.props.onClick === "function"
+      && typeof element.props.className === "string"
+      && element.props.className.includes("md:w-36")
+      && getText(element.props.children as React.ReactNode).includes(text)
+      && (title === undefined || element.props.title === title),
+  )[0];
+
+  if (!button) {
+    throw new Error(`Episode button not found: ${text}`);
   }
 
   return button;
@@ -274,8 +304,13 @@ describe("ShowDetailView refresh metadata UI", () => {
     hookState.transitionPending = false;
     routerRefreshMock.mockReset();
     refreshShowMetadataActionMock.mockReset();
+    setEpisodeWatchedActionMock.mockReset();
     refreshShowMetadataActionMock.mockResolvedValue({
       message: "Refreshed metadata for Arcane.",
+      status: "success",
+    });
+    setEpisodeWatchedActionMock.mockResolvedValue({
+      message: "Episode updated.",
       status: "success",
     });
   });
@@ -339,5 +374,115 @@ describe("ShowDetailView refresh metadata UI", () => {
     expect(markup).toContain("Jul 20, 2026");
     expect(markup).toContain("Jul 21, 2026");
     expect(markup).toContain("Metadata last refreshed Jul 18, 2026");
+  });
+
+  it("disables an unwatched future episode using the provided local reference date", async () => {
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate: "2026-09-21" })])],
+    });
+    const tree = renderShowDetail(show, "America/Sao_Paulo", "2026-09-14");
+    const button = findEpisodeButton("Mark watched", tree);
+
+    expect(button.props.disabled).toBe(true);
+    expect(button.props.title).toBe("Available Sep 21, 2026");
+    expect(button.props["aria-label"]).toBe("Mark watched — Available Sep 21, 2026");
+    (button.props.onClick as () => void)();
+    await flushPromises();
+    expect(setEpisodeWatchedActionMock).not.toHaveBeenCalled();
+  });
+
+  it("enables an unwatched episode on its local release date", () => {
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate: "2026-09-21" })])],
+    });
+    const button = findEpisodeButton(
+      "Mark watched",
+      renderShowDetail(show, "America/Sao_Paulo", "2026-09-21"),
+    );
+
+    expect(button.props.disabled).toBe(false);
+    expect(button.props.title).toBeUndefined();
+  });
+
+  it("keeps a released episode actionable", () => {
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate: "2026-09-07" })])],
+    });
+    const button = findEpisodeButton(
+      "Mark watched",
+      renderShowDetail(show, "America/Sao_Paulo", "2026-09-14"),
+    );
+
+    expect(button.props.disabled).toBe(false);
+  });
+
+  it.each([
+    ["null", null],
+    ["invalid", "2026-02-29"],
+  ])("preserves trackable fallback behavior for a %s air date", (_label, airDate) => {
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate })])],
+    });
+    const button = findEpisodeButton(
+      "Mark watched",
+      renderShowDetail(show, "America/Sao_Paulo", "2026-09-14"),
+    );
+
+    expect(button.props.disabled).toBe(false);
+  });
+
+  it("keeps Unwatch enabled for an already-watched future episode", () => {
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate: "2026-09-21", watched: true })])],
+    });
+    const button = findEpisodeButton(
+      "Unwatch",
+      renderShowDetail(show, "America/Sao_Paulo", "2026-09-14"),
+    );
+
+    expect(button.props.disabled).toBe(false);
+    expect(button.props.title).toBeUndefined();
+  });
+
+  it("keeps a released episode disabled while its mutation is pending", () => {
+    hookState.states = [null, "episode:1:2:watch"];
+    const button = findEpisodeButton(
+      "Mark watched",
+      renderShowDetail(showDetail(), "America/Sao_Paulo", "2026-09-14"),
+    );
+
+    expect(button.props.disabled).toBe(true);
+  });
+
+  it("does not change season or show bulk-control eligibility", () => {
+    const episodes = [
+      episode(1, 1, { airDate: "2026-09-07" }),
+      episode(1, 2, { airDate: "2026-09-21" }),
+    ];
+    const show = showDetail({
+      progress: {
+        displayStatus: "watchlist",
+        progressPercentage: 0,
+        status: "watchlist",
+        totalEpisodeCount: 1,
+        watchedEpisodeCount: 0,
+      },
+      seasons: [
+        season(1, episodes, {
+          progress: {
+            displayStatus: "watchlist",
+            progressPercentage: 0,
+            status: "watchlist",
+            totalEpisodeCount: 1,
+            watchedEpisodeCount: 0,
+          },
+        }),
+      ],
+    });
+    const tree = renderShowDetail(show, "America/Sao_Paulo", "2026-09-14");
+
+    expect(findButton("Watch season", tree).props.disabled).toBe(false);
+    expect(findButton("Mark watched", tree).props.disabled).toBe(false);
+    expect(findEpisodeButton("Mark watched", tree, "Available Sep 21, 2026").props.disabled).toBe(true);
   });
 });
