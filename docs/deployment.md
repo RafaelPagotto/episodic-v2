@@ -134,7 +134,7 @@ This is the only configured schedule. On Hobby, the invocation may occur anywher
 
 - Select distinct shows present in at least one non-dropped library. Favourite and watched progress do not affect eligibility.
 - Null `last_synced_at` is immediately stale and has highest priority.
-- Active or unknown lifecycle is stale at 24 hours; Ended/Canceled/Cancelled is stale at 30 days. Exact thresholds count as stale; matching ignores case and surrounding whitespace.
+- Active or unknown lifecycle is stale at 5 days; Ended/Canceled/Cancelled is stale at 180 days. Exact thresholds count as stale; matching ignores case and surrounding whitespace.
 - After null timestamps, prioritize active lifecycle, then oldest sync time, then ascending TMDB ID.
 - Each invocation selects at most the default 5 candidates and refreshes them sequentially. The selector's hard cap remains 10, but the route does not override its default.
 

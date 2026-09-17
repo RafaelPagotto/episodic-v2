@@ -116,37 +116,37 @@ describe("metadata refresh candidates", () => {
   });
 
   it.each(["Returning Series", "In Production", "Planned", null, "Unknown Lifecycle", "", " returning SERIES "])(
-    "uses the inclusive 24-hour threshold for %s", async (status) => {
+    "uses the inclusive 5-day threshold for %s", async (status) => {
       const db = new FakeSupabase();
-      addShow(db, 1, status, syncedAgo(DAY + 1));
-      addShow(db, 2, status, syncedAgo(DAY));
-      addShow(db, 3, status, syncedAgo(DAY - 1));
-      addShow(db, 4, status, syncedAgo(-DAY));
+      addShow(db, 1, status, syncedAgo(5 * DAY + 1));
+      addShow(db, 2, status, syncedAgo(5 * DAY));
+      addShow(db, 3, status, syncedAgo(5 * DAY - 1));
+      addShow(db, 4, status, syncedAgo(4 * DAY));
       expect((await getMetadataRefreshCandidates(client(db), { now: NOW })).map((row) => row.tmdbId)).toEqual([1, 2]);
     },
   );
 
   it.each(["Ended", "Canceled", "Cancelled", " eNDeD ", " CANCELED ", " cancelled "])(
-    "uses the inclusive 30-day threshold for %s", async (status) => {
+    "uses the inclusive 180-day threshold for %s", async (status) => {
       const db = new FakeSupabase();
-      addShow(db, 1, status, syncedAgo(30 * DAY + 1));
-      addShow(db, 2, status, syncedAgo(30 * DAY));
-      addShow(db, 3, status, syncedAgo(30 * DAY - 1));
-      addShow(db, 4, status, syncedAgo(2 * DAY));
+      addShow(db, 1, status, syncedAgo(180 * DAY + 1));
+      addShow(db, 2, status, syncedAgo(180 * DAY));
+      addShow(db, 3, status, syncedAgo(180 * DAY - 1));
+      addShow(db, 4, status, syncedAgo(179 * DAY));
       expect((await getMetadataRefreshCandidates(client(db), { now: NOW })).map((row) => row.tmdbId)).toEqual([1, 2]);
     },
   );
 
   it("orders null syncs first, then lifecycle, age and ID independent of input order", async () => {
     const db = new FakeSupabase();
-    addShow(db, 90, "Ended", syncedAgo(60 * DAY));
+    addShow(db, 90, "Ended", syncedAgo(240 * DAY));
     addShow(db, 30, "Ended", null);
     addShow(db, 20, "Returning Series", null);
     addShow(db, 10, null, null);
-    addShow(db, 70, "Returning Series", syncedAgo(2 * DAY));
-    addShow(db, 60, "Returning Series", syncedAgo(2 * DAY));
-    addShow(db, 50, "Unknown", syncedAgo(3 * DAY));
-    addShow(db, 80, "Canceled", syncedAgo(31 * DAY));
+    addShow(db, 70, "Returning Series", syncedAgo(6 * DAY));
+    addShow(db, 60, "Returning Series", syncedAgo(6 * DAY));
+    addShow(db, 50, "Unknown", syncedAgo(7 * DAY));
+    addShow(db, 80, "Canceled", syncedAgo(181 * DAY));
     const expectedIds = [10, 20, 30, 50, 60, 70, 90, 80];
     const select = () => getMetadataRefreshCandidates(client(db), { now: NOW, batchSize: 10 });
 
@@ -231,7 +231,7 @@ describe("metadata refresh candidates", () => {
     try {
       vi.setSystemTime(NOW);
       const db = new FakeSupabase();
-      addShow(db, 1, null, syncedAgo(DAY));
+      addShow(db, 1, null, syncedAgo(5 * DAY));
       expect((await getMetadataRefreshCandidates(client(db))).map((row) => row.tmdbId)).toEqual([1]);
     } finally {
       vi.useRealTimers();

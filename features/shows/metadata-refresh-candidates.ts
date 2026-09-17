@@ -8,8 +8,9 @@ const PAGE_SIZE = 1000;
 const SHOW_ID_BATCH_SIZE = 100;
 const DEFAULT_BATCH_SIZE = 5;
 const MAX_BATCH_SIZE = 10;
-const ACTIVE_STALE_MS = 24 * 60 * 60 * 1000;
-const INACTIVE_STALE_MS = 30 * ACTIVE_STALE_MS;
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ACTIVE_STALE_MS = 5 * DAY_MS;
+const INACTIVE_STALE_MS = 180 * DAY_MS;
 const INACTIVE_STATUSES = new Set(["ended", "canceled", "cancelled"]);
 
 type MetadataClient = SupabaseClient<Database>;
