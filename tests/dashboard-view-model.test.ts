@@ -260,7 +260,7 @@ describe("dashboard view model", () => {
     expect(dashboard.hiddenContinueWatchingCount).toBe(0);
   });
 
-  it("omits a watching show with released backlog and includes a caught-up show", () => {
+  it("includes watching and caught-up shows in Upcoming while only the backlog appears in Continue Watching", () => {
     const records = [
       record({
         episodes: [
@@ -293,7 +293,7 @@ describe("dashboard view model", () => {
 
     const items = getUpcomingEpisodeItems(records, options);
 
-    expect(items).toHaveLength(1);
+    expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({
       airDate: "2026-06-08",
       detailHref: "/shows/2?season=1",
@@ -303,9 +303,15 @@ describe("dashboard view model", () => {
       showTitle: "Show 2",
       tmdbId: 2,
     });
+    expect(items[1]).toMatchObject({
+      airDate: "2026-06-10",
+      episodeNumber: 3,
+      seasonNumber: 1,
+      tmdbId: 1,
+    });
   });
 
-  it("keeps a One Piece-style large backlog in Continue Watching and out of Upcoming", () => {
+  it("intentionally shows One Piece in both sections with distinct released and future episodes", () => {
     const showTmdbId = 37854;
     const episodes = Array.from({ length: 1178 }, (_, index) =>
       episode(showTmdbId, 23, index + 1, {
@@ -323,8 +329,9 @@ describe("dashboard view model", () => {
       watchedEpisodes,
     })];
     const options = { referenceDate: "2026-09-12", timeZone: "America/Sao_Paulo" };
+    const dashboard = createDashboardData(records, preferences(), options);
 
-    expect(getContinueWatchingItems(records, preferences(), options)).toEqual([
+    expect(dashboard.continueWatching).toEqual([
       expect.objectContaining({
         nextEpisode: expect.objectContaining({ episodeNumber: 1089, seasonNumber: 23 }),
         title: "One Piece",
@@ -333,10 +340,18 @@ describe("dashboard view model", () => {
         watchedEpisodeCount: 1088,
       }),
     ]);
-    expect(getUpcomingEpisodeItems(records, options)).toEqual([]);
+    expect(dashboard.upcomingEpisodes).toEqual([
+      expect.objectContaining({
+        airDate: "2026-09-13",
+        episodeNumber: 1178,
+        seasonNumber: 23,
+        showTitle: "One Piece",
+        tmdbId: showTmdbId,
+      }),
+    ]);
   });
 
-  it("shows a future episode after the final released episode is watched", () => {
+  it("keeps the same Upcoming episode before and after the final released episode is watched", () => {
     const showTmdbId = 3;
     const episodes = [
       episode(showTmdbId, 1, 1, { airDate: "2026-06-01" }),
@@ -357,9 +372,42 @@ describe("dashboard view model", () => {
     });
     const options = { referenceDate: "2026-06-07" };
 
-    expect(getUpcomingEpisodeItems([behind], options)).toEqual([]);
+    expect(getContinueWatchingItems([behind], preferences(), options)).toEqual([
+      expect.objectContaining({
+        nextEpisode: expect.objectContaining({ episodeNumber: 2 }),
+        tmdbId: showTmdbId,
+      }),
+    ]);
+    expect(getContinueWatchingItems([caughtUp], preferences(), options)).toEqual([]);
+    expect(getUpcomingEpisodeItems([behind], options)).toEqual([
+      expect.objectContaining({ episodeNumber: 3, tmdbId: showTmdbId }),
+    ]);
     expect(getUpcomingEpisodeItems([caughtUp], options)).toEqual([
       expect.objectContaining({ episodeNumber: 3, tmdbId: showTmdbId }),
+    ]);
+  });
+
+  it.each([1, 2])("preserves the 90-day horizon with %i of 2 released episodes watched", (watchedCount) => {
+    const records = ["2026-12-11", "2026-12-12", "2027-01-10"].map((airDate, index) => {
+      const showTmdbId = 300 + index;
+      return record({
+        episodes: [
+          episode(showTmdbId, 1, 1, { airDate: "2026-09-01" }),
+          episode(showTmdbId, 1, 2, { airDate: "2026-09-02" }),
+          episode(showTmdbId, 1, 3, { airDate }),
+        ],
+        showTmdbId,
+        status: "watching",
+        watchedEpisodes: Array.from({ length: watchedCount }, (_, i) => watched(showTmdbId, 1, i + 1)),
+      });
+    });
+
+    // From September 12 these dates are +90, +91, and +120 calendar days.
+    expect(getUpcomingEpisodeItems(records, {
+      referenceDate: "2026-09-12",
+      timeZone: "America/Sao_Paulo",
+    })).toEqual([
+      expect.objectContaining({ airDate: "2026-12-11", episodeNumber: 3, tmdbId: 300 }),
     ]);
   });
 
