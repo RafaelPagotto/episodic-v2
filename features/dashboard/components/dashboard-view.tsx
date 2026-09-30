@@ -341,25 +341,12 @@ export function DashboardView({ data }: DashboardViewProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <section aria-labelledby="library-summary-heading" className="space-y-3">
-        <div>
-          <h2 id="library-summary-heading" className="text-lg font-semibold tracking-tight">
-            Library Summary
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Full library totals, including shows hidden by display preferences.
-          </p>
-        </div>
+      <section aria-label="Library summary">
         <LibrarySummaryTiles summary={data.summary} />
       </section>
 
       <section className="space-y-4">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Continue Watching</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick up from the next unwatched episode in your active shows.
-          </p>
-        </div>
+        <h2 className="text-xl font-semibold tracking-tight">Continue Watching</h2>
 
         {message ? (
           <ActionFeedback
@@ -392,14 +379,9 @@ export function DashboardView({ data }: DashboardViewProps) {
       </section>
 
       <section aria-labelledby="upcoming-episodes-heading" className="space-y-3">
-        <div>
-          <h2 id="upcoming-episodes-heading" className="text-lg font-semibold tracking-tight">
-            Upcoming Episodes
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Known future main-series episodes from your last TMDB import.
-          </p>
-        </div>
+        <h2 id="upcoming-episodes-heading" className="text-lg font-semibold tracking-tight">
+          Upcoming Episodes
+        </h2>
 
         {data.upcomingEpisodes.length === 0 ? (
           <Card className="border-dashed bg-card/60">
@@ -417,14 +399,9 @@ export function DashboardView({ data }: DashboardViewProps) {
       </section>
 
       <section aria-labelledby="start-watching-heading" className="space-y-3">
-        <div>
-          <h2 id="start-watching-heading" className="text-lg font-semibold tracking-tight">
-            Start Watching
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Pick a saved watchlist show and open its first available main-series episode.
-          </p>
-        </div>
+        <h2 id="start-watching-heading" className="text-lg font-semibold tracking-tight">
+          Start Watching
+        </h2>
 
         {data.startWatching.length === 0 ? (
           <Card className="border-dashed bg-card/60">

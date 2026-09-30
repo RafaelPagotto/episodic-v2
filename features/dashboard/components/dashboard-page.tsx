@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { Notice } from "@/components/ui/notice";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
 import { getUserDateOptions } from "@/features/profile/timezone";
@@ -59,12 +58,7 @@ export async function DashboardPageContent() {
   const { data, errorMessage } = await getDashboardPageState();
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <PageHeader
-        description="A quick look at your library, progress, favourites, and next episodes."
-        title="Dashboard"
-      />
-
+    <section aria-label="Dashboard" className="mx-auto w-full max-w-6xl">
       {errorMessage || !data ? (
         <Notice tone="error">{errorMessage || "Unable to load your dashboard."}</Notice>
       ) : (
