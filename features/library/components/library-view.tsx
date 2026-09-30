@@ -117,7 +117,7 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
           alt={`${show.title} poster`}
           className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
           height={513}
-          sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
+          sizes="(max-width: 639px) 182px, 234px"
           src={posterUrl}
           width={342}
         />
@@ -334,12 +334,13 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
   }
 
   return (
-    <div className="flex flex-col gap-5">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2" aria-label="Library filters">
+    <div className="flex min-w-0 flex-col gap-5 [container-type:inline-size]">
+      <div className="flex min-w-0 flex-col gap-3 [@container_(min-width:70rem)]:flex-row [@container_(min-width:70rem)]:items-center [@container_(min-width:70rem)]:justify-between">
+        <div className="-m-1 flex min-w-0 gap-2 overflow-x-auto p-1 [@container_(min-width:70rem)]:flex-1" aria-label="Library filters">
           {LIBRARY_FILTERS.map((option) => (
             <Button
               aria-pressed={filter === option.value}
+              className="shrink-0"
               key={option.value}
               onClick={() => handleFilterChange(option.value)}
               type="button"
@@ -350,11 +351,11 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="grid w-full min-w-0 grid-cols-1 items-center gap-3 [@container_(min-width:26rem)]:grid-cols-[minmax(0,1fr)_auto] [@container_(min-width:70rem)]:w-auto [@container_(min-width:70rem)]:shrink-0">
+          <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground [@container_(min-width:26rem)]:max-w-sm [@container_(min-width:70rem)]:w-64">
             Sort
             <select
-              className="h-9 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+              className="h-10 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
               onChange={(event) => handleSortChoiceChange(event.target.value)}
               value={`${sort}:${sortDirection}`}
             >
@@ -366,7 +367,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
             </select>
           </label>
 
-          <div aria-label="Library view mode" className="flex rounded-md border bg-background p-1" role="group">
+          <div aria-label="Library view mode" className="flex w-fit justify-self-end rounded-md border bg-background p-[3px]" role="group">
             {LIBRARY_VIEW_MODES.map((option) => {
               const Icon = option.value === "grid" ? LayoutGrid : List;
 
@@ -422,7 +423,9 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
       ) : null}
 
       {visibleShows.length > 0 && viewMode === "grid" ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5">
+        // Phones use two compact columns and a two-row action layout. Wider
+        // layouts need 220px per column plus 12px gaps, with tracks capped at 260px.
+        <div className="grid min-w-0 grid-cols-[repeat(2,minmax(0,12.5rem))] justify-center gap-2 max-[299px]:grid-cols-[minmax(0,12.5rem)] sm:grid-cols-[repeat(var(--library-columns),minmax(0,16.25rem))] sm:gap-3 [--library-columns:1] [@container_(min-width:28.25rem)]:[--library-columns:2] [@container_(min-width:42.75rem)]:[--library-columns:3] [@container_(min-width:57.25rem)]:[--library-columns:4] [@container_(min-width:71.75rem)]:[--library-columns:5]">
           {visibleShows.map((show) => {
             const isUpdatingFavourite = pendingAction === `favourite:${show.tmdbId}`;
             const isMarkingWatched = pendingAction === `watch:${show.tmdbId}`;
@@ -438,7 +441,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
                 key={show.tmdbId}
                 className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-60")}
               >
-                <CardContent className="flex h-full flex-col gap-2 p-3 sm:p-3 sm:px-4">
+                <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
                   <LibraryGridPosterLink show={show} />
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -463,7 +466,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
                       watchedEpisodeCount={show.watchedEpisodeCount}
                     />
 
-                    <div className="mt-auto grid grid-cols-4 gap-2">
+                    <div className="mt-auto grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-4 sm:justify-items-start">
                       <Button
                         aria-label={`Mark all main episodes of ${show.title} watched`}
                         disabled={Boolean(pendingAction) || isPending || show.totalEpisodeCount === 0 || showComplete}
