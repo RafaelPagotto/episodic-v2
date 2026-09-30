@@ -92,6 +92,7 @@ export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }:
   return (
     <ShowDetailView
       initialSeasonParam={seasonQueryParam}
+      key={show.tmdbId}
       referenceDate={referenceDate}
       show={show}
       timeZone={timeZone}

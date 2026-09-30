@@ -1,6 +1,6 @@
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ShowDetailView } from "../features/shows/components/show-detail-view";
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason } from "../features/shows";
@@ -8,6 +8,12 @@ import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason } from "../feature
 const hookState = vi.hoisted(() => ({
   stateIndex: 0,
   states: [] as unknown[],
+  refIndex: 0,
+  refs: [] as Array<{ current: unknown }>,
+  effectIndex: 0,
+  effectDeps: [] as Array<readonly unknown[] | undefined>,
+  effectCleanups: [] as Array<(() => void) | undefined>,
+  pendingEffects: [] as Array<{ index: number; effect: () => void | (() => void) }>,
   transitionPending: false,
 }));
 const routerRefreshMock = vi.hoisted(() => vi.fn());
@@ -19,7 +25,23 @@ vi.mock("react", async () => {
 
   return {
     ...actual,
-    useEffect: vi.fn(),
+    useEffect: vi.fn((effect: () => void | (() => void), deps?: readonly unknown[]) => {
+      const index = hookState.effectIndex++;
+      const previous = hookState.effectDeps[index];
+      if (!previous || !deps || deps.some((value, position) => !Object.is(value, previous[position]))) {
+        hookState.effectCleanups[index]?.();
+        hookState.effectDeps[index] = deps;
+        hookState.pendingEffects.push({ index, effect });
+      }
+    }),
+    useRef: vi.fn((initialValue: unknown) => {
+      const refIndex = hookState.refIndex;
+      hookState.refIndex += 1;
+      if (!hookState.refs[refIndex]) {
+        hookState.refs[refIndex] = { current: initialValue };
+      }
+      return hookState.refs[refIndex];
+    }),
     useState: vi.fn((initialValue: unknown) => {
       const stateIndex = hookState.stateIndex;
       hookState.stateIndex += 1;
@@ -203,7 +225,15 @@ function renderShowDetail(
   referenceDate?: string,
 ) {
   hookState.stateIndex = 0;
-  return ShowDetailView({ referenceDate, show, timeZone });
+  hookState.refIndex = 0;
+  hookState.effectIndex = 0;
+  const tree = ShowDetailView({ referenceDate, show, timeZone });
+  const effects = hookState.pendingEffects.splice(0);
+  effects.forEach(({ index, effect }) => {
+    const cleanup = effect();
+    hookState.effectCleanups[index] = typeof cleanup === "function" ? cleanup : undefined;
+  });
+  return tree;
 }
 
 function getText(node: React.ReactNode): string {
@@ -285,6 +315,21 @@ function findEpisodeButton(text: string, tree: React.ReactNode, title?: string) 
   return button;
 }
 
+function episodeButtons(tree: React.ReactNode) {
+  return findElements(
+    tree,
+    (element) => typeof element.props.onClick === "function"
+      && typeof element.props.className === "string"
+      && element.props.className.includes("md:w-36"),
+  );
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((complete) => { resolve = complete; });
+  return { promise, resolve };
+}
+
 function hasText(text: string | RegExp, tree: React.ReactNode) {
   const fullText = getText(tree);
 
@@ -297,10 +342,17 @@ async function flushPromises() {
 }
 
 describe("ShowDetailView refresh metadata UI", () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     (globalThis as typeof globalThis & { React: typeof React }).React = React;
     hookState.stateIndex = 0;
     hookState.states = [];
+    hookState.refIndex = 0;
+    hookState.refs = [];
+    hookState.effectIndex = 0;
+    hookState.effectDeps = [];
+    hookState.effectCleanups = [];
+    hookState.pendingEffects = [];
     hookState.transitionPending = false;
     routerRefreshMock.mockReset();
     refreshShowMetadataActionMock.mockReset();
@@ -445,7 +497,7 @@ describe("ShowDetailView refresh metadata UI", () => {
   });
 
   it("keeps a released episode disabled while its mutation is pending", () => {
-    hookState.states = [null, "episode:1:2:watch"];
+    hookState.states = [null, null, {}, new Set(["1:2"])];
     const button = findEpisodeButton(
       "Mark watched",
       renderShowDetail(showDetail(), "America/Sao_Paulo", "2026-09-14"),
@@ -484,5 +536,198 @@ describe("ShowDetailView refresh metadata UI", () => {
     expect(findButton("Watch season", tree).props.disabled).toBe(false);
     expect(findButton("Mark watched", tree).props.disabled).toBe(false);
     expect(findEpisodeButton("Mark watched", tree, "Available Sep 21, 2026").props.disabled).toBe(true);
+  });
+
+  it("marks one episode immediately, then reconciles new authoritative props after one refresh", async () => {
+    const response = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
+    const show = showDetail();
+
+    (episodeButtons(renderShowDetail(show))[1]?.props.onClick as () => void)();
+    const optimistic = renderShowDetail(show);
+    expect(getText(episodeButtons(optimistic)[1]?.props.children as React.ReactNode)).toContain("Unwatch");
+    expect(episodeButtons(optimistic)[1]?.props.disabled).toBe(true);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledWith({
+      episodeNumber: 2, seasonNumber: 1, tmdbId: 100, watched: true,
+    });
+
+    const intermediateProps = showDetail();
+    renderShowDetail(intermediateProps);
+    expect(getText(episodeButtons(renderShowDetail(intermediateProps))[1]?.props.children as React.ReactNode)).toContain("Unwatch");
+
+    response.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+
+    const authoritative = showDetail();
+    renderShowDetail(authoritative);
+    const reconciled = renderShowDetail(authoritative);
+    expect(getText(episodeButtons(reconciled)[1]?.props.children as React.ReactNode)).toContain("Mark watched");
+  });
+
+  it("keeps other rows usable and serializes three rapid optimistic marks", async () => {
+    const responses = [deferred<{ message: string; status: "success" }>(), deferred<{ message: string; status: "success" }>(), deferred<{ message: string; status: "success" }>()];
+    responses.forEach((response) => setEpisodeWatchedActionMock.mockImplementationOnce(() => response.promise));
+    const show = showDetail({
+      progress: { displayStatus: "watchlist", progressPercentage: 0, status: "watchlist", totalEpisodeCount: 3, watchedEpisodeCount: 0 },
+      seasons: [season(1, [episode(1, 5), episode(1, 6), episode(1, 7)])],
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      const tree = renderShowDetail(show);
+      expect(episodeButtons(tree)[index]?.props.disabled).toBe(false);
+      (episodeButtons(tree)[index]?.props.onClick as () => void)();
+    }
+    const optimistic = renderShowDetail(show);
+    expect(episodeButtons(optimistic).slice(0, 3).map((button) => getText(button.props.children as React.ReactNode))).toEqual([
+      "Unwatch", "Unwatch", "Unwatch",
+    ]);
+    expect(hasText("Caught up", optimistic)).toBe(true);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(1);
+    expect(findButton("Unwatch season", optimistic).props.disabled).toBe(true);
+    expect(findButton("Mark watched", optimistic).props.disabled).toBe(true);
+    expect(findButton("Drop", optimistic).props.disabled).toBe(true);
+    expect(findButton("Refresh metadata", optimistic).props.disabled).toBe(true);
+    expect(findButton("Favourite", optimistic).props.disabled).toBe(false);
+
+    for (let index = 0; index < 3; index += 1) {
+      responses[index]?.resolve({ message: "Episode marked watched.", status: "success" });
+      await flushPromises();
+      expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(Math.min(index + 2, 3));
+    }
+    expect(setEpisodeWatchedActionMock.mock.calls.map(([input]) => input.episodeNumber)).toEqual([5, 6, 7]);
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rolls back only the failed episode and continues the queue", async () => {
+    const first = deferred<{ message: string; status: "error" }>();
+    const second = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
+    const show = showDetail({
+      progress: { displayStatus: "watchlist", progressPercentage: 0, status: "watchlist", totalEpisodeCount: 2, watchedEpisodeCount: 0 },
+      seasons: [season(1, [episode(1, 5), episode(1, 6)])],
+    });
+
+    (episodeButtons(renderShowDetail(show))[0]?.props.onClick as () => void)();
+    (episodeButtons(renderShowDetail(show))[1]?.props.onClick as () => void)();
+    first.resolve({ message: "This episode has not been released yet.", status: "error" });
+    await flushPromises();
+    const afterFailure = renderShowDetail(show);
+    expect(getText(episodeButtons(afterFailure)[0]?.props.children as React.ReactNode)).toContain("Mark watched");
+    expect(getText(episodeButtons(afterFailure)[1]?.props.children as React.ReactNode)).toContain("Unwatch");
+    expect(hasText("This episode has not been released yet.", afterFailure)).toBe(true);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(2);
+
+    second.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+    expect(hasText("This episode has not been released yet.", renderShowDetail(show))).toBe(true);
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves unwatch confirmation and prevents duplicate clicks on a pending episode", async () => {
+    const confirm = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    vi.stubGlobal("window", { confirm });
+    const response = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
+    const show = showDetail();
+    const originalButton = episodeButtons(renderShowDetail(show))[0];
+
+    (originalButton?.props.onClick as () => void)();
+    expect(setEpisodeWatchedActionMock).not.toHaveBeenCalled();
+    (originalButton?.props.onClick as () => void)();
+    (originalButton?.props.onClick as () => void)();
+    const optimistic = renderShowDetail(show);
+    expect(getText(episodeButtons(optimistic)[0]?.props.children as React.ReactNode)).toContain("Mark watched");
+    expect(episodeButtons(optimistic)[0]?.props.disabled).toBe(true);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(1);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledWith({
+      episodeNumber: 1, seasonNumber: 1, tmdbId: 100, watched: false,
+    });
+
+    response.resolve({ message: "Episode marked unwatched.", status: "success" });
+    await flushPromises();
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps queued mutations when the visible season changes", async () => {
+    vi.stubGlobal("window", {
+      history: { replaceState: vi.fn() },
+      location: { pathname: "/shows/100", search: "" },
+    });
+    const first = deferred<{ message: string; status: "success" }>();
+    const second = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockImplementationOnce(() => first.promise).mockImplementationOnce(() => second.promise);
+    const show = showDetail({
+      progress: { displayStatus: "watchlist", progressPercentage: 0, status: "watchlist", totalEpisodeCount: 2, watchedEpisodeCount: 0 },
+      seasons: [season(1, [episode(1, 5)]), season(2, [episode(2, 1)])],
+    });
+
+    (episodeButtons(renderShowDetail(show))[0]?.props.onClick as () => void)();
+    const select = findElements(renderShowDetail(show), (element) => element.type === "select")[0];
+    (select?.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "2" } });
+    const nextSeason = renderShowDetail(show);
+    expect(hasText("Season 2", nextSeason)).toBe(true);
+    (episodeButtons(nextSeason)[0]?.props.onClick as () => void)();
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(1);
+
+    first.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(2);
+    expect(setEpisodeWatchedActionMock.mock.calls.map(([input]) => [input.seasonNumber, input.episodeNumber])).toEqual([
+      [1, 5], [2, 1],
+    ]);
+    second.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows optimistic cleanup of a watched future episode while still blocking a new future mark", async () => {
+    vi.stubGlobal("window", { confirm: vi.fn(() => true) });
+    const response = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
+    const show = showDetail({
+      seasons: [season(1, [episode(1, 1, { airDate: "2026-09-21", watched: true })])],
+    });
+
+    (episodeButtons(renderShowDetail(show, "America/Sao_Paulo", "2026-09-14"))[0]?.props.onClick as () => void)();
+    const optimistic = renderShowDetail(show, "America/Sao_Paulo", "2026-09-14");
+    expect(getText(episodeButtons(optimistic)[0]?.props.children as React.ReactNode)).toContain("Mark watched");
+    expect(episodeButtons(optimistic)[0]?.props.disabled).toBe(true);
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledWith({
+      episodeNumber: 1, seasonNumber: 1, tmdbId: 100, watched: false,
+    });
+    response.resolve({ message: "Episode marked unwatched.", status: "success" });
+    await flushPromises();
+    const afterSync = renderShowDetail(show, "America/Sao_Paulo", "2026-09-14");
+    expect(episodeButtons(afterSync)[0]?.props.disabled).toBe(true);
+  });
+
+  it("permits an optimistic manual mark for a released Special", async () => {
+    const response = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
+    const show = showDetail({ seasons: [season(0, [episode(0, 1)])] });
+
+    (episodeButtons(renderShowDetail(show, "UTC", "2026-09-14"))[0]?.props.onClick as () => void)();
+    expect(getText(episodeButtons(renderShowDetail(show, "UTC", "2026-09-14"))[0]?.props.children as React.ReactNode)).toContain("Unwatch");
+    expect(setEpisodeWatchedActionMock).toHaveBeenCalledWith({
+      episodeNumber: 1, seasonNumber: 0, tmdbId: 100, watched: true,
+    });
+    response.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+  });
+
+  it("does not update component state or refresh after unmount", async () => {
+    const response = deferred<{ message: string; status: "success" }>();
+    setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
+    const show = showDetail();
+
+    (episodeButtons(renderShowDetail(show))[1]?.props.onClick as () => void)();
+    const stateAtUnmount = [...hookState.states];
+    hookState.effectCleanups[0]?.();
+    response.resolve({ message: "Episode marked watched.", status: "success" });
+    await flushPromises();
+
+    expect(hookState.states).toEqual(stateAtUnmount);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 });

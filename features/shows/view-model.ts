@@ -1,4 +1,7 @@
 import {
+  calculateProgressPercentage,
+  deriveDisplayStatus,
+  deriveTrackingStatusAfterProgressChange,
   isEpisodeTrackable,
   isMainSeriesEpisode,
   type DisplayStatus,
@@ -18,6 +21,82 @@ export const SHOW_DETAIL_STATUS_LABELS: Record<DisplayStatus, string> = {
 
 export const SPECIALS_OPTIONAL_NOTE =
   "Specials are optional extras and do not affect main progress or status.";
+
+export function getShowDetailEpisodeKey(episode: Pick<ShowDetailEpisode, "seasonNumber" | "episodeNumber">) {
+  return `${episode.seasonNumber}:${episode.episodeNumber}`;
+}
+
+export function applyOptimisticEpisodeWatched(
+  show: ShowDetail,
+  watchedOverrides: Readonly<Record<string, boolean>>,
+  options: EpisodeCalculationOptions = {},
+): ShowDetail {
+  if (Object.keys(watchedOverrides).length === 0) {
+    return show;
+  }
+
+  let mainWatchedDelta = 0;
+  const seasons = show.seasons.map((season) => {
+    let seasonWatchedDelta = 0;
+    const episodes = season.episodes.map((episode) => {
+      const nextWatched = watchedOverrides[getShowDetailEpisodeKey(episode)];
+      if (nextWatched === undefined || nextWatched === episode.watched) {
+        return episode;
+      }
+
+      if (isShowDetailEpisodeTrackable(show.tmdbId, episode, options)) {
+        const delta = nextWatched ? 1 : -1;
+        seasonWatchedDelta += delta;
+        if (episode.seasonNumber > 0) {
+          mainWatchedDelta += delta;
+        }
+      }
+
+      return { ...episode, watched: nextWatched };
+    });
+    const watchedEpisodeCount = season.progress.watchedEpisodeCount + seasonWatchedDelta;
+
+    return {
+      ...season,
+      episodes,
+      progress: {
+        ...season.progress,
+        progressPercentage: calculateProgressPercentage({
+          totalEpisodeCount: season.progress.totalEpisodeCount,
+          watchedEpisodeCount,
+        }),
+        watchedEpisodeCount,
+      },
+    };
+  });
+
+  const watchedEpisodeCount = show.progress.watchedEpisodeCount + mainWatchedDelta;
+  const status = deriveTrackingStatusAfterProgressChange({
+    totalEpisodeCount: show.progress.totalEpisodeCount,
+    trackingStatus: show.progress.status,
+    watchedEpisodeCount,
+  });
+
+  return {
+    ...show,
+    progress: {
+      ...show.progress,
+      displayStatus: deriveDisplayStatus({
+        tmdbStatus: show.tmdbStatus,
+        totalEpisodeCount: show.progress.totalEpisodeCount,
+        trackingStatus: status,
+        watchedEpisodeCount,
+      }),
+      progressPercentage: calculateProgressPercentage({
+        totalEpisodeCount: show.progress.totalEpisodeCount,
+        watchedEpisodeCount,
+      }),
+      status,
+      watchedEpisodeCount,
+    },
+    seasons,
+  };
+}
 
 type SeasonNavigationOptions = EpisodeCalculationOptions;
 

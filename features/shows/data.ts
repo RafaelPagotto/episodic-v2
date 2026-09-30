@@ -201,6 +201,23 @@ export async function getOwnedUserShow(
   return data?.[0] ?? null;
 }
 
+async function getOwnedUserShowForEpisodeMutation(
+  supabase: EpisodicSupabaseClient,
+  userId: string,
+  tmdbId: number,
+) {
+  const { data, error } = await supabase
+    .from("user_shows")
+    .select("user_id,show_tmdb_id,status")
+    .eq("user_id", userId)
+    .eq("show_tmdb_id", tmdbId)
+    .limit(1);
+
+  throwDataError(error, "Unable to load show from your library.");
+
+  return data?.[0] ?? null;
+}
+
 async function getShowEpisodes(supabase: EpisodicSupabaseClient, tmdbId: number, seasonNumber?: number) {
   let query = supabase
     .from("episodes")
@@ -242,13 +259,29 @@ async function getFullShowWatchedEpisodes(supabase: EpisodicSupabaseClient, user
 
 async function updateUserShowStatusFromProgress(
   supabase: EpisodicSupabaseClient,
-  userShow: UserShowRow,
+  userShow: Pick<UserShowRow, "user_id" | "show_tmdb_id" | "status">,
   watchedEpisodes?: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {
-  const episodes = await getFullShowEpisodes(supabase, userShow.show_tmdb_id);
-  const currentWatchedEpisodes =
-    watchedEpisodes ?? (await getFullShowWatchedEpisodes(supabase, userShow.user_id, userShow.show_tmdb_id));
+  // Start both complete, paginated reads after the write. Check the episode result
+  // first to retain the prior error precedence if both reads fail.
+  const [episodesResult, watchedResult] = await Promise.allSettled([
+    getFullShowEpisodes(supabase, userShow.show_tmdb_id),
+    watchedEpisodes === undefined
+      ? getFullShowWatchedEpisodes(supabase, userShow.user_id, userShow.show_tmdb_id)
+      : Promise.resolve(watchedEpisodes),
+  ]);
+
+  if (episodesResult.status === "rejected") {
+    throw episodesResult.reason;
+  }
+
+  if (watchedResult.status === "rejected") {
+    throw watchedResult.reason;
+  }
+
+  const episodes = episodesResult.value;
+  const currentWatchedEpisodes = watchedResult.value;
   const nextStatus = deriveTrackingStatusAfterProgressChange({
     totalEpisodeCount: calculateTotalEpisodeCount(episodes, options),
     trackingStatus: userShow.status,
@@ -268,7 +301,10 @@ async function updateUserShowStatusFromProgress(
   throwDataError(error, "Unable to update show status.");
 }
 
-function watchedEpisodeInsertFromEpisode(row: EpisodeRow, userId: string): WatchedEpisodeInsert {
+function watchedEpisodeInsertFromEpisode(
+  row: Pick<EpisodeRow, "episode_number" | "season_number" | "show_tmdb_id">,
+  userId: string,
+): WatchedEpisodeInsert {
   return {
     episode_number: row.episode_number,
     season_number: row.season_number,
@@ -331,7 +367,7 @@ export async function setEpisodeWatched(
   watched: boolean,
   options: EpisodeCalculationOptions = {},
 ) {
-  const userShow = await getOwnedUserShow(supabase, userId, tmdbId);
+  const userShow = await getOwnedUserShowForEpisodeMutation(supabase, userId, tmdbId);
 
   if (!userShow) {
     throw new ShowDataError("This show is not in your library.");
@@ -339,7 +375,7 @@ export async function setEpisodeWatched(
 
   const { data: episodeRows, error: episodeError } = await supabase
     .from("episodes")
-    .select("*")
+    .select("show_tmdb_id,season_number,episode_number,air_date")
     .eq("show_tmdb_id", tmdbId)
     .eq("season_number", seasonNumber)
     .eq("episode_number", episodeNumber)
@@ -353,7 +389,7 @@ export async function setEpisodeWatched(
     throw new ShowDataError("Episode not found.");
   }
 
-  if (watched && !isEpisodeTrackable(mapEpisodeRow(episode), options)) {
+  if (watched && !isEpisodeTrackable({ airDate: episode.air_date }, options)) {
     throw new ShowDataError("This episode has not been released yet.");
   }
 

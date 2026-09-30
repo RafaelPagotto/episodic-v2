@@ -82,6 +82,8 @@ class FakeSupabase {
   shows: ShowRow[];
   userShows: UserShowRow[];
   watchedEpisodes: WatchedEpisodeRow[] = [];
+  selections: Array<{ table: TableName; columns: string }> = [];
+  onRange?: (table: TableName) => Promise<void> | void;
 
   private watchedEpisodeId = 1;
 
@@ -178,6 +180,7 @@ class FakeQuery {
   private limitCount: number | null = null;
   private orderColumns: string[] = [];
   private operation: "delete" | "select" | "update" = "select";
+  private selectedColumns = "*";
   private updateValues: Record<string, unknown> = {};
 
   constructor(
@@ -210,13 +213,15 @@ class FakeQuery {
     return this;
   }
 
-  select() {
+  select(columns = "*") {
     this.operation = "select";
+    this.selectedColumns = columns;
+    this.db.selections.push({ table: this.table, columns });
     return this;
   }
 
   range(rangeStart: number, rangeEnd: number) {
-    return Promise.resolve(this.execute(rangeStart, rangeEnd));
+    return Promise.resolve(this.db.onRange?.(this.table)).then(() => this.execute(rangeStart, rangeEnd));
   }
 
   update(values: Record<string, unknown>) {
@@ -249,7 +254,7 @@ class FakeQuery {
       return { data: null, error: null };
     }
 
-    let rows = this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters));
+    let rows: object[] = this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters));
 
     if (this.orderColumns.length > 0) {
       rows = [...rows].sort((left, right) => {
@@ -274,11 +279,17 @@ class FakeQuery {
       rows = rows.slice(rangeStart, rangeEnd + 1);
     }
 
+    if (this.selectedColumns !== "*") {
+      rows = rows.map((row) => Object.fromEntries(
+        this.selectedColumns.split(",").map((column) => [column, getColumnValue(row, column)]),
+      ));
+    }
+
     return { data: rows, error: null };
   }
 }
 
-function episodeRow(seasonNumber: number, episodeNumber: number, airDate = "2026-01-01"): EpisodeRow {
+function episodeRow(seasonNumber: number, episodeNumber: number, airDate: string | null = "2026-01-01"): EpisodeRow {
   return {
     air_date: airDate,
     episode_number: episodeNumber,
@@ -417,6 +428,100 @@ describe("show progress actions", () => {
     await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, MULTI_SHOW_EPISODE_PAGE_SIZE + 1, true);
 
     expect(db.watchedEpisodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 1);
+    expect(db.userShows[0]?.status).toBe("watched");
+  });
+
+  it("starts both complete post-write reads before either finishes", async () => {
+    const db = new FakeSupabase();
+    let releaseEpisodeRead = () => {};
+    let signalEpisodeRead = () => {};
+    const heldEpisodeRead = new Promise<void>((resolve) => { releaseEpisodeRead = resolve; });
+    const episodeReadStarted = new Promise<void>((resolve) => { signalEpisodeRead = resolve; });
+    const startedReads: TableName[] = [];
+
+    db.onRange = (table) => {
+      startedReads.push(table);
+      if (table === "episodes") {
+        signalEpisodeRead();
+        return heldEpisodeRead;
+      }
+    };
+
+    const mutation = setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true);
+    await episodeReadStarted;
+
+    try {
+      expect(startedReads).toContain("watched_episodes");
+    } finally {
+      releaseEpisodeRead();
+    }
+
+    await mutation;
+    expect(db.userShows[0]?.status).toBe("watching");
+  });
+
+  it("selects only mutation-needed ownership and episode fields", async () => {
+    const db = new FakeSupabase();
+
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true);
+
+    expect(db.selections).toContainEqual({
+      table: "user_shows",
+      columns: "user_id,show_tmdb_id,status",
+    });
+    expect(db.selections).toContainEqual({
+      table: "episodes",
+      columns: "show_tmdb_id,season_number,episode_number,air_date",
+    });
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1"]);
+  });
+
+  it("still rejects an episode mutation when the show is not owned", async () => {
+    const db = new FakeSupabase();
+    db.userShows = [];
+
+    await expect(setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true)).rejects.toThrow(
+      "This show is not in your library.",
+    );
+    expect(watchedEpisodeKeys(db)).toEqual([]);
+  });
+
+  it("preserves episode-read error precedence when both post-write reads fail", async () => {
+    const db = new FakeSupabase();
+    db.onRange = () => { throw new Error("Read failed"); };
+
+    await expect(setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true)).rejects.toThrow(
+      "Unable to load episodes.",
+    );
+  });
+
+  it("preserves individual episode status transitions and dropped status", async () => {
+    const db = new FakeSupabase();
+
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true);
+    expect(db.userShows[0]?.status).toBe("watching");
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, true);
+    expect(db.userShows[0]?.status).toBe("watched");
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, false);
+    expect(db.userShows[0]?.status).toBe("watching");
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, false);
+    expect(db.userShows[0]?.status).toBe("watchlist");
+
+    db.userShows[0] = { ...db.userShows[0], status: "dropped" };
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true);
+    expect(db.userShows[0]?.status).toBe("dropped");
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, false);
+    expect(db.userShows[0]?.status).toBe("dropped");
+  });
+
+  it("keeps null and invalid air dates trackable", async () => {
+    const db = new FakeSupabase();
+    db.episodes = [episodeRow(1, 1, null), episodeRow(1, 2, "invalid")];
+
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 1, true, { referenceDate: "2025-01-01" });
+    await setEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, true, { referenceDate: "2025-01-01" });
+
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
     expect(db.userShows[0]?.status).toBe("watched");
   });
 

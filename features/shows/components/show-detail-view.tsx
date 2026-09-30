@@ -3,7 +3,7 @@
 import { Check, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RefreshCw, RotateCcw, Star } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
   ACTION_FEEDBACK_AUTO_DISMISS_MS,
@@ -32,14 +32,17 @@ import {
   setSeasonWatchedAction,
 } from "../actions";
 import {
+  applyOptimisticEpisodeWatched,
   getSeasonLabel,
   getShowDetailActionLabels,
+  getShowDetailEpisodeKey,
   getShowDetailSeasonNavigation,
   getShowDetailSeasonUrl,
   isShowDetailEpisodeTrackable,
   SPECIALS_OPTIONAL_NOTE,
 } from "../view-model";
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActionResult } from "../types";
+import { EpisodeMutationQueue } from "../episode-mutation-queue";
 
 type ShowDetailViewProps = {
   initialSeasonParam?: string | null;
@@ -55,10 +58,6 @@ type ActionMessage = {
 
 function getSeasonActionId(seasonNumber: number, watched: boolean) {
   return `season:${seasonNumber}:${watched ? "watch" : "unwatch"}`;
-}
-
-function getEpisodeActionId(episode: ShowDetailEpisode, watched: boolean) {
-  return `episode:${episode.seasonNumber}:${episode.episodeNumber}:${watched ? "watch" : "unwatch"}`;
 }
 
 function ShowPoster({ show }: { show: ShowDetail }) {
@@ -90,22 +89,20 @@ function EpisodeRow({
   disabled,
   episode,
   onToggle,
-  pendingAction,
+  pending,
 }: {
   canMarkWatched: boolean;
   disabled: boolean;
   episode: ShowDetailEpisode;
   onToggle: (episode: ShowDetailEpisode, watched: boolean) => void;
-  pendingAction: string | null;
+  pending: boolean;
 }) {
   const nextWatched = !episode.watched;
-  const actionId = getEpisodeActionId(episode, nextWatched);
-  const isPending = pendingAction === actionId;
   const airDate = formatDateOnly(episode.airDate);
   const releaseAvailability = !episode.watched && !canMarkWatched && airDate
     ? `Available ${airDate}`
     : undefined;
-  const actionDisabled = disabled || isPending || (!episode.watched && !canMarkWatched);
+  const actionDisabled = disabled || pending || (!episode.watched && !canMarkWatched);
 
   return (
     <div className="grid gap-3 border-t py-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
@@ -146,7 +143,7 @@ function EpisodeRow({
         type="button"
         variant={episode.watched ? "outline" : "default"}
       >
-        {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
+        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
         {episode.watched ? "Unwatch" : "Mark watched"}
       </Button>
     </div>
@@ -154,19 +151,23 @@ function EpisodeRow({
 }
 
 function SeasonPanel({
-  disabled,
+  bulkDisabled,
+  episodeDisabled,
   onSeasonToggle,
   onToggleEpisode,
   pendingAction,
+  pendingEpisodeKeys,
   referenceDate,
   season,
   showTmdbId,
   timeZone,
 }: {
-  disabled: boolean;
+  bulkDisabled: boolean;
+  episodeDisabled: boolean;
   onSeasonToggle: (season: ShowDetailSeason, watched: boolean) => void;
   onToggleEpisode: (episode: ShowDetailEpisode, watched: boolean) => void;
   pendingAction: string | null;
+  pendingEpisodeKeys: ReadonlySet<string>;
   referenceDate?: string;
   season: ShowDetailSeason;
   showTmdbId: number;
@@ -192,7 +193,7 @@ function SeasonPanel({
         </div>
         <Button
           className="w-full gap-2 sm:w-auto md:w-40"
-          disabled={disabled || season.progress.totalEpisodeCount === 0 || isPending}
+          disabled={bulkDisabled || season.progress.totalEpisodeCount === 0 || isPending}
           onClick={() => onSeasonToggle(season, nextWatched)}
           type="button"
           variant={seasonComplete ? "outline" : "default"}
@@ -225,10 +226,10 @@ function SeasonPanel({
               <EpisodeRow
                 canMarkWatched={isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone })}
                 key={`${episode.seasonNumber}-${episode.episodeNumber}`}
-                disabled={disabled}
+                disabled={episodeDisabled}
                 episode={episode}
                 onToggle={onToggleEpisode}
-                pendingAction={pendingAction}
+                pending={pendingEpisodeKeys.has(getShowDetailEpisodeKey(episode))}
               />
             ))}
           </div>
@@ -248,11 +249,58 @@ export function ShowDetailView({
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<ActionMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [watchedOverrides, setWatchedOverrides] = useState<Record<string, boolean>>({});
+  const [pendingEpisodeKeys, setPendingEpisodeKeys] = useState<Set<string>>(() => new Set());
   const [activeSeasonNumber, setActiveSeasonNumber] = useState(
     () => getShowDetailSeasonNavigation(show, initialSeasonParam, { referenceDate, timeZone }).activeSeasonNumber,
   );
+  const mountedRef = useRef(true);
+  const routerRef = useRef(router);
+  const previousShowRef = useRef(show);
+  const actionInFlightRef = useRef(false);
+  const bulkTrackingRef = useRef(false);
+  const episodeQueueRef = useRef<EpisodeMutationQueue | null>(null);
+  routerRef.current = router;
 
-  const seasonNavigation = getShowDetailSeasonNavigation(show, activeSeasonNumber, { referenceDate, timeZone });
+  if (!episodeQueueRef.current) {
+    episodeQueueRef.current = new EpisodeMutationQueue(
+      setEpisodeWatchedAction,
+      (mutation, result) => {
+        if (!mountedRef.current) return;
+        if (result.status === "error") {
+          setWatchedOverrides((current) => ({
+            ...current,
+            [mutation.episodeKey]: mutation.previousWatched,
+          }));
+        }
+        setMessage((current) => result.status === "error" || current?.status !== "error" ? result : current);
+      },
+      (keys) => {
+        if (mountedRef.current) setPendingEpisodeKeys(keys);
+      },
+      () => {
+        if (mountedRef.current) routerRef.current.refresh();
+      },
+    );
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (previousShowRef.current === show) return;
+    previousShowRef.current = show;
+    if (!episodeQueueRef.current?.hasPending) {
+      setWatchedOverrides({});
+    }
+  }, [show]);
+
+  const displayShow = applyOptimisticEpisodeWatched(show, watchedOverrides, { referenceDate, timeZone });
+  const seasonNavigation = getShowDetailSeasonNavigation(displayShow, activeSeasonNumber, { referenceDate, timeZone });
+  const bulkDisabled = pendingEpisodeKeys.size > 0 || pendingAction !== null || isPending;
+  const episodeDisabled = pendingAction !== null && pendingAction !== "show:favourite";
 
   useEffect(() => {
     if (activeSeasonNumber !== seasonNavigation.activeSeasonNumber) {
@@ -264,7 +312,14 @@ export function ShowDetailView({
     actionId: string,
     action: () => Promise<ShowProgressActionResult>,
     fallbackMessage = "Unable to update progress right now.",
+    blocksEpisodeMutations = true,
   ) {
+    if (actionInFlightRef.current || (blocksEpisodeMutations && episodeQueueRef.current?.hasPending)) {
+      return;
+    }
+
+    actionInFlightRef.current = true;
+    bulkTrackingRef.current = blocksEpisodeMutations;
     setMessage(null);
     setPendingAction(actionId);
 
@@ -286,6 +341,8 @@ export function ShowDetailView({
             status: "error",
           });
         } finally {
+          actionInFlightRef.current = false;
+          bulkTrackingRef.current = false;
           setPendingAction(null);
         }
       })();
@@ -300,6 +357,7 @@ export function ShowDetailView({
         tmdbId: show.tmdbId,
       }),
       "Unable to update this favourite right now.",
+      false,
     );
   }
 
@@ -321,18 +379,29 @@ export function ShowDetailView({
   }
 
   function handleEpisodeToggle(episode: ShowDetailEpisode, watched: boolean) {
+    const episodeKey = getShowDetailEpisodeKey(episode);
+    if (bulkTrackingRef.current || episodeQueueRef.current?.isPending(episodeKey)) {
+      return;
+    }
+    if (watched && !isShowDetailEpisodeTrackable(show.tmdbId, episode, { referenceDate, timeZone })) {
+      return;
+    }
     if (!watched && !window.confirm(`Mark "${episode.title}" unwatched?`)) {
       return;
     }
 
-    runAction(getEpisodeActionId(episode, watched), () =>
-      setEpisodeWatchedAction({
+    setWatchedOverrides((current) => ({ ...current, [episodeKey]: watched }));
+    setMessage(null);
+    episodeQueueRef.current?.enqueue({
+      episodeKey,
+      input: {
         episodeNumber: episode.episodeNumber,
         seasonNumber: episode.seasonNumber,
         tmdbId: show.tmdbId,
         watched,
-      }),
-    );
+      },
+      previousWatched: episode.watched,
+    });
   }
 
   function handleSeasonToggle(season: ShowDetailSeason, watched: boolean) {
@@ -384,9 +453,9 @@ export function ShowDetailView({
   }
 
   const showComplete =
-    show.progress.totalEpisodeCount > 0
-    && show.progress.watchedEpisodeCount >= show.progress.totalEpisodeCount;
-  const controls = getShowDetailActionLabels(show);
+    displayShow.progress.totalEpisodeCount > 0
+    && displayShow.progress.watchedEpisodeCount >= displayShow.progress.totalEpisodeCount;
+  const controls = getShowDetailActionLabels(displayShow);
   const firstAirDate = formatDateOnly(show.firstAirDate);
   const lastSyncedAt = formatTimestamp(show.lastSyncedAt, "en", { timeZone });
 
@@ -431,7 +500,7 @@ export function ShowDetailView({
                 <Button
                   aria-label={controls.toggleDroppedAriaLabel}
                   className="w-full gap-2 sm:w-36"
-                  disabled={isPending}
+                  disabled={bulkDisabled}
                   onClick={handleDropToggle}
                   type="button"
                   variant={controls.isDropped ? "default" : "outline"}
@@ -447,7 +516,7 @@ export function ShowDetailView({
                 </Button>
                 <Button
                   className="w-full gap-2 sm:w-40"
-                  disabled={isPending || show.progress.totalEpisodeCount === 0 || showComplete}
+                  disabled={bulkDisabled || displayShow.progress.totalEpisodeCount === 0 || showComplete}
                   onClick={handleMarkShowWatched}
                   type="button"
                 >
@@ -460,7 +529,7 @@ export function ShowDetailView({
                 </Button>
                 <Button
                   className="w-full gap-2 sm:w-36"
-                  disabled={isPending || show.progress.watchedEpisodeCount === 0}
+                  disabled={bulkDisabled || displayShow.progress.watchedEpisodeCount === 0}
                   onClick={handleResetShow}
                   type="button"
                   variant="outline"
@@ -475,7 +544,7 @@ export function ShowDetailView({
                 <Button
                   aria-label={`Refresh metadata for ${show.title}`}
                   className="w-full gap-2 sm:w-44"
-                  disabled={isPending || pendingAction === "show:refresh"}
+                  disabled={bulkDisabled || pendingAction === "show:refresh"}
                   onClick={handleRefreshMetadata}
                   type="button"
                   variant="outline"
@@ -498,9 +567,9 @@ export function ShowDetailView({
             <div className="mt-6">
               <ProgressBar
                 label="Main progress"
-                progressPercentage={show.progress.progressPercentage}
-                totalEpisodeCount={show.progress.totalEpisodeCount}
-                watchedEpisodeCount={show.progress.watchedEpisodeCount}
+                progressPercentage={displayShow.progress.progressPercentage}
+                totalEpisodeCount={displayShow.progress.totalEpisodeCount}
+                watchedEpisodeCount={displayShow.progress.watchedEpisodeCount}
               />
             </div>
           </div>
@@ -531,7 +600,7 @@ export function ShowDetailView({
         </ActionFeedback>
       ) : null}
 
-      {show.seasons.length === 0 ? (
+      {displayShow.seasons.length === 0 ? (
         <EmptyState
           description="TMDB has not provided season or episode metadata for this show yet."
           title="No episodes available"
@@ -583,10 +652,12 @@ export function ShowDetailView({
           {seasonNavigation.activeSeason ? (
             <SeasonPanel
               key={seasonNavigation.activeSeason.seasonNumber}
-              disabled={isPending}
+              bulkDisabled={bulkDisabled}
+              episodeDisabled={episodeDisabled}
               onSeasonToggle={handleSeasonToggle}
               onToggleEpisode={handleEpisodeToggle}
               pendingAction={pendingAction}
+              pendingEpisodeKeys={pendingEpisodeKeys}
               referenceDate={referenceDate}
               season={seasonNavigation.activeSeason}
               showTmdbId={show.tmdbId}

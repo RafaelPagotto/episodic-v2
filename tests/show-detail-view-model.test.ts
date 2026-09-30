@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  applyOptimisticEpisodeWatched,
   getSeasonLabel,
   getShowDetailActionLabels,
   getShowDetailSeasonNavigation,
@@ -76,6 +77,50 @@ function season(
 }
 
 describe("show detail view model", () => {
+  it("updates main and season progress while leaving Specials out of main progress", () => {
+    const show = showDetail({
+      progress: { displayStatus: "watching", progressPercentage: 50, status: "watching", totalEpisodeCount: 2, watchedEpisodeCount: 1 },
+      seasons: [
+        season(0, [episode(0, 1)], {
+          progress: { displayStatus: "watchlist", progressPercentage: 0, status: "watching", totalEpisodeCount: 1, watchedEpisodeCount: 0 },
+        }),
+        season(1, [episode(1, 1, { watched: true }), episode(1, 2)], {
+          progress: { displayStatus: "watching", progressPercentage: 50, status: "watching", totalEpisodeCount: 2, watchedEpisodeCount: 1 },
+        }),
+      ],
+    });
+
+    const optimistic = applyOptimisticEpisodeWatched(show, { "0:1": true, "1:2": true }, { referenceDate: "2026-09-14" });
+
+    expect(optimistic.seasons[0]?.episodes[0]?.watched).toBe(true);
+    expect(optimistic.seasons[0]?.progress.watchedEpisodeCount).toBe(1);
+    expect(optimistic.seasons[1]?.progress.progressPercentage).toBe(100);
+    expect(optimistic.progress).toMatchObject({
+      displayStatus: "caught_up",
+      progressPercentage: 100,
+      status: "watched",
+      watchedEpisodeCount: 2,
+    });
+    expect(show.progress.watchedEpisodeCount).toBe(1);
+  });
+
+  it("preserves dropped status and excludes a future cleanup from released counts", () => {
+    const show = showDetail({
+      progress: { displayStatus: "dropped", progressPercentage: 100, status: "dropped", totalEpisodeCount: 1, watchedEpisodeCount: 1 },
+      seasons: [season(1, [
+        episode(1, 1, { watched: true }),
+        episode(1, 2, { airDate: "2026-09-21", watched: true }),
+      ], {
+        progress: { displayStatus: "dropped", progressPercentage: 100, status: "dropped", totalEpisodeCount: 1, watchedEpisodeCount: 1 },
+      })],
+    });
+
+    const optimistic = applyOptimisticEpisodeWatched(show, { "1:2": false }, { referenceDate: "2026-09-14" });
+
+    expect(optimistic.seasons[0]?.episodes[1]?.watched).toBe(false);
+    expect(optimistic.seasons[0]?.progress.watchedEpisodeCount).toBe(1);
+    expect(optimistic.progress).toMatchObject({ status: "dropped", displayStatus: "dropped", watchedEpisodeCount: 1 });
+  });
   it("labels favourite and unfavourite actions", () => {
     expect(getShowDetailActionLabels(showDetail({ favourite: false }))).toMatchObject({
       favouriteAriaLabel: "Add Arcane to favourites",

@@ -59,7 +59,7 @@ function watchedEpisodeKeySet(watchedEpisodes: WatchedEpisode[]) {
   return new Set(watchedEpisodes.map((episode) => buildEpisodeKey(episode)));
 }
 
-export function isEpisodeTrackable(episode: Episode, options: EpisodeCalculationOptions = {}) {
+export function isEpisodeTrackable(episode: Pick<Episode, "airDate">, options: EpisodeCalculationOptions = {}) {
   // Unknown or invalid TMDB dates preserve the existing behavior and remain trackable.
   if (!isDateOnly(episode.airDate)) {
     return true;
