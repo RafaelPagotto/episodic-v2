@@ -3,13 +3,12 @@
 import {
   CalendarDays,
   Check,
-  Loader2,
   Play,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { LibrarySummaryTiles } from "@/components/library-summary-tiles";
 import {
@@ -25,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { formatDateOnly } from "../../../lib/date-only";
 
 import { markContinueWatchingEpisodeWatchedAction } from "../actions";
+import { ContinueWatchingMutationQueue } from "../continue-watching-mutation-queue";
 import type {
   ContinueWatchingItem,
   DashboardData,
@@ -144,20 +144,12 @@ function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
   );
 }
 
-function getContinueWatchingActionKey(item: ContinueWatchingItem) {
-  return `${item.tmdbId}:${item.nextEpisode.seasonNumber}:${item.nextEpisode.episodeNumber}`;
-}
-
 function ContinueWatchingCard({
-  disabled,
   item,
   onMarkNextWatched,
-  pending,
 }: {
-  disabled: boolean;
   item: ContinueWatchingItem;
   onMarkNextWatched: (item: ContinueWatchingItem) => void;
-  pending: boolean;
 }) {
   const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
 
@@ -178,11 +170,10 @@ function ContinueWatchingCard({
               <Button
                 aria-label={`Mark ${item.title} ${nextEpisodeLabel} watched`}
                 className="w-full gap-2 sm:w-auto"
-                disabled={disabled || pending}
                 onClick={() => onMarkNextWatched(item)}
                 type="button"
               >
-                {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                <Check className="size-4" />
                 Mark {nextEpisodeLabel} watched
               </Button>
               <Button asChild className="w-full gap-2 sm:w-auto md:w-32" variant="outline">
@@ -243,43 +234,62 @@ function EmptyContinueWatchingState({
 
 export function DashboardView({ data }: DashboardViewProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<ActionMessage | null>(null);
-  const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [removedShowIds, setRemovedShowIds] = useState<Set<number>>(() => new Set());
+  const removedShowIdsRef = useRef(removedShowIds);
+  const mountedRef = useRef(true);
+  const routerRef = useRef(router);
+  const previousDataRef = useRef(data);
+  const queueRef = useRef<ContinueWatchingMutationQueue | null>(null);
+  routerRef.current = router;
+
+  if (!queueRef.current) {
+    queueRef.current = new ContinueWatchingMutationQueue(
+      markContinueWatchingEpisodeWatchedAction,
+      (mutation, result) => {
+        if (!mountedRef.current) return;
+        if (result.status === "error") {
+          removedShowIdsRef.current.delete(mutation.showId);
+          setRemovedShowIds(new Set(removedShowIdsRef.current));
+        }
+        setMessage((current) => result.status === "error" || current?.status !== "error" ? result : current);
+      },
+      () => {
+        if (mountedRef.current) routerRef.current.refresh();
+      },
+    );
+  }
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (previousDataRef.current === data) return;
+    previousDataRef.current = data;
+    if (!queueRef.current?.hasPending) {
+      removedShowIdsRef.current = new Set();
+      setRemovedShowIds(new Set());
+    }
+  }, [data]);
+
   const hasShows = data.summary.totalShows > 0;
+  const visibleContinueWatching = data.continueWatching.filter((item) => !removedShowIds.has(item.tmdbId));
 
   function handleMarkNextWatched(item: ContinueWatchingItem) {
-    const actionKey = getContinueWatchingActionKey(item);
+    if (removedShowIdsRef.current.has(item.tmdbId) || queueRef.current?.isPending(item.tmdbId)) return;
 
+    removedShowIdsRef.current.add(item.tmdbId);
+    setRemovedShowIds(new Set(removedShowIdsRef.current));
     setMessage(null);
-    setPendingAction(actionKey);
-
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await markContinueWatchingEpisodeWatchedAction({
-            episodeNumber: item.nextEpisode.episodeNumber,
-            seasonNumber: item.nextEpisode.seasonNumber,
-            tmdbId: item.tmdbId,
-          });
-
-          setMessage({
-            message: result.message,
-            status: result.status,
-          });
-
-          if (result.status === "success") {
-            router.refresh();
-          }
-        } catch {
-          setMessage({
-            message: "Unable to update this episode right now.",
-            status: "error",
-          });
-        } finally {
-          setPendingAction(null);
-        }
-      })();
+    queueRef.current?.enqueue({
+      input: {
+        episodeNumber: item.nextEpisode.episodeNumber,
+        seasonNumber: item.nextEpisode.seasonNumber,
+        tmdbId: item.tmdbId,
+      },
+      showId: item.tmdbId,
     });
   }
 
@@ -323,13 +333,11 @@ export function DashboardView({ data }: DashboardViewProps) {
           />
         ) : (
           <div className="grid gap-3">
-            {data.continueWatching.map((item) => (
+            {visibleContinueWatching.map((item) => (
               <ContinueWatchingCard
                 key={item.tmdbId}
-                disabled={isPending || pendingAction !== null}
                 item={item}
                 onMarkNextWatched={handleMarkNextWatched}
-                pending={pendingAction === getContinueWatchingActionKey(item)}
               />
             ))}
           </div>
