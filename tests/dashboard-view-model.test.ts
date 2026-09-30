@@ -260,6 +260,25 @@ describe("dashboard view model", () => {
     expect(dashboard.hiddenContinueWatchingCount).toBe(0);
   });
 
+  it.each([null, "/poster.jpg"])("carries the saved show poster into Upcoming with poster path %s", (posterPath) => {
+    const items = getUpcomingEpisodeItems([
+      record({
+        episodes: [
+          episode(25, 1, 1, { airDate: "2026-06-01" }),
+          episode(25, 2, 1, { airDate: "2026-06-08" }),
+        ],
+        posterPath,
+        showTmdbId: 25,
+        status: "watching",
+        watchedEpisodes: [watched(25, 1, 1)],
+      }),
+    ], { referenceDate: "2026-06-07" });
+
+    expect(items).toEqual([
+      expect.objectContaining({ posterPath, detailHref: "/shows/25?season=2", tmdbId: 25 }),
+    ]);
+  });
+
   it("includes watching and caught-up shows in Upcoming while only the backlog appears in Continue Watching", () => {
     const records = [
       record({
@@ -792,8 +811,8 @@ describe("dashboard view model", () => {
     expect(items.map((item) => item.tmdbId)).toEqual([42, 41, 40]);
   });
 
-  it("limits Start Watching to twelve shows", () => {
-    const records = Array.from({ length: 13 }, (_, index) =>
+  it("limits Start Watching to twenty shows, preserving newest-first order", () => {
+    const records = Array.from({ length: 25 }, (_, index) =>
       record({
         addedAt: `2026-06-${String(index + 1).padStart(2, "0")}T00:00:00.000Z`,
         showTmdbId: index + 50,
@@ -803,9 +822,10 @@ describe("dashboard view model", () => {
 
     const items = getStartWatchingItems(records, { referenceDate: "2026-06-07" });
 
-    expect(items).toHaveLength(12);
+    expect(items).toHaveLength(20);
     expect(items.map((item) => item.tmdbId)).toEqual([
-      62, 61, 60, 59, 58, 57, 56, 55, 54, 53, 52, 51,
+      74, 73, 72, 71, 70, 69, 68, 67, 66, 65,
+      64, 63, 62, 61, 60, 59, 58, 57, 56, 55,
     ]);
   });
 

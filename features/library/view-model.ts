@@ -24,6 +24,10 @@ export const LIBRARY_FILTERS: Array<{ label: string; value: LibraryFilter }> = [
   { label: "Favourites", value: "favourites" },
 ];
 
+export function getLibraryFilter(value: unknown): LibraryFilter {
+  return LIBRARY_FILTERS.find((option) => option.value === value)?.value ?? "all";
+}
+
 export const LIBRARY_SORT_CHOICES: Array<{
   direction: LibrarySortDirection;
   label: string;

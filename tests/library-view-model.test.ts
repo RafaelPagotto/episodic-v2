@@ -7,6 +7,7 @@ import {
   getInitialLibrarySortDirection,
   getInitialLibrarySortOption,
   getInitialLibraryViewMode,
+  getLibraryFilter,
   isLibrarySortDirection,
   isLibrarySortOption,
   isLibraryViewMode,
@@ -68,6 +69,18 @@ describe("library view model", () => {
       watchedEpisodeCount: 1,
     }),
   ];
+
+  it.each(["all", "watchlist", "watching", "caught_up", "completed", "dropped", "favourites"])(
+    "accepts the %s URL filter", (filter) => {
+      expect(getLibraryFilter(filter)).toBe(filter);
+    },
+  );
+
+  it.each([null, undefined, "", "invalid", "WATCHLIST", ["watchlist"], {}, 1])(
+    "defaults missing or invalid URL filter %j to All", (filter) => {
+      expect(getLibraryFilter(filter)).toBe("all");
+    },
+  );
 
   it("filters by display status and favourites", () => {
     expect(filterLibraryShows(shows, "watching").map((show) => show.title)).toEqual(["Beta"]);

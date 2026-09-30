@@ -1,4 +1,5 @@
 import * as React from "react";
+import { Check, Loader2 } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DashboardView } from "../features/dashboard/components/dashboard-view";
@@ -16,6 +17,7 @@ const hooks = vi.hoisted(() => ({
 }));
 const refresh = vi.hoisted(() => vi.fn());
 const markWatched = vi.hoisted(() => vi.fn());
+const getTmdbImageUrl = vi.hoisted(() => vi.fn(() => null as string | null));
 
 vi.mock("react", async () => {
   const actual = await vi.importActual<typeof import("react")>("react");
@@ -58,7 +60,7 @@ vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/card", () => ({ Card: () => null, CardContent: () => null }));
 vi.mock("@/components/ui/empty-state", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/progress-bar", () => ({ ProgressBar: () => null }));
-vi.mock("@/lib/tmdb/images", () => ({ getTmdbImageUrl: () => null }));
+vi.mock("@/lib/tmdb/images", () => ({ getTmdbImageUrl }));
 vi.mock("@/lib/utils", () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(" ") }));
 vi.mock("../features/dashboard/actions", () => ({ markContinueWatchingEpisodeWatchedAction: markWatched }));
 
@@ -83,7 +85,7 @@ function data(episodes = [item(100), item(200), item(300)]): DashboardData {
     hiddenContinueWatchingCount: 0,
     startWatching: [{ detailHref: "/shows/400", episodeNumber: 1, episodeTitle: "Start", posterPath: null, seasonNumber: 1, showTitle: "Start Show", tmdbId: 400 }],
     summary: { caughtUpCount: 0, completedCount: 0, droppedCount: 0, favouriteCount: 0, totalShows: 4, watchingCount: 3, watchlistCount: 1 },
-    upcomingEpisodes: [{ airDate: "2026-10-01", detailHref: "/shows/100", episodeNumber: 4, episodeTitle: "Future", seasonNumber: 1, showTitle: "Show 100", tmdbId: 100 }],
+    upcomingEpisodes: [{ airDate: "2026-10-01", detailHref: "/shows/100?season=1", episodeNumber: 4, episodeTitle: "Future", posterPath: null, seasonNumber: 1, showTitle: "Show 100", tmdbId: 100 }],
   };
 }
 
@@ -123,15 +125,18 @@ function cardPending(tree: React.ReactNode, showId: number) {
   return cards(tree).find(({ item: current }) => current.tmdbId === showId)?.pending;
 }
 
-function markButton(tree: React.ReactNode, showId: number) {
+function renderCard(tree: React.ReactNode, showId: number) {
   const card = elements(tree).find((element) =>
     typeof element.type === "function"
     && element.type.name === "ContinueWatchingCard"
     && (element.props.item as ContinueWatchingItem).tmdbId === showId,
   );
   if (!card || typeof card.type !== "function") throw new Error(`Missing card ${showId}`);
-  const rendered = (card.type as (props: Record<string, unknown>) => React.ReactNode)(card.props);
-  const button = elements(rendered).find((element) => element.props.type === "button");
+  return (card.type as (props: Record<string, unknown>) => React.ReactNode)(card.props);
+}
+
+function markButton(tree: React.ReactNode, showId: number) {
+  const button = elements(renderCard(tree, showId)).find((element) => element.props.type === "button");
   if (!button) throw new Error(`Missing tracking button ${showId}`);
   return button;
 }
@@ -162,7 +167,7 @@ async function flushPromises() {
 
 const success = { message: "Episode marked watched.", status: "success" } as const;
 
-describe("Dashboard Continue Watching queue", () => {
+describe("Dashboard view", () => {
   beforeEach(() => {
     (globalThis as typeof globalThis & { React: typeof React }).React = React;
     hooks.effectDeps = [];
@@ -175,6 +180,103 @@ describe("Dashboard Continue Watching queue", () => {
     hooks.states = [];
     refresh.mockReset();
     markWatched.mockReset();
+    getTmdbImageUrl.mockReset();
+    getTmdbImageUrl.mockReturnValue(null);
+  });
+
+  it.each([false, true])("opens the full Watchlist below Start Watching, including the empty state: %s", (empty) => {
+    const baseline = data();
+    if (empty) baseline.startWatching = [];
+    const section = elements(renderDashboard(baseline)).find((element) =>
+      element.type === "section" && element.props["aria-labelledby"] === "start-watching-heading",
+    );
+    expect(section).toBeDefined();
+    const children = React.Children.toArray(section?.props.children as React.ReactNode);
+    const footer = children.at(-1);
+    const link = elements(footer).find((element) => element.props.href);
+    expect(link?.props.href).toBe("/library?filter=watchlist");
+    expect(link?.props.children).toBe("Open Watchlist");
+    expect(elements(footer).find((element) => element.props.asChild)?.props.variant).toBe("outline");
+    expect(componentProps(section, "StartWatchingCard")).toHaveLength(empty ? 0 : 1);
+    expect(markWatched).not.toHaveBeenCalled();
+  });
+
+  it("links the poster and title to Show Detail without a Details button", () => {
+    const tree = renderDashboard(data());
+    const card = renderCard(tree, 100);
+    const poster = elements(card).find((element) => typeof element.type === "function" && element.type.name === "ContinuePoster");
+    expect(poster).toBeDefined();
+    const posterLink = (poster?.type as (props: Record<string, unknown>) => React.ReactNode)(poster?.props ?? {});
+    const posterAnchor = elements(posterLink).find((element) => element.props.href === "/shows/100");
+    const titleAnchor = elements(card).find((element) => element.props.href === "/shows/100");
+
+    expect(posterAnchor?.props["aria-label"]).toBe("View details for Show 100 poster");
+    expect(titleAnchor?.props["aria-label"]).toBe("View details for Show 100");
+    expect(elements(card).filter((element) => element.props.type === "button")).toHaveLength(1);
+    expect(elements(card).some((element) => element.props.children === "Details")).toBe(false);
+    expect(elements(posterLink).some((element) => element.props.type === "button")).toBe(false);
+
+    const posterContainer = elements(card).find((element) =>
+      element.type === "div" && Array.isArray(element.props.children) && element.props.children.includes(poster),
+    );
+    expect(posterContainer).toBeDefined();
+    expect(elements(posterContainer).filter((element) => element.props.type === "button")).toHaveLength(1);
+    expect(componentProps(posterContainer, "ProgressBar")).toHaveLength(0);
+
+    getTmdbImageUrl.mockReturnValue("https://example.test/poster.jpg");
+    const imagePoster = elements((poster?.type as (props: Record<string, unknown>) => React.ReactNode)(poster?.props ?? {}));
+    expect(imagePoster.find((element) => element.props.href === "/shows/100")?.props["aria-label"]).toBe("View details for Show 100 poster");
+    expect(imagePoster.find((element) => element.props.alt === "Show 100 poster")).toBeDefined();
+  });
+
+  it.each([null, "/poster.jpg"])("links Upcoming poster and title to the episode's season with poster path %s", (posterPath) => {
+    const baseline = data();
+    const upcoming = baseline.upcomingEpisodes[0];
+    if (!upcoming) throw new Error("Missing upcoming fixture");
+    upcoming.posterPath = posterPath;
+    getTmdbImageUrl.mockReturnValue(posterPath ? "https://example.test/upcoming-poster.jpg" : null);
+    const card = elements(renderDashboard(baseline)).find((element) =>
+      typeof element.type === "function" && element.type.name === "UpcomingEpisodeCard",
+    );
+    if (!card || typeof card.type !== "function") throw new Error("Missing Upcoming card");
+    const rendered = (card.type as (props: Record<string, unknown>) => React.ReactNode)(card.props);
+    const links = elements(rendered).filter((element) => element.props.href);
+
+    expect(links.map((link) => [link.props.href, link.props["aria-label"]])).toEqual([
+      ["/shows/100?season=1", "View details for Show 100 poster"],
+      ["/shows/100?season=1", "View details for Show 100"],
+    ]);
+    expect(links[1]?.props.children).toBe("Show 100");
+    expect(elements(rendered).some((element) => element.props.children === "Details")).toBe(false);
+    expect(elements(rendered).some((element) => element.props.asChild || element.props.type === "button")).toBe(false);
+    expect(elements(rendered).some((element) => element.props.children === "S1E4")).toBe(true);
+    expect(getTmdbImageUrl).toHaveBeenCalledWith(posterPath, "w185");
+
+    if (posterPath) {
+      expect(elements(links[0]).find((element) => element.props.alt === "Show 100 poster")?.props.src).toBe("https://example.test/upcoming-poster.jpg");
+    } else {
+      expect(elements(links[0]).find((element) => element.props["aria-hidden"] === "true")?.props.children).toBe("S");
+    }
+  });
+
+  it("uses a labelled icon button to enqueue the displayed episode", () => {
+    const response = deferred<typeof success>();
+    markWatched.mockReturnValue(response.promise);
+    const baseline = data();
+    const button = markButton(renderDashboard(baseline), 100);
+    expect(button.props["aria-label"]).toBe("Mark Show 100 S1E2 watched");
+    expect(button.props.size).toBe("icon");
+    expect(React.isValidElement(button.props.children)).toBe(true);
+    expect((button.props.children as React.ReactElement).type).toBe(Check);
+    expect(button.props["aria-busy"]).toBe(false);
+
+    (button.props.onClick as () => void)();
+    expect(markWatched).toHaveBeenCalledWith({ episodeNumber: 2, seasonNumber: 1, tmdbId: 100 });
+    const pending = markButton(renderDashboard(baseline), 100);
+    expect(pending.props.disabled).toBe(true);
+    expect(pending.props["aria-label"]).toBe("Marking Show 100 S1E2 watched");
+    expect(pending.props["aria-busy"]).toBe(true);
+    expect((pending.props.children as React.ReactElement).type).toBe(Loader2);
   });
 
   it("keeps one card visible and saving until authoritative props advance it", async () => {
@@ -186,7 +288,7 @@ describe("Dashboard Continue Watching queue", () => {
     const pending = renderDashboard(baseline);
     expect(cardIds(pending)).toEqual([100, 200, 300]);
     expect(markButton(pending, 100).props.disabled).toBe(true);
-    expect(markButton(pending, 100).props.children).toContain("Saving…");
+    expect(markButton(pending, 100).props["aria-busy"]).toBe(true);
     expect(markButton(pending, 200).props.disabled).toBe(false);
     expect(markWatched).toHaveBeenCalledWith({ episodeNumber: 2, seasonNumber: 1, tmdbId: 100 });
     expect(refresh).not.toHaveBeenCalled();

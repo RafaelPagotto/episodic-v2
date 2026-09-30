@@ -4,7 +4,6 @@ import {
   CalendarDays,
   Check,
   Loader2,
-  Play,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -47,13 +46,42 @@ function formatUpcomingAirDate(airDate: string) {
 
 function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
   const episodeCode = `S${item.seasonNumber}E${item.episodeNumber}`;
+  const posterUrl = getTmdbImageUrl(item.posterPath, "w185");
 
   return (
     <Card className="flex h-full bg-card/70">
-      <CardContent className="flex min-h-20 flex-1 flex-col justify-center gap-3 p-3 pt-3 sm:flex-row sm:items-center sm:justify-between sm:p-3 sm:pt-3">
+      <CardContent className="flex min-h-24 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
+        <Link
+          aria-label={`View details for ${item.showTitle} poster`}
+          className="block shrink-0 rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          href={item.detailHref}
+        >
+          {posterUrl ? (
+            <Image
+              alt={`${item.showTitle} poster`}
+              className="aspect-[2/3] w-14 rounded-md object-cover"
+              height={278}
+              sizes="56px"
+              src={posterUrl}
+              width={185}
+            />
+          ) : (
+            <div aria-hidden="true" className="flex aspect-[2/3] w-14 items-center justify-center rounded-md bg-secondary text-sm font-semibold text-muted-foreground">
+              {item.showTitle.charAt(0)}
+            </div>
+          )}
+        </Link>
         <div className="min-w-0 flex-1">
-          <p className="break-words text-sm font-medium leading-snug">{item.showTitle}</p>
-          <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
+          <h3 className="min-w-0 text-sm font-medium leading-6">
+            <Link
+              aria-label={`View details for ${item.showTitle}`}
+              className="block truncate rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              href={item.detailHref}
+            >
+              {item.showTitle}
+            </Link>
+          </h3>
+          <p className="mt-1 line-clamp-2 text-xs leading-snug text-muted-foreground" title={item.episodeTitle ? `${episodeCode} - ${item.episodeTitle}` : episodeCode}>
             <span className="font-semibold text-foreground">{episodeCode}</span>
             {item.episodeTitle ? ` - ${item.episodeTitle}` : null}
           </p>
@@ -62,85 +90,75 @@ function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
             {formatUpcomingAirDate(item.airDate)}
           </p>
         </div>
-        <Button asChild className="w-full shrink-0 sm:w-auto" size="sm" variant="outline">
-          <Link aria-label={`View details for ${item.showTitle} ${episodeCode}`} href={item.detailHref}>
-            Details
-          </Link>
-        </Button>
       </CardContent>
     </Card>
-  );
-}
-
-function StartWatchingPoster({ item }: { item: StartWatchingItem }) {
-  const posterUrl = getTmdbImageUrl(item.posterPath, "w185");
-
-  if (!posterUrl) {
-    return (
-      <div className="flex aspect-[2/3] w-14 shrink-0 items-center justify-center rounded-md bg-secondary text-sm font-semibold text-muted-foreground">
-        {item.showTitle.charAt(0)}
-      </div>
-    );
-  }
-
-  return (
-    <Image
-      alt={`${item.showTitle} poster`}
-      className="aspect-[2/3] w-14 shrink-0 rounded-md object-cover"
-      height={278}
-      sizes="56px"
-      src={posterUrl}
-      width={185}
-    />
   );
 }
 
 function StartWatchingCard({ item }: { item: StartWatchingItem }) {
   const episodeCode = `S${item.seasonNumber}E${item.episodeNumber}`;
+  const posterUrl = getTmdbImageUrl(item.posterPath, "w342");
 
   return (
-    <Card className="flex h-full bg-card/70">
-      <CardContent className="flex min-h-24 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
-        <StartWatchingPoster item={item} />
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-3">
-          <div className="min-w-0">
-            <p className="break-words text-sm font-medium leading-snug">{item.showTitle}</p>
-            <p className="mt-1 break-words text-xs leading-snug text-muted-foreground">
-              <span className="font-semibold text-foreground">{episodeCode}</span>
-              {item.episodeTitle ? ` - ${item.episodeTitle}` : null}
-            </p>
+    <Link
+      aria-label={`Start watching ${item.showTitle} at ${episodeCode}`}
+      className="group/start relative block min-w-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      href={item.detailHref}
+    >
+      <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-secondary">
+        {posterUrl ? (
+          <Image
+            alt={`${item.showTitle} poster`}
+            className="h-full w-full object-cover transition-transform group-hover/start:scale-[1.02] motion-reduce:transform-none motion-reduce:transition-none"
+            height={513}
+            sizes="(max-width: 639px) 50vw, 180px"
+            src={posterUrl}
+            width={342}
+          />
+        ) : (
+          <div aria-hidden="true" className="flex h-full items-center justify-center p-3 text-center text-sm font-semibold text-muted-foreground">
+            <span className="break-words">{item.showTitle}</span>
           </div>
-          <Button asChild className="w-full sm:w-fit" size="sm" variant="outline">
-            <Link aria-label={`Start watching ${item.showTitle} at ${episodeCode}`} href={item.detailHref}>
-              Start watching
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        )}
+        {posterUrl ? (
+          <span
+            aria-hidden="true"
+            className="pointer-events-none invisible absolute inset-x-0 bottom-0 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible"
+          >
+            <span className="line-clamp-3 break-words">{item.showTitle}</span>
+          </span>
+        ) : null}
+      </div>
+    </Link>
   );
 }
 
 function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
   const posterUrl = getTmdbImageUrl(item.posterPath, "w185");
+  const href = `/shows/${item.tmdbId}`;
+  const linkClassName = "block shrink-0 rounded-md transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
   if (!posterUrl) {
     return (
-      <div className="flex aspect-[2/3] w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-lg font-semibold text-muted-foreground">
-        {item.title.charAt(0)}
-      </div>
+      <Link aria-label={`View details for ${item.title} poster`} className={linkClassName} href={href}>
+        <div className="flex aspect-[2/3] w-20 items-center justify-center rounded-md bg-secondary text-lg font-semibold text-muted-foreground">
+          {item.title.charAt(0)}
+        </div>
+      </Link>
     );
   }
 
   return (
-    <Image
-      alt={`${item.title} poster`}
-      className="aspect-[2/3] w-20 shrink-0 rounded-md object-cover"
-      height={278}
-      sizes="80px"
-      src={posterUrl}
-      width={185}
-    />
+    <Link aria-label={`View details for ${item.title} poster`} className={linkClassName} href={href}>
+      <Image
+        alt={`${item.title} poster`}
+        className="aspect-[2/3] w-20 rounded-md object-cover"
+        height={278}
+        sizes="80px"
+        src={posterUrl}
+        width={185}
+      />
+    </Link>
   );
 }
 
@@ -156,38 +174,43 @@ function ContinueWatchingCard({
   const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
 
   return (
-    <Card className={cn("overflow-hidden", item.isFaded && "opacity-60")}>
-      <CardContent className="flex gap-4 p-4 sm:p-5">
-        <ContinuePoster item={item} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="min-w-0">
-              <h3 className="truncate text-base font-semibold">{item.title}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Next: S{item.nextEpisode.seasonNumber}E{item.nextEpisode.episodeNumber} -{" "}
-                {item.nextEpisode.title}
-              </p>
-            </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row md:justify-end">
-              <Button
-                aria-label={pending ? `Saving ${item.title} ${nextEpisodeLabel}` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
-                className="w-full gap-2 sm:w-auto"
-                disabled={pending}
-                onClick={() => onMarkNextWatched(item)}
-                type="button"
+    <Card className={cn("group/continue overflow-hidden", item.isFaded && "opacity-60")}>
+      <CardContent className="flex items-center gap-3 p-3 sm:p-4">
+        <div className="relative w-20 shrink-0">
+          <ContinuePoster item={item} />
+          <Button
+            aria-label={pending ? `Marking ${item.title} ${nextEpisodeLabel} watched` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
+            aria-busy={pending}
+            className={cn(
+              "absolute bottom-1.5 left-1/2 -translate-x-1/2 shadow-md",
+              // Hover-capable pointers reveal on hover/focus; touch keeps the action visible.
+              !pending && "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/continue:pointer-events-auto group-hover/continue:opacity-100 group-focus-within/continue:pointer-events-auto group-focus-within/continue:opacity-100",
+            )}
+            disabled={pending}
+            onClick={() => onMarkNextWatched(item)}
+            size="icon"
+            title={pending ? `Marking ${nextEpisodeLabel} watched` : `Mark ${nextEpisodeLabel} watched`}
+            type="button"
+          >
+            {pending ? <Loader2 aria-hidden="true" className="size-4 animate-spin" /> : <Check aria-hidden="true" className="size-4" />}
+          </Button>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center self-stretch">
+          <div className="min-w-0">
+            <h3 className="min-w-0 text-base font-semibold">
+              <Link
+                aria-label={`View details for ${item.title}`}
+                className="block truncate rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                href={`/shows/${item.tmdbId}`}
               >
-                {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                {pending ? "Saving…" : `Mark ${nextEpisodeLabel} watched`}
-              </Button>
-              <Button asChild className="w-full gap-2 sm:w-auto md:w-32" variant="outline">
-                <Link href={`/shows/${item.tmdbId}`}>
-                  <Play className="size-4" />
-                  Details
-                </Link>
-              </Button>
-            </div>
+                {item.title}
+              </Link>
+            </h3>
+            <p className="mt-1 truncate text-sm text-muted-foreground" title={`${nextEpisodeLabel} - ${item.nextEpisode.title}`}>
+              <span className="font-medium text-foreground">{nextEpisodeLabel}</span> - {item.nextEpisode.title}
+            </p>
           </div>
-          <div className="mt-5">
+          <div className="mt-3">
             <ProgressBar
               progressPercentage={item.progressPercentage}
               totalEpisodeCount={item.totalEpisodeCount}
@@ -355,7 +378,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             hasShows={hasShows}
           />
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
             {data.continueWatching.map((item) => (
               <ContinueWatchingCard
                 key={item.tmdbId}
@@ -410,12 +433,17 @@ export function DashboardView({ data }: DashboardViewProps) {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-3">
             {data.startWatching.map((item) => (
               <StartWatchingCard key={item.tmdbId} item={item} />
             ))}
           </div>
         )}
+        <div className="flex justify-center pt-3">
+          <Button asChild variant="outline">
+            <Link href="/library?filter=watchlist">Open Watchlist</Link>
+          </Button>
+        </div>
       </section>
     </div>
   );

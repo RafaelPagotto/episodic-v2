@@ -26,7 +26,7 @@ import type {
   UpcomingEpisodeItem,
 } from "./types";
 
-const START_WATCHING_LIMIT = 12;
+const START_WATCHING_LIMIT = 20;
 const UPCOMING_EPISODE_LIMIT = 12;
 const UPCOMING_EPISODE_HORIZON_DAYS = 90;
 
@@ -141,6 +141,7 @@ function getUpcomingEpisodeCandidate(
     detailHref: getShowDetailSeasonHref(record.tmdbId, nextUpcomingEpisode.episode.seasonNumber),
     episodeNumber: nextUpcomingEpisode.episode.episodeNumber,
     episodeTitle: nextUpcomingEpisode.episode.title,
+    posterPath: record.posterPath,
     seasonNumber: nextUpcomingEpisode.episode.seasonNumber,
     showTitle: record.title,
     tmdbId: record.tmdbId,

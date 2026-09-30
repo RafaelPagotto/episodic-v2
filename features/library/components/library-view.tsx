@@ -3,6 +3,7 @@
 import { Check, CircleSlash, LayoutGrid, List, ListVideo, Loader2, Play, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
 import {
@@ -37,6 +38,7 @@ import type {
 import {
   DISPLAY_STATUS_LABELS,
   filterAndSortLibraryShows,
+  getLibraryFilter,
   getInitialLibrarySortDirection,
   getInitialLibrarySortOption,
   getInitialLibraryViewMode,
@@ -136,7 +138,9 @@ function LibraryStatusBadge({ show }: { show: LibraryShowCard }) {
 }
 
 export function LibraryView({ initialShows, loadError, preferences, timeZone = "UTC" }: LibraryViewProps) {
-  const [filter, setFilter] = useState<LibraryFilter>("all");
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const filter = getLibraryFilter(searchParams.get("filter"));
   const [isPending, startTransition] = useTransition();
   const [message, setMessage] = useState<LibraryMessage | null>(null);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
@@ -281,6 +285,20 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
     );
   }
 
+  function handleFilterChange(nextFilter: LibraryFilter) {
+    if (nextFilter === filter) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextFilter === "all") {
+      params.delete("filter");
+    } else {
+      params.set("filter", nextFilter);
+    }
+    const query = params.toString();
+    // Update filters locally and keep Back reserved for navigation between pages.
+    window.history.replaceState(null, "", `${pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+  }
+
   function handleViewModeChange(nextViewMode: LibraryViewMode) {
     setViewMode(nextViewMode);
     try {
@@ -319,7 +337,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
             <Button
               aria-pressed={filter === option.value}
               key={option.value}
-              onClick={() => setFilter(option.value)}
+              onClick={() => handleFilterChange(option.value)}
               type="button"
               variant={filter === option.value ? "default" : "outline"}
             >

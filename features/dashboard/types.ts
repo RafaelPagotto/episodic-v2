@@ -47,6 +47,7 @@ export type UpcomingEpisodeItem = {
   detailHref: string;
   episodeNumber: number;
   episodeTitle: string;
+  posterPath: string | null;
   seasonNumber: number;
   showTitle: string;
   tmdbId: number;
