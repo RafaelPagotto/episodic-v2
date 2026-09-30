@@ -538,7 +538,7 @@ describe("ShowDetailView refresh metadata UI", () => {
     expect(findEpisodeButton("Mark watched", tree, "Available Sep 21, 2026").props.disabled).toBe(true);
   });
 
-  it("marks one episode immediately, then reconciles new authoritative props after one refresh", async () => {
+  it("reconciles one optimistic episode from action props without an explicit refresh", async () => {
     const response = deferred<{ message: string; status: "success" }>();
     setEpisodeWatchedActionMock.mockReturnValueOnce(response.promise);
     const show = showDetail();
@@ -555,14 +555,20 @@ describe("ShowDetailView refresh metadata UI", () => {
     renderShowDetail(intermediateProps);
     expect(getText(episodeButtons(renderShowDetail(intermediateProps))[1]?.props.children as React.ReactNode)).toContain("Unwatch");
 
+    const authoritative = showDetail({
+      progress: { displayStatus: "caught_up", progressPercentage: 100, status: "watching", totalEpisodeCount: 2, watchedEpisodeCount: 2 },
+      seasons: [season(1, [episode(1, 1, { watched: true }), episode(1, 2, { watched: true })])],
+    });
+    renderShowDetail(authoritative);
+    expect(getText(episodeButtons(renderShowDetail(authoritative))[1]?.props.children as React.ReactNode)).toContain("Unwatch");
+
     response.resolve({ message: "Episode marked watched.", status: "success" });
     await flushPromises();
-    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
-
-    const authoritative = showDetail();
-    renderShowDetail(authoritative);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+    expect(hookState.states[2]).toEqual({});
     const reconciled = renderShowDetail(authoritative);
-    expect(getText(episodeButtons(reconciled)[1]?.props.children as React.ReactNode)).toContain("Mark watched");
+    expect(getText(episodeButtons(reconciled)[1]?.props.children as React.ReactNode)).toContain("Unwatch");
+    expect(hasText("Caught up", reconciled)).toBe(true);
   });
 
   it("keeps other rows usable and serializes three rapid optimistic marks", async () => {
@@ -594,9 +600,35 @@ describe("ShowDetailView refresh metadata UI", () => {
       responses[index]?.resolve({ message: "Episode marked watched.", status: "success" });
       await flushPromises();
       expect(setEpisodeWatchedActionMock).toHaveBeenCalledTimes(Math.min(index + 2, 3));
+      if (index === 0) {
+        const firstResponseProps = showDetail({
+          progress: { displayStatus: "watching", progressPercentage: 33, status: "watching", totalEpisodeCount: 3, watchedEpisodeCount: 1 },
+          seasons: [season(1, [episode(1, 5, { watched: true }), episode(1, 6), episode(1, 7)])],
+        });
+        renderShowDetail(firstResponseProps);
+        expect(hookState.states[2]).toEqual({ "1:6": true, "1:7": true });
+      }
+      if (index === 1) {
+        const finalResponseProps = showDetail({
+          progress: { displayStatus: "caught_up", progressPercentage: 100, status: "watching", totalEpisodeCount: 3, watchedEpisodeCount: 3 },
+          seasons: [season(1, [episode(1, 5, { watched: true }), episode(1, 6, { watched: true }), episode(1, 7, { watched: true })])],
+        });
+        renderShowDetail(finalResponseProps);
+        expect(hookState.states[2]).toEqual({ "1:7": true });
+      }
     }
     expect(setEpisodeWatchedActionMock.mock.calls.map(([input]) => input.episodeNumber)).toEqual([5, 6, 7]);
-    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+    expect(hookState.states[2]).toEqual({});
+    const authoritative = showDetail({
+      progress: { displayStatus: "caught_up", progressPercentage: 100, status: "watching", totalEpisodeCount: 3, watchedEpisodeCount: 3 },
+      seasons: [season(1, [episode(1, 5, { watched: true }), episode(1, 6, { watched: true }), episode(1, 7, { watched: true })])],
+    });
+    renderShowDetail(authoritative);
+    expect(hookState.states[2]).toEqual({});
+    expect(episodeButtons(renderShowDetail(authoritative)).slice(0, 3).map((button) => getText(button.props.children as React.ReactNode))).toEqual([
+      "Unwatch", "Unwatch", "Unwatch",
+    ]);
   });
 
   it("rolls back only the failed episode and continues the queue", async () => {
@@ -621,7 +653,14 @@ describe("ShowDetailView refresh metadata UI", () => {
     second.resolve({ message: "Episode marked watched.", status: "success" });
     await flushPromises();
     expect(hasText("This episode has not been released yet.", renderShowDetail(show))).toBe(true);
-    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+    const authoritative = showDetail({
+      seasons: [season(1, [episode(1, 5), episode(1, 6, { watched: true })])],
+    });
+    renderShowDetail(authoritative);
+    const reconciled = renderShowDetail(authoritative);
+    expect(getText(episodeButtons(reconciled)[0]?.props.children as React.ReactNode)).toContain("Mark watched");
+    expect(getText(episodeButtons(reconciled)[1]?.props.children as React.ReactNode)).toContain("Unwatch");
   });
 
   it("preserves unwatch confirmation and prevents duplicate clicks on a pending episode", async () => {
@@ -646,7 +685,7 @@ describe("ShowDetailView refresh metadata UI", () => {
 
     response.resolve({ message: "Episode marked unwatched.", status: "success" });
     await flushPromises();
-    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 
   it("keeps queued mutations when the visible season changes", async () => {
@@ -678,7 +717,7 @@ describe("ShowDetailView refresh metadata UI", () => {
     ]);
     second.resolve({ message: "Episode marked watched.", status: "success" });
     await flushPromises();
-    expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 
   it("allows optimistic cleanup of a watched future episode while still blocking a new future mark", async () => {

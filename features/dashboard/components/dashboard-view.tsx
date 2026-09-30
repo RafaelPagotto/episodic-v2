@@ -7,7 +7,6 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { LibrarySummaryTiles } from "@/components/library-summary-tiles";
@@ -233,15 +232,31 @@ function EmptyContinueWatchingState({
 }
 
 export function DashboardView({ data }: DashboardViewProps) {
-  const router = useRouter();
   const [message, setMessage] = useState<ActionMessage | null>(null);
   const [removedShowIds, setRemovedShowIds] = useState<Set<number>>(() => new Set());
   const removedShowIdsRef = useRef(removedShowIds);
+  const removedEpisodesRef = useRef(new Map<number, ContinueWatchingItem["nextEpisode"]>());
   const mountedRef = useRef(true);
-  const routerRef = useRef(router);
   const previousDataRef = useRef(data);
+  const latestDataRef = useRef(data);
   const queueRef = useRef<ContinueWatchingMutationQueue | null>(null);
-  routerRef.current = router;
+  latestDataRef.current = data;
+
+  function reconcileResolvedRemovals() {
+    // A returned RSC payload may arrive while later cards are still queued.
+    let changed = false;
+    for (const [showId, episode] of removedEpisodesRef.current) {
+      if (queueRef.current?.isPending(showId)) continue;
+      const current = latestDataRef.current.continueWatching.find((item) => item.tmdbId === showId);
+      if (!current || current.nextEpisode.seasonNumber !== episode.seasonNumber
+        || current.nextEpisode.episodeNumber !== episode.episodeNumber) {
+        removedEpisodesRef.current.delete(showId);
+        removedShowIdsRef.current.delete(showId);
+        changed = true;
+      }
+    }
+    if (changed) setRemovedShowIds(new Set(removedShowIdsRef.current));
+  }
 
   if (!queueRef.current) {
     queueRef.current = new ContinueWatchingMutationQueue(
@@ -249,13 +264,14 @@ export function DashboardView({ data }: DashboardViewProps) {
       (mutation, result) => {
         if (!mountedRef.current) return;
         if (result.status === "error") {
+          removedEpisodesRef.current.delete(mutation.showId);
           removedShowIdsRef.current.delete(mutation.showId);
           setRemovedShowIds(new Set(removedShowIdsRef.current));
         }
         setMessage((current) => result.status === "error" || current?.status !== "error" ? result : current);
       },
       () => {
-        if (mountedRef.current) routerRef.current.refresh();
+        if (mountedRef.current) reconcileResolvedRemovals();
       },
     );
   }
@@ -269,8 +285,11 @@ export function DashboardView({ data }: DashboardViewProps) {
     if (previousDataRef.current === data) return;
     previousDataRef.current = data;
     if (!queueRef.current?.hasPending) {
+      removedEpisodesRef.current.clear();
       removedShowIdsRef.current = new Set();
       setRemovedShowIds(new Set());
+    } else {
+      reconcileResolvedRemovals();
     }
   }, [data]);
 
@@ -281,6 +300,7 @@ export function DashboardView({ data }: DashboardViewProps) {
     if (removedShowIdsRef.current.has(item.tmdbId) || queueRef.current?.isPending(item.tmdbId)) return;
 
     removedShowIdsRef.current.add(item.tmdbId);
+    removedEpisodesRef.current.set(item.tmdbId, item.nextEpisode);
     setRemovedShowIds(new Set(removedShowIdsRef.current));
     setMessage(null);
     queueRef.current?.enqueue({

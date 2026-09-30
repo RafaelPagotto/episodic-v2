@@ -255,12 +255,32 @@ export function ShowDetailView({
     () => getShowDetailSeasonNavigation(show, initialSeasonParam, { referenceDate, timeZone }).activeSeasonNumber,
   );
   const mountedRef = useRef(true);
-  const routerRef = useRef(router);
   const previousShowRef = useRef(show);
+  const latestShowRef = useRef(show);
   const actionInFlightRef = useRef(false);
   const bulkTrackingRef = useRef(false);
   const episodeQueueRef = useRef<EpisodeMutationQueue | null>(null);
-  routerRef.current = router;
+  latestShowRef.current = show;
+
+  function reconcileResolvedWatchedOverrides() {
+    // Action RSC props can arrive before the queue settles; keep unresolved rows optimistic.
+    const serverWatched = new Map(
+      latestShowRef.current.seasons.flatMap((season) =>
+        season.episodes.map((episode) => [getShowDetailEpisodeKey(episode), episode.watched] as const),
+      ),
+    );
+    setWatchedOverrides((current) => {
+      const next = { ...current };
+      let changed = false;
+      for (const [key, watched] of Object.entries(current)) {
+        if (!episodeQueueRef.current?.isPending(key) && serverWatched.get(key) === watched) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
+  }
 
   if (!episodeQueueRef.current) {
     episodeQueueRef.current = new EpisodeMutationQueue(
@@ -279,7 +299,7 @@ export function ShowDetailView({
         if (mountedRef.current) setPendingEpisodeKeys(keys);
       },
       () => {
-        if (mountedRef.current) routerRef.current.refresh();
+        if (mountedRef.current) reconcileResolvedWatchedOverrides();
       },
     );
   }
@@ -294,6 +314,8 @@ export function ShowDetailView({
     previousShowRef.current = show;
     if (!episodeQueueRef.current?.hasPending) {
       setWatchedOverrides({});
+    } else {
+      reconcileResolvedWatchedOverrides();
     }
   }, [show]);
 

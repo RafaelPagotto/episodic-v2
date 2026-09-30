@@ -159,7 +159,7 @@ describe("Dashboard Continue Watching queue", () => {
     markWatched.mockReset();
   });
 
-  it("removes one card immediately, then refreshes once after the server action", async () => {
+  it("reconciles one removed card from action props without an explicit refresh", async () => {
     const response = deferred<typeof success>();
     markWatched.mockReturnValue(response.promise);
     const baseline = data();
@@ -169,13 +169,14 @@ describe("Dashboard Continue Watching queue", () => {
     expect(markWatched).toHaveBeenCalledWith({ episodeNumber: 2, seasonNumber: 1, tmdbId: 100 });
     expect(refresh).not.toHaveBeenCalled();
 
-    response.resolve(success);
-    await flushPromises();
-    expect(cardIds(renderDashboard(baseline))).toEqual([200, 300]);
-    expect(refresh).toHaveBeenCalledTimes(1);
-
     const authoritative = data([item(100, 3), item(200), item(300)]);
     renderDashboard(authoritative);
+    expect(cardIds(renderDashboard(authoritative))).toEqual([200, 300]);
+
+    response.resolve(success);
+    await flushPromises();
+    expect(refresh).not.toHaveBeenCalled();
+    expect(hooks.states[1]).toEqual(new Set());
     expect(cards(renderDashboard(authoritative))[0]?.item.nextEpisode.episodeNumber).toBe(3);
     expect(cardIds(renderDashboard(authoritative))).toEqual([100, 200, 300]);
   });
@@ -196,10 +197,20 @@ describe("Dashboard Continue Watching queue", () => {
       responses[index]?.resolve(success);
       await flushPromises();
       expect(markWatched).toHaveBeenCalledTimes(Math.min(index + 2, 3));
-      if (index < 2) expect(refresh).not.toHaveBeenCalled();
+      if (index === 0) {
+        const firstResponseProps = data([item(100, 3), item(200), item(300)]);
+        renderDashboard(firstResponseProps);
+        expect(cardIds(renderDashboard(firstResponseProps))).toEqual([100]);
+      }
+      if (index === 1) {
+        const finalResponseProps = data([item(100, 3), item(200, 3)]);
+        renderDashboard(finalResponseProps);
+        expect(cardIds(renderDashboard(finalResponseProps))).toEqual([100, 200]);
+      }
+      expect(refresh).not.toHaveBeenCalled();
     }
     expect(markWatched.mock.calls.map(([input]) => input.tmdbId)).toEqual([100, 200, 300]);
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(hooks.states[1]).toEqual(new Set());
   });
 
   it("restores only a failed card in server order, shows its error, and continues the queue", async () => {
@@ -221,7 +232,10 @@ describe("Dashboard Continue Watching queue", () => {
     await flushPromises();
     expect(cardIds(renderDashboard(baseline))).toEqual([100, 300]);
     expect(componentProps(renderDashboard(baseline), "ActionFeedback")[0]?.children).toBe("The next episode has changed.");
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
+    const authoritative = data([item(100), item(200, 3), item(300)]);
+    renderDashboard(authoritative);
+    expect(cardIds(renderDashboard(authoritative))).toEqual([100, 200, 300]);
   });
 
   it("continues queued work when a server action rejects unexpectedly", async () => {
@@ -240,7 +254,7 @@ describe("Dashboard Continue Watching queue", () => {
     second.resolve(success);
     await flushPromises();
     expect(componentProps(renderDashboard(baseline), "ActionFeedback")[0]?.children).toBe("Unable to update this episode right now.");
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it("keeps removals through intermediate props and leaves Upcoming and Start Watching authoritative", async () => {
