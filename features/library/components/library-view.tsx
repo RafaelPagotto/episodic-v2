@@ -103,35 +103,39 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
   const linkClassName =
-    "group block overflow-hidden rounded-md bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "group relative block overflow-hidden rounded-md bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-  if (!posterUrl) {
-    return (
-      <Link aria-label={`View details for ${show.title}`} className={linkClassName} href={href}>
+  return (
+    <Link
+      aria-describedby={`library-status-${show.tmdbId}`}
+      aria-label={`View details for ${show.title}`}
+      className={linkClassName}
+      href={href}
+    >
+      {posterUrl ? (
+        <Image
+          alt={`${show.title} poster`}
+          className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
+          height={513}
+          sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
+          src={posterUrl}
+          width={342}
+        />
+      ) : (
         <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
           {show.title.charAt(0)}
         </div>
-      </Link>
-    );
-  }
-
-  return (
-    <Link aria-label={`View details for ${show.title}`} className={linkClassName} href={href}>
-      <Image
-        alt={`${show.title} poster`}
-        className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
-        height={513}
-        sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
-        src={posterUrl}
-        width={342}
-      />
+      )}
+      <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex" id={`library-status-${show.tmdbId}`}>
+        <LibraryStatusBadge className="max-w-full truncate border-border/75 bg-card/75 text-card-foreground shadow-sm" show={show} />
+      </div>
     </Link>
   );
 }
 
-function LibraryStatusBadge({ show }: { show: LibraryShowCard }) {
+function LibraryStatusBadge({ className, show }: { className?: string; show: LibraryShowCard }) {
   return (
-    <span className="rounded-full border px-2 py-1 text-xs text-muted-foreground">
+    <span className={cn("rounded-full border px-2 py-1 text-xs text-muted-foreground", className)}>
       {DISPLAY_STATUS_LABELS[show.displayStatus]}
     </span>
   );
@@ -434,34 +438,26 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
                 key={show.tmdbId}
                 className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-60")}
               >
-                <CardContent className="flex h-full flex-col gap-3 p-3 sm:p-4">
+                <CardContent className="flex h-full flex-col gap-2 p-3 sm:p-3 sm:px-4">
                   <LibraryGridPosterLink show={show} />
 
-                  <div className="flex min-h-0 flex-1 flex-col gap-3">
+                  <div className="flex min-h-0 flex-1 flex-col gap-2">
                     <div className="min-w-0">
-                      <div className="flex min-w-0 items-start justify-between gap-2">
-                        <h2 className="min-w-0 text-sm font-semibold leading-tight sm:text-base">
+                      <div className="min-h-10 min-w-0">
+                        <h2 className="min-w-0 text-sm font-semibold leading-5 sm:text-base sm:leading-5">
                           <Link
                             aria-label={`View details for ${show.title}`}
-                            className="line-clamp-2 rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="line-clamp-2 rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                             href={detailHref}
                           >
                             {show.title}
                           </Link>
                         </h2>
-                        {show.favourite ? (
-                          <Star
-                            aria-label="Favourite"
-                            className="mt-0.5 size-4 shrink-0 fill-primary text-primary"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <LibraryStatusBadge show={show} />
                       </div>
                     </div>
 
                     <ProgressBar
+                      compact
                       progressPercentage={show.progressPercentage}
                       totalEpisodeCount={show.totalEpisodeCount}
                       watchedEpisodeCount={show.watchedEpisodeCount}
@@ -567,12 +563,6 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
                               {show.title}
                             </Link>
                           </h2>
-                          {show.favourite ? (
-                            <Star
-                              aria-label="Favourite"
-                              className="size-4 shrink-0 fill-primary text-primary"
-                            />
-                          ) : null}
                         </div>
                         <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
                           <LibraryStatusBadge show={show} />

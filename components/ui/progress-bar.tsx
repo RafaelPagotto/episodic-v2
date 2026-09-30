@@ -1,4 +1,5 @@
 type ProgressBarProps = {
+  compact?: boolean;
   label?: string;
   progressPercentage: number;
   totalEpisodeCount: number;
@@ -6,6 +7,7 @@ type ProgressBarProps = {
 };
 
 export function ProgressBar({
+  compact = false,
   label,
   progressPercentage,
   totalEpisodeCount,
@@ -14,7 +16,7 @@ export function ProgressBar({
   const safeProgressPercentage = Math.min(100, Math.max(0, progressPercentage));
 
   return (
-    <div className="space-y-2">
+    <div className={compact ? "space-y-1" : "space-y-2"}>
       <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span className="truncate">
           {label ? `${label}: ` : ""}

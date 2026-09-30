@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
 import type { UserPreferences } from "@/features/preferences";
@@ -72,11 +71,7 @@ export async function LibraryPageContent() {
   const { errorMessage, preferences, shows, timeZone } = await getLibraryPageState();
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <PageHeader
-        description="Your saved shows, progress, favourites, and watch status."
-        title="Library"
-      />
+    <section aria-label="Library" className="mx-auto w-full max-w-6xl">
       <LibraryView initialShows={shows} loadError={errorMessage} preferences={preferences} timeZone={timeZone} />
     </section>
   );
