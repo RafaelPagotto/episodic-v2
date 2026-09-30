@@ -3,6 +3,7 @@
 import {
   CalendarDays,
   Check,
+  Loader2,
   Play,
 } from "lucide-react";
 import Image from "next/image";
@@ -146,9 +147,11 @@ function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
 function ContinueWatchingCard({
   item,
   onMarkNextWatched,
+  pending,
 }: {
   item: ContinueWatchingItem;
   onMarkNextWatched: (item: ContinueWatchingItem) => void;
+  pending: boolean;
 }) {
   const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
 
@@ -167,13 +170,14 @@ function ContinueWatchingCard({
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row md:justify-end">
               <Button
-                aria-label={`Mark ${item.title} ${nextEpisodeLabel} watched`}
+                aria-label={pending ? `Saving ${item.title} ${nextEpisodeLabel}` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
                 className="w-full gap-2 sm:w-auto"
+                disabled={pending}
                 onClick={() => onMarkNextWatched(item)}
                 type="button"
               >
-                <Check className="size-4" />
-                Mark {nextEpisodeLabel} watched
+                {pending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                {pending ? "Saving…" : `Mark ${nextEpisodeLabel} watched`}
               </Button>
               <Button asChild className="w-full gap-2 sm:w-auto md:w-32" variant="outline">
                 <Link href={`/shows/${item.tmdbId}`}>
@@ -233,29 +237,29 @@ function EmptyContinueWatchingState({
 
 export function DashboardView({ data }: DashboardViewProps) {
   const [message, setMessage] = useState<ActionMessage | null>(null);
-  const [removedShowIds, setRemovedShowIds] = useState<Set<number>>(() => new Set());
-  const removedShowIdsRef = useRef(removedShowIds);
-  const removedEpisodesRef = useRef(new Map<number, ContinueWatchingItem["nextEpisode"]>());
+  const [pendingShowIds, setPendingShowIds] = useState<Set<number>>(() => new Set());
+  const pendingShowIdsRef = useRef(pendingShowIds);
+  const submittedEpisodesRef = useRef(new Map<number, ContinueWatchingItem["nextEpisode"]>());
   const mountedRef = useRef(true);
   const previousDataRef = useRef(data);
   const latestDataRef = useRef(data);
   const queueRef = useRef<ContinueWatchingMutationQueue | null>(null);
   latestDataRef.current = data;
 
-  function reconcileResolvedRemovals() {
+  function reconcileSettledPending() {
     // A returned RSC payload may arrive while later cards are still queued.
     let changed = false;
-    for (const [showId, episode] of removedEpisodesRef.current) {
+    for (const [showId, episode] of submittedEpisodesRef.current) {
       if (queueRef.current?.isPending(showId)) continue;
       const current = latestDataRef.current.continueWatching.find((item) => item.tmdbId === showId);
       if (!current || current.nextEpisode.seasonNumber !== episode.seasonNumber
         || current.nextEpisode.episodeNumber !== episode.episodeNumber) {
-        removedEpisodesRef.current.delete(showId);
-        removedShowIdsRef.current.delete(showId);
+        submittedEpisodesRef.current.delete(showId);
+        pendingShowIdsRef.current.delete(showId);
         changed = true;
       }
     }
-    if (changed) setRemovedShowIds(new Set(removedShowIdsRef.current));
+    if (changed) setPendingShowIds(new Set(pendingShowIdsRef.current));
   }
 
   if (!queueRef.current) {
@@ -264,14 +268,14 @@ export function DashboardView({ data }: DashboardViewProps) {
       (mutation, result) => {
         if (!mountedRef.current) return;
         if (result.status === "error") {
-          removedEpisodesRef.current.delete(mutation.showId);
-          removedShowIdsRef.current.delete(mutation.showId);
-          setRemovedShowIds(new Set(removedShowIdsRef.current));
+          submittedEpisodesRef.current.delete(mutation.showId);
+          pendingShowIdsRef.current.delete(mutation.showId);
+          setPendingShowIds(new Set(pendingShowIdsRef.current));
         }
         setMessage((current) => result.status === "error" || current?.status !== "error" ? result : current);
       },
       () => {
-        if (mountedRef.current) reconcileResolvedRemovals();
+        if (mountedRef.current) reconcileSettledPending();
       },
     );
   }
@@ -285,23 +289,22 @@ export function DashboardView({ data }: DashboardViewProps) {
     if (previousDataRef.current === data) return;
     previousDataRef.current = data;
     if (!queueRef.current?.hasPending) {
-      removedEpisodesRef.current.clear();
-      removedShowIdsRef.current = new Set();
-      setRemovedShowIds(new Set());
+      submittedEpisodesRef.current.clear();
+      pendingShowIdsRef.current = new Set();
+      setPendingShowIds(new Set());
     } else {
-      reconcileResolvedRemovals();
+      reconcileSettledPending();
     }
   }, [data]);
 
   const hasShows = data.summary.totalShows > 0;
-  const visibleContinueWatching = data.continueWatching.filter((item) => !removedShowIds.has(item.tmdbId));
 
   function handleMarkNextWatched(item: ContinueWatchingItem) {
-    if (removedShowIdsRef.current.has(item.tmdbId) || queueRef.current?.isPending(item.tmdbId)) return;
+    if (pendingShowIdsRef.current.has(item.tmdbId) || queueRef.current?.isPending(item.tmdbId)) return;
 
-    removedShowIdsRef.current.add(item.tmdbId);
-    removedEpisodesRef.current.set(item.tmdbId, item.nextEpisode);
-    setRemovedShowIds(new Set(removedShowIdsRef.current));
+    pendingShowIdsRef.current.add(item.tmdbId);
+    submittedEpisodesRef.current.set(item.tmdbId, item.nextEpisode);
+    setPendingShowIds(new Set(pendingShowIdsRef.current));
     setMessage(null);
     queueRef.current?.enqueue({
       input: {
@@ -353,11 +356,12 @@ export function DashboardView({ data }: DashboardViewProps) {
           />
         ) : (
           <div className="grid gap-3">
-            {visibleContinueWatching.map((item) => (
+            {data.continueWatching.map((item) => (
               <ContinueWatchingCard
                 key={item.tmdbId}
                 item={item}
                 onMarkNextWatched={handleMarkNextWatched}
+                pending={pendingShowIds.has(item.tmdbId)}
               />
             ))}
           </div>
