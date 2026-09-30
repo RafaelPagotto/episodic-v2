@@ -8,8 +8,6 @@ import { setEpisodeWatched } from "../shows/data";
 import {
   loadEpisodesByShowIds,
   loadWatchedEpisodesByShowIds,
-  mapEpisodeRow,
-  mapWatchedEpisodeRow,
 } from "../tracking";
 import type { Episode, WatchedEpisode } from "../tracking";
 import type { EpisodeCalculationOptions } from "../tracking";
@@ -128,8 +126,8 @@ export async function markContinueWatchingNextEpisodeWatched(
   const [
     { data: userShows, error: userShowsError },
     { data: shows, error: showsError },
-    { data: episodes, error: episodesError },
-    { data: watchedEpisodes, error: watchedEpisodesError },
+    episodesByShowId,
+    watchedByShowId,
   ] = await Promise.all([
     supabase
       .from("user_shows")
@@ -138,23 +136,12 @@ export async function markContinueWatchingNextEpisodeWatched(
       .eq("show_tmdb_id", tmdbId)
       .limit(1),
     supabase.from("shows").select("*").eq("tmdb_id", tmdbId).limit(1),
-    supabase
-      .from("episodes")
-      .select("*")
-      .eq("show_tmdb_id", tmdbId)
-      .order("season_number", { ascending: true })
-      .order("episode_number", { ascending: true }),
-    supabase
-      .from("watched_episodes")
-      .select("*")
-      .eq("user_id", userId)
-      .eq("show_tmdb_id", tmdbId),
+    getDashboardEpisodesByShowId(supabase, [tmdbId]),
+    getDashboardWatchedEpisodesByShowId(supabase, userId, [tmdbId]),
   ]);
 
   throwDataError(userShowsError, "Unable to load this show from your library.");
   throwDataError(showsError, "Unable to load show details.");
-  throwDataError(episodesError, "Unable to load episodes.");
-  throwDataError(watchedEpisodesError, "Unable to load watched progress.");
 
   const userShow = userShows?.[0];
 
@@ -165,8 +152,8 @@ export async function markContinueWatchingNextEpisodeWatched(
   const record = createDashboardRecord(
     userShow,
     shows?.[0],
-    (episodes ?? []).map(mapEpisodeRow),
-    (watchedEpisodes ?? []).map(mapWatchedEpisodeRow),
+    episodesByShowId.get(tmdbId) ?? [],
+    watchedByShowId.get(tmdbId) ?? [],
   );
   const nextEpisode = getContinueWatchingNextEpisode(record, options);
 

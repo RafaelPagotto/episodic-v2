@@ -83,6 +83,9 @@ class FakeSupabase {
   userShows: UserShowRow[];
   watchedEpisodes: WatchedEpisodeRow[] = [];
   selections: Array<{ table: TableName; columns: string }> = [];
+  ranges: Array<{ afterWrite: boolean; rangeStart: number; table: TableName }> = [];
+  enforceRowCap = false;
+  watchedWriteStarted = false;
   onRange?: (table: TableName) => Promise<void> | void;
 
   private watchedEpisodeId = 1;
@@ -221,6 +224,7 @@ class FakeQuery {
   }
 
   range(rangeStart: number, rangeEnd: number) {
+    this.db.ranges.push({ afterWrite: this.db.watchedWriteStarted, rangeStart, table: this.table });
     return Promise.resolve(this.db.onRange?.(this.table)).then(() => this.execute(rangeStart, rangeEnd));
   }
 
@@ -231,6 +235,7 @@ class FakeQuery {
   }
 
   upsert(values: WatchedEpisodeInsert | WatchedEpisodeInsert[]) {
+    this.db.watchedWriteStarted = true;
     this.db.upsertWatchedEpisodes(Array.isArray(values) ? values : [values]);
 
     return Promise.resolve({ data: null, error: null });
@@ -277,6 +282,8 @@ class FakeQuery {
 
     if (rangeStart !== undefined && rangeEnd !== undefined) {
       rows = rows.slice(rangeStart, rangeEnd + 1);
+    } else if (this.db.enforceRowCap && (this.table === "episodes" || this.table === "watched_episodes")) {
+      rows = rows.slice(0, MULTI_SHOW_EPISODE_PAGE_SIZE);
     }
 
     if (this.selectedColumns !== "*") {
@@ -581,6 +588,77 @@ describe("show progress actions", () => {
 
     expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
     expect(db.userShows[0]?.status).toBe("watching");
+  });
+
+  it("validates the next episode beyond the first episode page", async () => {
+    const db = new FakeSupabase();
+    db.enforceRowCap = true;
+    db.episodes = Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE + 1 }, (_, index) =>
+      episodeRow(1, index + 1),
+    );
+    db.upsertWatchedEpisodes(db.episodes.slice(0, MULTI_SHOW_EPISODE_PAGE_SIZE).map((episode) => ({
+      episode_number: episode.episode_number,
+      season_number: episode.season_number,
+      show_tmdb_id: SHOW_TMDB_ID,
+      user_id: USER_ID,
+    })));
+
+    await markContinueWatchingNextEpisodeWatched(
+      client(db), USER_ID, SHOW_TMDB_ID, 1, MULTI_SHOW_EPISODE_PAGE_SIZE + 1,
+    );
+
+    expect(db.watchedEpisodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 1);
+    expect(db.userShows[0]?.status).toBe("watched");
+    expect(db.ranges.filter((call) => call.table === "episodes" && !call.afterWrite).map((call) => call.rangeStart))
+      .toEqual([0, MULTI_SHOW_EPISODE_PAGE_SIZE]);
+    expect(db.ranges.filter((call) => call.table === "episodes" && call.afterWrite).map((call) => call.rangeStart))
+      .toEqual([0, MULTI_SHOW_EPISODE_PAGE_SIZE]);
+  });
+
+  it("validates watched rows beyond the first watched page", async () => {
+    const db = new FakeSupabase();
+    db.enforceRowCap = true;
+    db.episodes = Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE + 2 }, (_, index) =>
+      episodeRow(1, index + 1),
+    );
+    db.upsertWatchedEpisodes(db.episodes.slice(0, MULTI_SHOW_EPISODE_PAGE_SIZE + 1).map((episode) => ({
+      episode_number: episode.episode_number,
+      season_number: episode.season_number,
+      show_tmdb_id: SHOW_TMDB_ID,
+      user_id: USER_ID,
+    })));
+
+    await markContinueWatchingNextEpisodeWatched(
+      client(db), USER_ID, SHOW_TMDB_ID, 1, MULTI_SHOW_EPISODE_PAGE_SIZE + 2,
+    );
+
+    expect(db.watchedEpisodes).toHaveLength(MULTI_SHOW_EPISODE_PAGE_SIZE + 2);
+    expect(db.ranges.filter((call) => call.table === "watched_episodes" && !call.afterWrite).map((call) => call.rangeStart))
+      .toEqual([0, MULTI_SHOW_EPISODE_PAGE_SIZE]);
+    expect(db.ranges.filter((call) => call.table === "watched_episodes" && call.afterWrite).map((call) => call.rangeStart))
+      .toEqual([0, MULTI_SHOW_EPISODE_PAGE_SIZE]);
+  });
+
+  it("still rejects a stale requested Continue Watching episode", async () => {
+    const db = new FakeSupabase();
+    db.episodes.push(episodeRow(1, 3));
+    db.upsertWatchedEpisodes([{ episode_number: 1, season_number: 1, show_tmdb_id: SHOW_TMDB_ID, user_id: USER_ID }]);
+
+    await expect(markContinueWatchingNextEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 3))
+      .rejects.toThrow("The next episode has changed.");
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1"]);
+  });
+
+  it.each([null, "invalid"])("keeps %s air-date fallback for Continue Watching", async (airDate) => {
+    const db = new FakeSupabase();
+    db.episodes = [episodeRow(1, 1, "2024-01-01"), episodeRow(1, 2, airDate)];
+    db.upsertWatchedEpisodes([{ episode_number: 1, season_number: 1, show_tmdb_id: SHOW_TMDB_ID, user_id: USER_ID }]);
+
+    await markContinueWatchingNextEpisodeWatched(client(db), USER_ID, SHOW_TMDB_ID, 1, 2, {
+      referenceDate: "2025-01-01",
+    });
+
+    expect(watchedEpisodeKeys(db)).toEqual(["1:1", "1:2"]);
   });
 
   it("does not let the Continue Watching action mark specials or dropped shows", async () => {
