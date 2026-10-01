@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/page-header";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
 import { DEFAULT_USER_PREFERENCES } from "@/features/preferences/defaults";
 import { getUserPreferences } from "@/features/preferences/data";
@@ -55,11 +54,7 @@ export async function SearchPageContent() {
   const { initialAddedShowIds, preferences } = await getSearchPageState();
 
   return (
-    <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <PageHeader
-        description="Find TV shows from TMDB and add them to your private library."
-        title="Search"
-      />
+    <section aria-label="Search" className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <ShowSearch initialAddedShowIds={initialAddedShowIds} preferences={preferences} />
     </section>
   );

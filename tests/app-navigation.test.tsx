@@ -54,8 +54,16 @@ describe("collapsible navigation", () => {
     expect(desktop).toContain('<span>Sign out</span>');
   });
 
-  it("keeps mobile navigation independent of the desktop preference", () => {
-    expect(markup(true).mobile).toBe(markup(false).mobile);
+  it("keeps mobile navigation icon-only and independent of the desktop preference", () => {
+    const { mobile } = markup(true);
+    expect(mobile).toBe(markup(false).mobile);
+    for (const item of APP_NAV_ITEMS) {
+      expect(mobile).toContain(`aria-label="${item.label}"`);
+      expect(mobile).toContain(`title="${item.label}"`);
+      expect(mobile).toContain(`<span class="sr-only">${item.label}</span>`);
+    }
+    expect(mobile).toContain('aria-label="Sign out"');
+    expect(mobile).toContain('<span class="sr-only">Sign out</span>');
   });
 
   it.each([true, false])("retires Progress and preserves the remaining routes when collapsed=%s", (collapsed) => {
@@ -78,6 +86,7 @@ describe("collapsible navigation", () => {
   it("preserves active route highlighting for nested pages", () => {
     pathname.value = "/profile/preferences";
     expect(markup(true).desktop).toMatch(/<a[^>]*aria-current="page"[^>]*aria-label="Profile"/);
+    expect(markup(true).mobile).toMatch(/<a[^>]*aria-current="page"[^>]*aria-label="Profile"/);
   });
 
   it("uses a safe account initial when the email is unavailable", () => {

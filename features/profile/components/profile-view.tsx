@@ -27,7 +27,6 @@ export function ProfileView({ data }: ProfileViewProps) {
       <section className="space-y-3">
         <div>
           <h2 className="text-xl font-semibold tracking-tight">Library Statistics</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Your current library counts by watch status.</p>
         </div>
         <LibrarySummaryTiles summary={data.summary} />
       </section>

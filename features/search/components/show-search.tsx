@@ -64,14 +64,14 @@ function ShowPoster({
   const content = posterUrl ? (
     <Image
       alt={`${show.title} poster`}
-      className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
+      className={cn("aspect-[2/3] w-full object-cover", isAdded && "transition group-hover:scale-[1.02]")}
       height={513}
       sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
       src={posterUrl}
       width={342}
     />
   ) : (
-    <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
+    <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground", isAdded && "transition group-hover:scale-[1.02]")}>
       {show.title.charAt(0)}
     </div>
   );
