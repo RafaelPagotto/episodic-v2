@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { DashboardDataError, getUserDashboardData } from "@/features/dashboard";
+import { DashboardDataError, getUserDashboardSummary } from "@/features/dashboard";
 import { getUserPreferences, PreferencesDataError } from "@/features/preferences";
 import { getDateOnlyForTimeZone, resolveTimeZone } from "@/lib/date-only";
 import type { Database } from "@/lib/supabase/types";
@@ -33,14 +33,14 @@ export async function getUserProfileData(
       referenceDate: getDateOnlyForTimeZone(new Date(), timeZone),
       timeZone,
     };
-    const dashboardData = await getUserDashboardData(supabase, userId, preferences, dateOptions);
+    const summary = await getUserDashboardSummary(supabase, userId, dateOptions);
 
     return {
       deleteConfirmationTarget: getDeleteAccountConfirmationTarget(email),
       email: email || "Unknown email",
       persistedTimeZone,
       preferences,
-      summary: dashboardData.summary,
+      summary,
     };
   } catch (error) {
     if (error instanceof DashboardDataError || error instanceof PreferencesDataError) {

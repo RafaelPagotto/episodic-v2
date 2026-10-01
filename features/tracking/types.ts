@@ -62,6 +62,9 @@ export type Episode = {
   metadata: Record<string, unknown>;
 };
 
+export type EpisodeProgress = Pick<Episode, "showTmdbId" | "seasonNumber" | "episodeNumber" | "airDate">;
+export type EpisodeSummary = EpisodeProgress & Pick<Episode, "title">;
+
 export type UserShow = {
   id: number;
   userId: string;

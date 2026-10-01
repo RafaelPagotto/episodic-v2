@@ -1,8 +1,16 @@
-import type { DisplayStatus, Episode, TrackingStatus, WatchedEpisode } from "@/features/tracking";
+import type { DisplayStatus, EpisodeProgress, EpisodeSummary, TrackingStatus, WatchedEpisode } from "@/features/tracking";
+
+export type DashboardProgressRecord = {
+  episodes: EpisodeProgress[];
+  favourite: boolean;
+  tmdbStatus: string | null;
+  trackingStatus: TrackingStatus;
+  watchedEpisodes: WatchedEpisode[];
+};
 
 export type DashboardShowRecord = {
   addedAt: string;
-  episodes: Episode[];
+  episodes: EpisodeSummary[];
   favourite: boolean;
   posterPath: string | null;
   title: string;

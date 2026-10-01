@@ -2,8 +2,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
 import {
+  loadEpisodeProgressByShowIds,
+  loadEpisodeSummariesByShowIds,
   loadEpisodesByShowIds,
   loadWatchedEpisodesByShowIds,
+  MULTI_SHOW_EPISODE_CONCURRENCY,
   MULTI_SHOW_EPISODE_PAGE_SIZE,
 } from "../features/tracking";
 import type { Database } from "../lib/supabase/types";
@@ -25,6 +28,8 @@ type QueryFilter =
   };
 
 type QueryCall = {
+  columns: string;
+  countRequested: boolean;
   filters: QueryFilter[];
   orders: string[];
   rangeEnd: number;
@@ -36,6 +41,11 @@ class FakeSupabase {
   readonly calls: QueryCall[] = [];
   episodes: EpisodeRow[] = [];
   watchedEpisodes: WatchedEpisodeRow[] = [];
+  includeCount = true;
+  rowLimit = MULTI_SHOW_EPISODE_PAGE_SIZE;
+  respond?: (call: QueryCall) => Promise<void>;
+  failedRange: number | null = null;
+  truncatedRange: number | null = null;
 
   from<TTable extends TableName>(table: TTable) {
     return new FakeQuery<TTable>(this, table);
@@ -47,6 +57,8 @@ class FakeSupabase {
 }
 
 class FakeQuery<TTable extends TableName> {
+  private columns = "*";
+  private countRequested = false;
   private readonly filters: QueryFilter[] = [];
   private readonly orderColumns: string[] = [];
 
@@ -70,28 +82,37 @@ class FakeQuery<TTable extends TableName> {
     return this;
   }
 
-  range(rangeStart: number, rangeEnd: number) {
-    this.db.calls.push({
+  async range(rangeStart: number, rangeEnd: number) {
+    const call = {
+      columns: this.columns,
+      countRequested: this.countRequested,
       filters: [...this.filters],
       orders: [...this.orderColumns],
       rangeEnd,
       rangeStart,
       table: this.table,
-    });
+    };
+    this.db.calls.push(call);
 
-    const rows = this.db
+    const allRows = this.db
       .getRows(this.table)
       .filter((row) => matchesFilters(row, this.filters))
-      .sort((left, right) => compareRows(left, right, this.orderColumns))
-      .slice(rangeStart, rangeEnd + 1);
+      .sort((left, right) => compareRows(left, right, this.orderColumns));
+    const rows = this.db.truncatedRange === rangeStart ? [] : allRows.slice(rangeStart, Math.min(rangeEnd + 1, rangeStart + this.db.rowLimit));
+    await this.db.respond?.(call);
 
-    return Promise.resolve({
-      data: rows,
-      error: null,
-    });
+    return {
+      count: this.countRequested && this.db.includeCount ? allRows.length : null,
+      data: this.db.failedRange === rangeStart ? null : rows.map((row) =>
+        Object.fromEntries(this.columns.split(",").map((column) => [column, getColumnValue(row, column)])),
+      ),
+      error: this.db.failedRange === rangeStart ? { message: "Request failed" } : null,
+    };
   }
 
-  select() {
+  select(columns: string, options: { count?: string } = {}) {
+    this.columns = columns;
+    this.countRequested = options.count === "exact";
     return this;
   }
 }
@@ -168,11 +189,131 @@ function compareRows(left: object, right: object, orderColumns: string[]) {
 }
 
 describe("multi-show episode loaders", () => {
+  it.each(["progress", "summary"] as const)("loads complete compact %s data without descriptions or metadata", async (kind) => {
+    const db = new FakeSupabase();
+    db.episodes = Array.from({ length: 1001 }, (_, index) => episodeRow(1, 1, index + 1));
+    const episodes = kind === "progress"
+      ? await loadEpisodeProgressByShowIds(client(db), [1])
+      : await loadEpisodeSummariesByShowIds(client(db), [1]);
+    expect(episodes.get(1)).toHaveLength(1001);
+    expect(episodes.get(1)?.at(-1)).toEqual({
+      airDate: "2026-01-01",
+      episodeNumber: 1001,
+      seasonNumber: 1,
+      showTmdbId: 1,
+      ...(kind === "summary" ? { title: "Show 1 S1E1001" } : {}),
+    });
+    for (const call of db.calls) {
+      expect(call.columns.split(",")).toEqual([
+        "air_date", "episode_number", "season_number", "show_tmdb_id",
+        ...(kind === "summary" ? ["title"] : []),
+      ]);
+    }
+  });
+
+  it("stops scheduling new pages after a failure", async () => {
+    const db = new FakeSupabase();
+    db.episodes = Array.from({ length: 8001 }, (_, index) => episodeRow(1, 1, index + 1));
+    db.failedRange = 1000;
+    db.respond = async (call) => {
+      if (call.rangeStart > 1000) await new Promise((resolve) => setTimeout(resolve, 10));
+    };
+    await expect(loadEpisodesByShowIds(client(db), [1])).rejects.toThrow("Unable to load");
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(db.calls.map((call) => call.rangeStart)).toEqual([0, 1000, 2000, 3000]);
+  });
+
+  it("reads only fields used by the domain, preserving episode descriptions", async () => {
+    const db = new FakeSupabase();
+    db.episodes = [episodeRow(1, 1, 1)];
+    db.watchedEpisodes = [watchedEpisodeRow(1, 1, 1)];
+    const episodes = await loadEpisodesByShowIds(client(db), [1]);
+    await loadWatchedEpisodesByShowIds(client(db), "user-1", [1]);
+    for (const call of db.calls) {
+      expect(call.columns).not.toContain("*");
+      expect(call.columns.split(",")).not.toContain("metadata");
+      expect(call.columns.split(",")).not.toContain("created_at");
+    }
+    expect(episodes.get(1)?.[0].overview).toBe("Overview 1-1-1");
+  });
+
+  it.each(["episodes", "watched_episodes"] as const)("bounds concurrent %s reads and restores range order", async (table) => {
+    const db = new FakeSupabase();
+    const size = MULTI_SHOW_EPISODE_PAGE_SIZE * 6 + 1;
+    db.episodes = Array.from({ length: size }, (_, index) => episodeRow(1, 1, index + 1));
+    db.watchedEpisodes = Array.from({ length: size }, (_, index) => watchedEpisodeRow(1, 1, index + 1));
+    let active = 0;
+    let maxActive = 0;
+    db.respond = async (call) => {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      // Later ranges deliberately finish first.
+      await new Promise((resolve) => setTimeout(resolve, call.rangeStart === 1000 ? 20 : 1));
+      active--;
+    };
+    const grouped = table === "episodes"
+      ? await loadEpisodesByShowIds(client(db), [1, 1])
+      : await loadWatchedEpisodesByShowIds(client(db), "user-1", [1, 1]);
+    expect(maxActive).toBe(MULTI_SHOW_EPISODE_CONCURRENCY);
+    expect(grouped.get(1)?.map((row) => row.episodeNumber)).toEqual(Array.from({ length: size }, (_, index) => index + 1));
+    expect(db.calls).toHaveLength(7);
+    expect(db.calls.filter((call) => call.countRequested)).toHaveLength(1);
+    if (table === "watched_episodes") {
+      expect(db.calls.every((call) => call.filters.some((filter) => filter.kind === "eq" && filter.column === "user_id" && filter.value === "user-1"))).toBe(true);
+    }
+  });
+
+  it("uses a lower API row limit without losing rows", async () => {
+    const db = new FakeSupabase();
+    db.rowLimit = 250;
+    db.episodes = Array.from({ length: 1051 }, (_, index) => episodeRow(1, 1, index + 1));
+    const episodes = await loadEpisodesByShowIds(client(db), [1]);
+    expect(episodes.get(1)).toHaveLength(1051);
+    expect(db.calls.map((call) => call.rangeStart)).toEqual([0, 250, 500, 750, 1000]);
+  });
+
+  it("falls back to complete pagination when the count is unavailable", async () => {
+    const db = new FakeSupabase();
+    db.includeCount = false;
+    db.episodes = Array.from({ length: 2001 }, (_, index) => episodeRow(1, 1, index + 1));
+    expect((await loadEpisodesByShowIds(client(db), [1])).get(1)).toHaveLength(2001);
+    expect(db.calls.map((call) => call.rangeStart)).toEqual([0, 1000, 2000]);
+  });
+
+  it("keeps all rows when both count is missing and the API limit is below 1,000", async () => {
+    const db = new FakeSupabase();
+    db.includeCount = false;
+    db.rowLimit = 250;
+    db.episodes = Array.from({ length: 1001 }, (_, index) => episodeRow(1, 1, index + 1));
+    expect((await loadEpisodeProgressByShowIds(client(db), [1])).get(1)).toHaveLength(1001);
+    expect(db.calls.map((call) => call.rangeStart)).toEqual([0, 250, 500, 750, 1000]);
+  });
+
+  it.each([0, 1000, 2000])("rejects missing rows at offset %s even when the API reports success", async (rangeStart) => {
+    const db = new FakeSupabase();
+    db.episodes = Array.from({ length: 2001 }, (_, index) => episodeRow(1, 1, index + 1));
+    db.truncatedRange = rangeStart;
+    await expect(loadEpisodeSummariesByShowIds(client(db), [1])).rejects.toThrow("Unable to load episodes.");
+  });
+
+  it.each(["episodes", "watched_episodes"] as const)("rejects a failed later %s page instead of returning partial progress", async (table) => {
+    const db = new FakeSupabase();
+    db.episodes = Array.from({ length: 2001 }, (_, index) => episodeRow(1, 1, index + 1));
+    db.watchedEpisodes = Array.from({ length: 2001 }, (_, index) => watchedEpisodeRow(1, 1, index + 1));
+    db.failedRange = 1000;
+    const result = table === "episodes"
+      ? loadEpisodesByShowIds(client(db), [1])
+      : loadWatchedEpisodesByShowIds(client(db), "user-1", [1]);
+    await expect(result).rejects.toThrow("Unable to load");
+  });
+
   it("returns empty grouped results for empty show ID input", async () => {
     const db = new FakeSupabase();
 
     await expect(loadEpisodesByShowIds(client(db), [])).resolves.toEqual(new Map());
     await expect(loadWatchedEpisodesByShowIds(client(db), "user-1", [])).resolves.toEqual(new Map());
+    await expect(loadEpisodeProgressByShowIds(client(db), [])).resolves.toEqual(new Map());
+    await expect(loadEpisodeSummariesByShowIds(client(db), [])).resolves.toEqual(new Map());
     expect(db.calls).toEqual([]);
   });
 

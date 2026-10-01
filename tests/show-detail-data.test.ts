@@ -28,6 +28,7 @@ type QueryOrder = {
   column: string;
 };
 type QueryResponse = {
+  count: number | null;
   data: AnyRow[] | null;
   error: null;
 };
@@ -57,6 +58,8 @@ class FakeSupabase {
 }
 
 class FakeQuery {
+  private columns = "*";
+  private countRequested = false;
   private readonly filters: QueryFilter[] = [];
   private limitCount: number | null = null;
   private readonly orders: QueryOrder[] = [];
@@ -90,7 +93,9 @@ class FakeQuery {
     return Promise.resolve(this.execute(rangeStart, rangeEnd));
   }
 
-  select() {
+  select(columns: string, options: { count?: string } = {}) {
+    this.columns = columns;
+    this.countRequested = options.count === "exact";
     return this;
   }
 
@@ -103,6 +108,7 @@ class FakeQuery {
 
   private execute(rangeStart?: number, rangeEnd?: number): QueryResponse {
     let rows = this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters));
+    const count = this.countRequested ? rows.length : null;
 
     if (this.orders.length > 0) {
       rows = [...rows].sort((left, right) => compareRows(left, right, this.orders));
@@ -116,7 +122,10 @@ class FakeQuery {
       rows = rows.slice(rangeStart, rangeEnd + 1);
     }
 
-    return { data: rows, error: null };
+    const projected = this.columns === "*" ? rows : rows.map((row) =>
+      Object.fromEntries(this.columns.split(",").map((column) => [column, getColumnValue(row, column)])) as AnyRow,
+    );
+    return { count, data: projected, error: null };
   }
 }
 
@@ -271,6 +280,19 @@ function compareRows(left: object, right: object, orders: QueryOrder[]) {
 }
 
 describe("show detail data loading", () => {
+  it("retains all episode presentation fields beyond the first page", async () => {
+    const db = new FakeSupabase();
+    const episodes = Array.from({ length: 1001 }, (_, index) => episodeRow(1, index + 1));
+    episodes[1000] = { ...episodes[1000], overview: "Complete episode description", still_path: "/still.jpg", runtime_minutes: 45, title: "Last episode" };
+    seedShow(db, { episodes, seasons: [seasonRow(1, 1001)], watchedEpisodes: [watchedEpisodeRow(1, 1001)] });
+    const show = await getUserShowDetail(client(db), USER_ID, SHOW_TMDB_ID, { referenceDate: "2026-07-19" });
+    expect(show?.seasons[0].episodes.at(-1)).toEqual({
+      airDate: "2026-01-01", episodeNumber: 1001, overview: "Complete episode description",
+      runtimeMinutes: 45, seasonNumber: 1, stillPath: "/still.jpg", title: "Last episode", watched: true,
+    });
+    expect(show?.progress.watchedEpisodeCount).toBe(1);
+  });
+
   it("uses paginated full-show episode loading for Show Detail progress and seasons", async () => {
     const db = new FakeSupabase();
     const episodes = Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE + 1 }, (_, index) =>

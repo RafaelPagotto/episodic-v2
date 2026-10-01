@@ -8,12 +8,12 @@ import {
   calculateWatchedEpisodeCount,
   deriveDisplayStatus,
   deriveTrackingStatusAfterProgressChange,
-  loadEpisodesByShowIds,
+  loadEpisodeProgressByShowIds,
   loadWatchedEpisodesByShowIds,
   mapEpisodeRow,
   mapWatchedEpisodeRow,
 } from "../tracking";
-import type { Episode, EpisodeCalculationOptions, WatchedEpisode } from "../tracking";
+import type { EpisodeProgress, EpisodeCalculationOptions, WatchedEpisode } from "../tracking";
 
 import type { LibraryShowCard } from "./types";
 
@@ -36,9 +36,9 @@ function throwDataError(error: { message?: string } | null, fallbackMessage: str
 }
 
 function createLibraryCard(
-  userShow: UserShowRow,
-  show: ShowRow | undefined,
-  episodes: Episode[],
+  userShow: Pick<UserShowRow, "added_at" | "favourite" | "show_tmdb_id" | "status">,
+  show: Pick<ShowRow, "first_air_date" | "poster_path" | "title" | "tmdb_status"> | undefined,
+  episodes: EpisodeProgress[],
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions,
 ): LibraryShowCard {
@@ -73,7 +73,7 @@ function createLibraryCard(
 
 async function getLibraryEpisodesByShowId(supabase: EpisodicSupabaseClient, showIds: number[]) {
   try {
-    return await loadEpisodesByShowIds(supabase, showIds);
+    return await loadEpisodeProgressByShowIds(supabase, showIds);
   } catch {
     throw new LibraryDataError("Unable to load episode details.");
   }
@@ -98,7 +98,7 @@ export async function getUserLibraryShows(
 ) {
   const { data: userShows, error: userShowsError } = await supabase
     .from("user_shows")
-    .select("*")
+    .select("added_at,favourite,show_tmdb_id,status")
     .eq("user_id", userId)
     .order("added_at", { ascending: false });
 
@@ -115,7 +115,7 @@ export async function getUserLibraryShows(
     episodesByShowId,
     watchedByShowId,
   ] = await Promise.all([
-    supabase.from("shows").select("*").in("tmdb_id", showIds),
+    supabase.from("shows").select("tmdb_id,first_air_date,poster_path,title,tmdb_status").in("tmdb_id", showIds),
     getLibraryEpisodesByShowId(supabase, showIds),
     getLibraryWatchedEpisodesByShowId(supabase, userId, showIds),
   ]);

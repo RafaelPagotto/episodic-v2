@@ -27,6 +27,7 @@ type QueryOrder = {
   column: string;
 };
 type QueryResponse = {
+  count: number | null;
   data: AnyRow[] | null;
   error: null;
 };
@@ -53,6 +54,8 @@ class FakeSupabase {
 }
 
 class FakeQuery {
+  private columns = "*";
+  private countRequested = false;
   private readonly filters: QueryFilter[] = [];
   private readonly orders: QueryOrder[] = [];
 
@@ -80,7 +83,9 @@ class FakeQuery {
     return Promise.resolve(this.execute(rangeStart, rangeEnd));
   }
 
-  select() {
+  select(columns: string, options: { count?: string } = {}) {
+    this.columns = columns;
+    this.countRequested = options.count === "exact";
     return this;
   }
 
@@ -93,6 +98,7 @@ class FakeQuery {
 
   private execute(rangeStart?: number, rangeEnd?: number): QueryResponse {
     let rows = this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters));
+    const count = this.countRequested ? rows.length : null;
 
     if (this.orders.length > 0) {
       rows = [...rows].sort((left, right) => compareRows(left, right, this.orders));
@@ -102,7 +108,10 @@ class FakeQuery {
       rows = rows.slice(rangeStart, rangeEnd + 1);
     }
 
-    return { data: rows, error: null };
+    const projected = this.columns === "*" ? rows : rows.map((row) =>
+      Object.fromEntries(this.columns.split(",").map((column) => [column, getColumnValue(row, column)])) as AnyRow,
+    );
+    return { count, data: projected, error: null };
   }
 }
 
@@ -238,6 +247,29 @@ function compareRows(left: object, right: object, orders: QueryOrder[]) {
 }
 
 describe("library data loading", () => {
+  it("preserves every displayed card field and release eligibility across local midnight", async () => {
+    const db = new FakeSupabase();
+    const current = { ...episodeRow(100, 1, 1), air_date: null };
+    const next = { ...episodeRow(100, 1, 2), air_date: "2026-07-19" };
+    addShow(db, {
+      addedAt: "2026-07-10T00:00:00.000Z",
+      episodes: [current, next, episodeRow(100, 0, 1)],
+      show: { ...showRow(100, "Named show", "Ended"), first_air_date: "2020-05-06", poster_path: "/poster.jpg" },
+      watchedEpisodes: [watchedEpisodeRow(100, 1, 1), watchedEpisodeRow(100, 0, 1)],
+    });
+    db.userShows[0].favourite = true;
+    db.watchedEpisodes.push({ ...watchedEpisodeRow(100, 1, 2), user_id: "other-user" });
+    const before = await getUserLibraryShows(client(db), USER_ID, { referenceDate: new Date("2026-07-19T02:30:00.000Z"), timeZone: "America/Sao_Paulo" });
+    expect(before).toEqual([{
+      addedAt: "2026-07-10T00:00:00.000Z", displayStatus: "completed", favourite: true,
+      firstAirDate: "2020-05-06", posterPath: "/poster.jpg", progressPercentage: 100,
+      status: "watchlist", title: "Named show", tmdbId: 100, tmdbStatus: "Ended",
+      totalEpisodeCount: 1, watchedEpisodeCount: 1,
+    }]);
+    const after = await getUserLibraryShows(client(db), USER_ID, { referenceDate: new Date("2026-07-19T03:00:00.000Z"), timeZone: "America/Sao_Paulo" });
+    expect(after[0]).toEqual({ ...before[0], displayStatus: "watching", progressPercentage: 50, totalEpisodeCount: 2 });
+  });
+
   it("shows a completed miniseries when all season 1 episodes are watched", async () => {
     const db = new FakeSupabase();
     const episodes = Array.from({ length: 8 }, (_, index) => episodeRow(100, 1, index + 1));

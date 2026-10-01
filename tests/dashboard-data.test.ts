@@ -1,8 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
-import { getUserDashboardData } from "../features/dashboard/data";
-import { MULTI_SHOW_EPISODE_PAGE_SIZE } from "../features/tracking";
+import { DashboardDataError, getUserDashboardData, getUserDashboardSummary } from "../features/dashboard/data";
+import { createDashboardData } from "../features/dashboard/view-model";
+import { DEFAULT_USER_PREFERENCES } from "../features/preferences/defaults";
+import { mapEpisodeRow, mapWatchedEpisodeRow, MULTI_SHOW_EPISODE_PAGE_SIZE } from "../features/tracking";
 import type { Database } from "../lib/supabase/types";
 
 type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
@@ -27,17 +29,21 @@ type QueryOrder = {
   column: string;
 };
 type QueryResponse = {
+  count: number | null;
   data: AnyRow[] | null;
-  error: null;
+  error: { message: string } | null;
 };
 
 const USER_ID = "user-1";
 
 class FakeSupabase {
+  readonly calls: { columns: string; filters: QueryFilter[]; table: TableName }[] = [];
   episodes: EpisodeRow[] = [];
   shows: ShowRow[] = [];
   userShows: UserShowRow[] = [];
   watchedEpisodes: WatchedEpisodeRow[] = [];
+  failedTable: TableName | null = null;
+  rowLimit = Number.POSITIVE_INFINITY;
 
   from(table: TableName) {
     return new FakeQuery(this, table);
@@ -53,6 +59,8 @@ class FakeSupabase {
 }
 
 class FakeQuery {
+  private columns = "*";
+  private countRequested = false;
   private readonly filters: QueryFilter[] = [];
   private readonly orders: QueryOrder[] = [];
 
@@ -80,7 +88,9 @@ class FakeQuery {
     return Promise.resolve(this.execute(rangeStart, rangeEnd));
   }
 
-  select() {
+  select(columns: string, options: { count?: string } = {}) {
+    this.columns = columns;
+    this.countRequested = options.count === "exact";
     return this;
   }
 
@@ -92,7 +102,10 @@ class FakeQuery {
   }
 
   private execute(rangeStart?: number, rangeEnd?: number): QueryResponse {
+    this.db.calls.push({ columns: this.columns, filters: [...this.filters], table: this.table });
+    if (this.db.failedTable === this.table) return { count: null, data: null, error: { message: "Failed request" } };
     let rows = this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters));
+    const count = this.countRequested ? rows.length : null;
 
     if (this.orders.length > 0) {
       rows = [...rows].sort((left, right) => compareRows(left, right, this.orders));
@@ -101,8 +114,12 @@ class FakeQuery {
     if (rangeStart !== undefined && rangeEnd !== undefined) {
       rows = rows.slice(rangeStart, rangeEnd + 1);
     }
+    rows = rows.slice(0, this.db.rowLimit);
 
-    return { data: rows, error: null };
+    const projected = this.columns === "*" ? rows : rows.map((row) =>
+      Object.fromEntries(this.columns.split(",").map((column) => [column, getColumnValue(row, column)])) as AnyRow,
+    );
+    return { count, data: projected, error: null };
   }
 }
 
@@ -249,6 +266,102 @@ function watchedRowsFor(episodes: EpisodeRow[]) {
 }
 
 describe("dashboard data loading", () => {
+  it.each([
+    { referenceDate: new Date("2026-07-19T02:30:00.000Z"), timeZone: "America/Sao_Paulo" },
+    { referenceDate: new Date("2026-07-19T03:00:00.000Z"), timeZone: "America/Sao_Paulo" },
+    { referenceDate: new Date("2026-07-18T10:00:00.000Z"), timeZone: "Pacific/Kiritimati" },
+  ])("matches full-record Dashboard results at $referenceDate in $timeZone", async (options) => {
+    const db = new FakeSupabase();
+    const longEpisodes = Array.from({ length: 3 }, (_, index) => episodeRow(1, 1, index + 1));
+    longEpisodes[2].air_date = "2026-07-19";
+    addShow(db, { episodes: longEpisodes, show: { ...showRow(1, "Ongoing"), poster_path: "/ongoing.jpg" }, watchedEpisodes: watchedRowsFor(longEpisodes.slice(0, 2)) });
+    addShow(db, { episodes: [episodeRow(2, 0, 1), episodeRow(2, 1, 1)], show: showRow(2, "Ended", "Ended"), watchedEpisodes: [watchedEpisodeRow(2, 1, 1)] });
+    addShow(db, { addedAt: "2026-07-10T00:00:00.000Z", episodes: [{ ...episodeRow(3, 1, 1), air_date: null }], show: showRow(3, "Start here") });
+    addShow(db, { episodes: [episodeRow(4, 1, 1), episodeRow(4, 1, 2)], show: showRow(4, "Dropped"), watchedEpisodes: [watchedEpisodeRow(4, 1, 1)] });
+    db.userShows[3].status = "dropped";
+    db.userShows[0].favourite = true;
+    addShow(db, { episodes: [episodeRow(5, 1, 1), episodeRow(5, 1, 2, "2026-07-20")], show: showRow(5, "Upcoming"), watchedEpisodes: [watchedEpisodeRow(5, 1, 1)] });
+    addShow(db, { episodes: [episodeRow(6, 0, 1)], show: showRow(6, "Specials only"), watchedEpisodes: [watchedEpisodeRow(6, 0, 1)] });
+    db.userShows.push(userShowRow(7), { ...userShowRow(8), user_id: "other-user" });
+    db.episodes.push(episodeRow(7, 1, 1));
+    db.watchedEpisodes.push({ ...watchedEpisodeRow(3, 1, 1), user_id: "other-user" });
+    const fullRecords = [...db.userShows].filter((row) => row.user_id === USER_ID)
+      .sort((a, b) => b.added_at.localeCompare(a.added_at)).map((userShow) => {
+        const show = db.shows.find((row) => row.tmdb_id === userShow.show_tmdb_id);
+        return {
+          addedAt: userShow.added_at,
+          episodes: db.episodes.filter((row) => row.show_tmdb_id === userShow.show_tmdb_id).map(mapEpisodeRow),
+          favourite: userShow.favourite,
+          posterPath: show?.poster_path ?? null,
+          title: show?.title ?? `Show ${userShow.show_tmdb_id}`,
+          tmdbId: userShow.show_tmdb_id,
+          tmdbStatus: show?.tmdb_status ?? null,
+          trackingStatus: userShow.status,
+          watchedEpisodes: db.watchedEpisodes.filter((row) => row.user_id === USER_ID && row.show_tmdb_id === userShow.show_tmdb_id).map(mapWatchedEpisodeRow),
+        };
+      });
+    for (const preferences of [DEFAULT_USER_PREFERENCES, { ...DEFAULT_USER_PREFERENCES, hideCompleted: true, hideDropped: true }]) {
+      const expected = createDashboardData(fullRecords, preferences, options);
+      expect(await getUserDashboardData(client(db), USER_ID, preferences, options)).toEqual(expected);
+      expect(await getUserDashboardSummary(client(db), USER_ID, options)).toEqual(expected.summary);
+    }
+  });
+
+  it.each(["user_shows", "shows", "episodes", "watched_episodes"] as const)("rejects a failed %s read instead of displaying empty Profile statistics", async (table) => {
+    const db = new FakeSupabase();
+    addShow(db, { episodes: [episodeRow(1, 1, 1)], show: showRow(1, "Example") });
+    db.failedTable = table;
+    await expect(getUserDashboardSummary(client(db), USER_ID)).rejects.toBeInstanceOf(DashboardDataError);
+    if (table === "episodes") await expect(getUserDashboardSummary(client(db), USER_ID)).rejects.toThrow("Unable to load episodes.");
+  });
+
+  it("uses the same library subset for Profile and Dashboard when an API row cap applies", async () => {
+    const db = new FakeSupabase();
+    db.rowLimit = 1;
+    addShow(db, { addedAt: "2026-01-01T00:00:00.000Z", episodes: [episodeRow(1, 1, 1)], show: showRow(1, "Older completed", "Ended"), watchedEpisodes: [watchedEpisodeRow(1, 1, 1)] });
+    addShow(db, { addedAt: "2026-02-01T00:00:00.000Z", episodes: [episodeRow(2, 1, 1)], show: showRow(2, "New watchlist") });
+    const dashboard = await getUserDashboardData(client(db), USER_ID);
+    expect(dashboard.summary).toMatchObject({ totalShows: 1, watchlistCount: 1, completedCount: 0 });
+    expect(await getUserDashboardSummary(client(db), USER_ID)).toEqual(dashboard.summary);
+  });
+
+  it("keeps Profile summary equal to Dashboard across page boundaries, specials, future episodes and user isolation", async () => {
+    const db = new FakeSupabase();
+    const longShow = Array.from({ length: 1001 }, (_, index) => episodeRow(1, 1, index + 1));
+    addShow(db, { episodes: longShow, show: showRow(1, "Completed", "Ended"), watchedEpisodes: watchedRowsFor(longShow) });
+    addShow(db, {
+      episodes: [episodeRow(2, 0, 1), episodeRow(2, 1, 1), episodeRow(2, 1, 2, "2026-06-08")],
+      show: showRow(2, "Caught up"), watchedEpisodes: [watchedEpisodeRow(2, 1, 1)],
+    });
+    addShow(db, { episodes: [episodeRow(3, 1, 1)], show: showRow(3, "Dropped") });
+    addShow(db, { episodes: [episodeRow(4, 1, 1)], show: showRow(4, "Watchlist") });
+    db.userShows[1].favourite = true;
+    db.userShows[2].status = "dropped";
+    db.userShows.push({ ...userShowRow(5), user_id: "other-user" });
+    db.shows.push(showRow(5, "Other user's show"));
+    db.episodes.push(episodeRow(5, 1, 1));
+    db.watchedEpisodes.push({ ...watchedEpisodeRow(4, 1, 1), user_id: "other-user" });
+    const options = { referenceDate: "2026-06-07", timeZone: "America/Sao_Paulo" };
+    const dashboard = await getUserDashboardData(client(db), USER_ID, undefined, options);
+    db.calls.length = 0;
+    const summary = await getUserDashboardSummary(client(db), USER_ID, options);
+    expect(summary).toEqual(dashboard.summary);
+    expect(summary).toMatchObject({ totalShows: 4, completedCount: 1, caughtUpCount: 1, droppedCount: 1, watchlistCount: 1, favouriteCount: 1 });
+    expect(db.calls.filter((call) => call.table === "episodes").every((call) =>
+      call.columns === "air_date,episode_number,season_number,show_tmdb_id",
+    )).toBe(true);
+    expect(db.calls.find((call) => call.table === "shows")?.columns).toBe("tmdb_id,tmdb_status");
+    expect(db.calls.filter((call) => ["user_shows", "watched_episodes"].includes(call.table)).every((call) =>
+      call.filters.some((filter) => filter.kind === "eq" && filter.column === "user_id" && filter.value === USER_ID),
+    )).toBe(true);
+  });
+
+  it("returns an empty Profile summary without fetching episodes for an empty library", async () => {
+    const db = new FakeSupabase();
+    expect(await getUserDashboardSummary(client(db), USER_ID)).toEqual((await getUserDashboardData(client(db), USER_ID)).summary);
+    expect(db.calls.every((call) => call.table === "user_shows")).toBe(true);
+  });
+
   it("does not put completed or caught-up shows in Start Watching when rows are after a pagination boundary", async () => {
     const db = new FakeSupabase();
     const fillerEpisodes = Array.from({ length: MULTI_SHOW_EPISODE_PAGE_SIZE }, (_, index) =>

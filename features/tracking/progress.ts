@@ -1,4 +1,4 @@
-import type { DisplayStatus, Episode, TrackingStatus, WatchedEpisode } from "./types";
+import type { DisplayStatus, Episode, EpisodeProgress, TrackingStatus, WatchedEpisode } from "./types";
 import { compareDateOnly, getReferenceDateOnly, isDateOnly } from "../../lib/date-only";
 
 type EpisodeIdentity = Pick<Episode, "episodeNumber" | "seasonNumber" | "showTmdbId">;
@@ -40,7 +40,7 @@ export function isSpecialEpisode(episode: Pick<Episode, "seasonNumber">) {
   return episode.seasonNumber === 0;
 }
 
-function uniqueEpisodes(episodes: Episode[]) {
+function uniqueEpisodes<TEpisode extends EpisodeProgress>(episodes: TEpisode[]) {
   const seenEpisodeKeys = new Set<string>();
 
   return episodes.filter((episode) => {
@@ -69,28 +69,28 @@ export function isEpisodeTrackable(episode: Pick<Episode, "airDate">, options: E
   return compareDateOnly(episode.airDate, referenceDate) <= 0;
 }
 
-export function getReleasedEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function getReleasedEpisodes<TEpisode extends EpisodeProgress>(episodes: TEpisode[], options: EpisodeCalculationOptions = {}) {
   return uniqueEpisodes(episodes).filter((episode) => isEpisodeTrackable(episode, options));
 }
 
-export function getReleasedTrackableEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function getReleasedTrackableEpisodes<TEpisode extends EpisodeProgress>(episodes: TEpisode[], options: EpisodeCalculationOptions = {}) {
   return getReleasedEpisodes(episodes, options).filter(isMainSeriesEpisode);
 }
 
-export function getReleasedSpecialEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function getReleasedSpecialEpisodes<TEpisode extends EpisodeProgress>(episodes: TEpisode[], options: EpisodeCalculationOptions = {}) {
   return getReleasedEpisodes(episodes, options).filter(isSpecialEpisode);
 }
 
-export function getTrackableEpisodes(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function getTrackableEpisodes<TEpisode extends EpisodeProgress>(episodes: TEpisode[], options: EpisodeCalculationOptions = {}) {
   return getReleasedTrackableEpisodes(episodes, options);
 }
 
-export function calculateTotalEpisodeCount(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function calculateTotalEpisodeCount(episodes: EpisodeProgress[], options: EpisodeCalculationOptions = {}) {
   return getReleasedTrackableEpisodes(episodes, options).length;
 }
 
 export function calculateWatchedEpisodeCount(
-  episodes: Episode[],
+  episodes: EpisodeProgress[],
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {
@@ -102,12 +102,12 @@ export function calculateWatchedEpisodeCount(
   return Array.from(watchedKeys).filter((episodeKey) => episodeKeys.has(episodeKey)).length;
 }
 
-export function calculateReleasedEpisodeCount(episodes: Episode[], options: EpisodeCalculationOptions = {}) {
+export function calculateReleasedEpisodeCount(episodes: EpisodeProgress[], options: EpisodeCalculationOptions = {}) {
   return getReleasedEpisodes(episodes, options).length;
 }
 
 export function calculateReleasedWatchedEpisodeCount(
-  episodes: Episode[],
+  episodes: EpisodeProgress[],
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {
@@ -128,8 +128,8 @@ export function calculateProgressPercentage({
   return Math.min(100, Math.round((watchedEpisodeCount / totalEpisodeCount) * 100));
 }
 
-export function getNextEpisodeToWatch(
-  episodes: Episode[],
+export function getNextEpisodeToWatch<TEpisode extends EpisodeProgress>(
+  episodes: TEpisode[],
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {
@@ -145,7 +145,7 @@ export function getNextEpisodeToWatch(
 }
 
 export function isShowCompleted(
-  episodes: Episode[],
+  episodes: EpisodeProgress[],
   watchedEpisodes: WatchedEpisode[],
   options: EpisodeCalculationOptions = {},
 ) {

@@ -20,6 +20,7 @@ import { getShowDetailSeasonHref } from "../shows/routes";
 import type {
   ContinueWatchingItem,
   DashboardData,
+  DashboardProgressRecord,
   DashboardShowRecord,
   DashboardSummary,
   StartWatchingItem,
@@ -69,7 +70,7 @@ function getLatestWatchedAt(record: DashboardShowRecord) {
   }, null);
 }
 
-export function getDashboardShowProgress(record: DashboardShowRecord, options: DashboardDateOptions = {}) {
+export function getDashboardShowProgress(record: DashboardProgressRecord, options: DashboardDateOptions = {}) {
   const totalEpisodeCount = calculateTotalEpisodeCount(record.episodes, options);
   const watchedEpisodeCount = calculateWatchedEpisodeCount(record.episodes, record.watchedEpisodes, options);
 
@@ -241,7 +242,7 @@ function getContinueWatchingState(record: DashboardShowRecord, options: Dashboar
 }
 
 export function createDashboardSummary(
-  records: DashboardShowRecord[],
+  records: DashboardProgressRecord[],
   options: DashboardDateOptions = {},
 ): DashboardSummary {
   return records.reduce<DashboardSummary>((summary, record) => {
