@@ -212,21 +212,48 @@ describe("Library URL filters", () => {
     expect(titles(render())).toEqual(["Active"]);
   });
 
-  it("preserves sorting and list mode when switching filters", () => {
+  it("ignores a legacy list preference while preserving saved sorting and URL filters", () => {
     visit("/library?filter=watchlist");
     const savedPreferences: Record<string, string> = {
       "episodic.library.viewMode": "list", "episodic.library.sort": "title",
       "episodic.library.sortDirection": "desc",
     };
     window.localStorage.getItem = vi.fn((key: string) => savedPreferences[key] ?? null);
-    render();
+    const initialTree = render();
+    expect(titles(initialTree)).toEqual(["Alpha", "Zulu"]);
+    expect(button(initialTree, "Mark all main episodes of Alpha watched").props.size).toBe("icon");
     expect(titles(render())).toEqual(["Zulu", "Alpha"]);
-    expect(button(render(), "List").props["aria-pressed"]).toBe(true);
+    expect(button(render(), "Mark all main episodes of Alpha watched").props.size).toBe("icon");
+    expect(elements(render()).some((element) => element.props["aria-label"] === "Library view mode")).toBe(false);
+    expect(() => button(render(), "Grid")).toThrow("Missing button Grid");
+    expect(() => button(render(), "List")).toThrow("Missing button List");
+    expect(window.localStorage.getItem).not.toHaveBeenCalledWith("episodic.library.viewMode");
     click(render(), "All");
     expect(titles(render())).toEqual(["Zulu", "Alpha", "Active"]);
-    expect(button(render(), "List").props["aria-pressed"]).toBe(true);
+    expect(button(render(), "Mark all main episodes of Active watched").props.size).toBe("icon");
     expect(elements(render()).find((element) => element.type === "select")?.props.value).toBe("title:desc");
     expect(window.localStorage.setItem).not.toHaveBeenCalled();
+  });
+
+  it("persists new sorting choices and restores them after remount without changing the filter URL", () => {
+    visit("/library?filter=watchlist");
+    const savedPreferences: Record<string, string> = { "episodic.library.viewMode": "list" };
+    window.localStorage.getItem = vi.fn((key: string) => savedPreferences[key] ?? null);
+    window.localStorage.setItem = vi.fn((key: string, value: string) => { savedPreferences[key] = value; });
+    render();
+    const select = elements(render()).find((element) => element.type === "select")!;
+    (select.props.onChange as (event: { target: { value: string } }) => void)({ target: { value: "title:desc" } });
+    expect(titles(render())).toEqual(["Zulu", "Alpha"]);
+    expect(vi.mocked(window.localStorage.setItem).mock.calls).toEqual([
+      ["episodic.library.sort", "title"], ["episodic.library.sortDirection", "desc"],
+    ]);
+    hooks.states = [];
+    hooks.mounted = false;
+    render();
+    expect(titles(render())).toEqual(["Zulu", "Alpha"]);
+    expect(button(render(), "Watchlist").props["aria-pressed"]).toBe(true);
+    expect(button(render(), "Mark all main episodes of Alpha watched").props.size).toBe("icon");
+    expect(replaceState).not.toHaveBeenCalled();
   });
 
   it("keeps favourite actions working without changing the current filter URL", async () => {
@@ -238,6 +265,14 @@ describe("Library URL filters", () => {
     expect(button(render(), "Remove Alpha from favourites").props["aria-pressed"]).toBe(true);
     expect(titles(render())).toEqual(["Alpha", "Zulu"]);
     expect(replaceState).not.toHaveBeenCalled();
+  });
+
+  it("keeps confirmation before removing a show from the library", () => {
+    window.confirm = vi.fn(() => false);
+    click(render(), "Remove Alpha from library");
+    expect(window.confirm).toHaveBeenCalledWith("Remove Alpha from your library?");
+    expect(remove).not.toHaveBeenCalled();
+    expect(titles(render())).toContain("Alpha");
   });
 
   it.each([

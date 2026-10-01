@@ -6,11 +6,9 @@ import {
   getDefaultLibrarySortDirection,
   getInitialLibrarySortDirection,
   getInitialLibrarySortOption,
-  getInitialLibraryViewMode,
   getLibraryFilter,
   isLibrarySortDirection,
   isLibrarySortOption,
-  isLibraryViewMode,
   LIBRARY_SORT_CHOICES,
   sortLibraryShows,
   updateLibraryShowFavourite,
@@ -123,13 +121,6 @@ describe("library view model", () => {
     ]);
   });
 
-  it("defaults library view mode to grid when no valid local preference exists", () => {
-    expect(getInitialLibraryViewMode(null)).toBe("grid");
-    expect(getInitialLibraryViewMode(undefined)).toBe("grid");
-    expect(getInitialLibraryViewMode("cards")).toBe("grid");
-    expect(isLibraryViewMode("cards")).toBe(false);
-  });
-
   it("defaults library sort to date added when no valid local preference exists", () => {
     expect(getInitialLibrarySortOption(null)).toBe("added");
     expect(getInitialLibrarySortOption(undefined)).toBe("added");
@@ -147,13 +138,6 @@ describe("library view model", () => {
     expect(getInitialLibrarySortDirection(undefined, "added")).toBe("desc");
     expect(getInitialLibrarySortDirection("sideways", "progress")).toBe("desc");
     expect(isLibrarySortDirection("sideways")).toBe(false);
-  });
-
-  it("restores persisted grid and list library view modes", () => {
-    expect(getInitialLibraryViewMode("grid")).toBe("grid");
-    expect(getInitialLibraryViewMode("list")).toBe("list");
-    expect(isLibraryViewMode("grid")).toBe(true);
-    expect(isLibraryViewMode("list")).toBe(true);
   });
 
   it("restores persisted library sort options", () => {
@@ -191,7 +175,7 @@ describe("library view model", () => {
     ]);
   });
 
-  it("provides one filtered and sorted item order for grid and list layouts", () => {
+  it("orders visible cards by status", () => {
     const visibleItems = filterAndSortLibraryShows(shows, "all", "status", "asc");
 
     expect(visibleItems.map((show) => show.title)).toEqual(["Beta", "Alpha", "Gamma"]);

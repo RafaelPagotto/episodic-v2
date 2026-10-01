@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleSlash, LayoutGrid, List, ListVideo, Loader2, Play, Star, Trash2 } from "lucide-react";
+import { Check, CircleSlash, Loader2, Play, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -21,7 +21,6 @@ import { getShowDetailHref } from "@/features/shows";
 import { markShowWatchedAction } from "@/features/shows/actions";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
-import { formatTimestamp } from "../../../lib/date-time";
 
 import {
   removeShowFromLibraryAction,
@@ -33,7 +32,6 @@ import type {
   LibraryShowCard,
   LibrarySortDirection,
   LibrarySortOption,
-  LibraryViewMode,
 } from "../types";
 import {
   DISPLAY_STATUS_LABELS,
@@ -41,13 +39,10 @@ import {
   getLibraryFilter,
   getInitialLibrarySortDirection,
   getInitialLibrarySortOption,
-  getInitialLibraryViewMode,
   LIBRARY_FILTERS,
   LIBRARY_SORT_DIRECTION_STORAGE_KEY,
   LIBRARY_SORT_CHOICES,
   LIBRARY_SORT_STORAGE_KEY,
-  LIBRARY_VIEW_MODES,
-  LIBRARY_VIEW_MODE_STORAGE_KEY,
   updateLibraryShowFavourite,
   updateLibraryShowDropped,
   updateLibraryShowWatched,
@@ -57,47 +52,12 @@ type LibraryViewProps = {
   initialShows: LibraryShowCard[];
   loadError: string;
   preferences: UserPreferences;
-  timeZone?: string;
 };
 
 type LibraryMessage = {
   message: string;
   status: "error" | "success";
 };
-
-function formatAddedDate(value: string, timeZone: string) {
-  return formatTimestamp(value, "en", { timeZone }) ?? value;
-}
-
-function LibraryPosterLink({ show }: { show: LibraryShowCard }) {
-  const href = getShowDetailHref(show.tmdbId);
-  const posterUrl = getTmdbImageUrl(show.posterPath, "w185");
-  const linkClassName =
-    "block shrink-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
-
-  if (!posterUrl) {
-    return (
-      <Link aria-label={`View details for ${show.title}`} className={linkClassName} href={href}>
-        <div className="flex aspect-[2/3] w-24 items-center justify-center rounded-md bg-secondary text-xl font-semibold text-muted-foreground">
-          {show.title.charAt(0)}
-        </div>
-      </Link>
-    );
-  }
-
-  return (
-    <Link aria-label={`View details for ${show.title}`} className={linkClassName} href={href}>
-      <Image
-        alt={`${show.title} poster`}
-        className="aspect-[2/3] w-24 rounded-md object-cover"
-        height={278}
-        sizes="96px"
-        src={posterUrl}
-        width={185}
-      />
-    </Link>
-  );
-}
 
 function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
@@ -141,7 +101,7 @@ function LibraryStatusBadge({ className, show }: { className?: string; show: Lib
   );
 }
 
-export function LibraryView({ initialShows, loadError, preferences, timeZone = "UTC" }: LibraryViewProps) {
+export function LibraryView({ initialShows, loadError, preferences }: LibraryViewProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const filter = getLibraryFilter(searchParams.get("filter"));
@@ -151,15 +111,8 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
   const [shows, setShows] = useState(initialShows);
   const [sort, setSort] = useState<LibrarySortOption>("added");
   const [sortDirection, setSortDirection] = useState<LibrarySortDirection>("desc");
-  const [viewMode, setViewMode] = useState<LibraryViewMode>("grid");
 
   useEffect(() => {
-    try {
-      setViewMode(getInitialLibraryViewMode(window.localStorage.getItem(LIBRARY_VIEW_MODE_STORAGE_KEY)));
-    } catch {
-      setViewMode("grid");
-    }
-
     try {
       const nextSort = getInitialLibrarySortOption(window.localStorage.getItem(LIBRARY_SORT_STORAGE_KEY));
 
@@ -303,15 +256,6 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
     window.history.replaceState(null, "", `${pathname}${query ? `?${query}` : ""}${window.location.hash}`);
   }
 
-  function handleViewModeChange(nextViewMode: LibraryViewMode) {
-    setViewMode(nextViewMode);
-    try {
-      window.localStorage.setItem(LIBRARY_VIEW_MODE_STORAGE_KEY, nextViewMode);
-    } catch {
-      // Local storage is a convenience preference; keep the in-session selection if persistence is blocked.
-    }
-  }
-
   function handleSortChoiceChange(nextSortChoiceValue: string) {
     const nextSortChoice = LIBRARY_SORT_CHOICES.find((option) => option.value === nextSortChoiceValue);
 
@@ -351,43 +295,20 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
           ))}
         </div>
 
-        <div className="grid w-full min-w-0 grid-cols-1 items-center gap-3 [@container_(min-width:26rem)]:grid-cols-[minmax(0,1fr)_auto] [@container_(min-width:70rem)]:w-auto [@container_(min-width:70rem)]:shrink-0">
-          <label className="flex min-w-0 items-center gap-2 text-sm text-muted-foreground [@container_(min-width:26rem)]:max-w-sm [@container_(min-width:70rem)]:w-64">
-            Sort
-            <select
-              className="h-10 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              onChange={(event) => handleSortChoiceChange(event.target.value)}
-              value={`${sort}:${sortDirection}`}
-            >
-              {LIBRARY_SORT_CHOICES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div aria-label="Library view mode" className="flex w-fit justify-self-end rounded-md border bg-background p-[3px]" role="group">
-            {LIBRARY_VIEW_MODES.map((option) => {
-              const Icon = option.value === "grid" ? LayoutGrid : List;
-
-              return (
-                <Button
-                  aria-pressed={viewMode === option.value}
-                  className="h-8 gap-2 px-3"
-                  key={option.value}
-                  onClick={() => handleViewModeChange(option.value)}
-                  size="sm"
-                  type="button"
-                  variant={viewMode === option.value ? "default" : "ghost"}
-                >
-                  <Icon className="size-4" />
-                  {option.label}
-                </Button>
-              );
-            })}
-          </div>
-        </div>
+        <label className="flex w-full min-w-0 max-w-sm items-center gap-2 text-sm text-muted-foreground [@container_(min-width:70rem)]:w-64 [@container_(min-width:70rem)]:shrink-0">
+          Sort
+          <select
+            className="h-10 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            onChange={(event) => handleSortChoiceChange(event.target.value)}
+            value={`${sort}:${sortDirection}`}
+          >
+            {LIBRARY_SORT_CHOICES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
       {message ? (
@@ -422,7 +343,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
         />
       ) : null}
 
-      {visibleShows.length > 0 && viewMode === "grid" ? (
+      {visibleShows.length > 0 ? (
         // Phones use two compact columns and a two-row action layout. Wider
         // layouts need 220px per column plus 12px gaps, with tracks capped at 260px.
         <div className="grid min-w-0 grid-cols-[repeat(2,minmax(0,12.5rem))] justify-center gap-2 max-[299px]:grid-cols-[minmax(0,12.5rem)] sm:grid-cols-[repeat(var(--library-columns),minmax(0,16.25rem))] sm:gap-3 [--library-columns:1] [@container_(min-width:28.25rem)]:[--library-columns:2] [@container_(min-width:42.75rem)]:[--library-columns:3] [@container_(min-width:57.25rem)]:[--library-columns:4] [@container_(min-width:71.75rem)]:[--library-columns:5]">
@@ -439,7 +360,7 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
             return (
               <Card
                 key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-60")}
+                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-50")}
               >
                 <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
                   <LibraryGridPosterLink show={show} />
@@ -529,116 +450,6 @@ export function LibraryView({ initialShows, loadError, preferences, timeZone = "
                       >
                         {isRemoving ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
                       </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {visibleShows.length > 0 && viewMode === "list" ? (
-        <div className="grid gap-3">
-          {visibleShows.map((show) => {
-            const isUpdatingFavourite = pendingAction === `favourite:${show.tmdbId}`;
-            const isUpdatingStatus = pendingAction === `drop:${show.tmdbId}`;
-            const isRemoving = pendingAction === `remove:${show.tmdbId}`;
-            const detailHref = getShowDetailHref(show.tmdbId);
-
-            return (
-              <Card
-                key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-60")}
-              >
-                <CardContent className="flex gap-4 p-4 sm:p-5">
-                  <LibraryPosterLink show={show} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <h2 className="min-w-0 text-base font-semibold">
-                            <Link
-                              aria-label={`View details for ${show.title}`}
-                              className="block truncate rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                              href={detailHref}
-                            >
-                              {show.title}
-                            </Link>
-                          </h2>
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          <LibraryStatusBadge show={show} />
-                          <span className="rounded-full border px-2 py-1">
-                            Added {formatAddedDate(show.addedAt, timeZone)}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button asChild className="gap-2" variant="outline">
-                          <Link
-                            aria-label={`View details and track episodes for ${show.title}`}
-                            href={detailHref}
-                          >
-                            <ListVideo className="size-4" />
-                            Details
-                          </Link>
-                        </Button>
-
-                        <Button
-                          aria-label={show.favourite ? `Remove ${show.title} from favourites` : `Add ${show.title} to favourites`}
-                          aria-pressed={show.favourite}
-                          disabled={isPending}
-                          onClick={() => handleFavourite(show)}
-                          size="icon"
-                          title={show.favourite ? "Remove from favourites" : "Add to favourites"}
-                          type="button"
-                          variant="outline"
-                        >
-                          {isUpdatingFavourite ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Star className={cn("size-4", show.favourite && "fill-primary text-primary")} />
-                          )}
-                        </Button>
-
-                        <Button
-                          className="gap-2"
-                          disabled={isPending}
-                          onClick={() => handleDropToggle(show)}
-                          type="button"
-                          variant="outline"
-                        >
-                          {isUpdatingStatus ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : show.status === "dropped" ? (
-                            <Play className="size-4" />
-                          ) : (
-                            <CircleSlash className="size-4" />
-                          )}
-                          {show.status === "dropped" ? "Resume" : "Drop"}
-                        </Button>
-
-                        <Button
-                          className="gap-2"
-                          disabled={isPending}
-                          onClick={() => handleRemove(show)}
-                          type="button"
-                          variant="outline"
-                        >
-                          {isRemoving ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-                          Remove
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-5">
-                      <ProgressBar
-                        progressPercentage={show.progressPercentage}
-                        totalEpisodeCount={show.totalEpisodeCount}
-                        watchedEpisodeCount={show.watchedEpisodeCount}
-                      />
                     </div>
                   </div>
                 </CardContent>

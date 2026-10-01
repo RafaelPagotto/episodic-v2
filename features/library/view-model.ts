@@ -10,7 +10,6 @@ import type {
   LibraryShowCard,
   LibrarySortDirection,
   LibrarySortOption,
-  LibraryViewMode,
 } from "./types";
 import { compareDateOnly, isDateOnly } from "../../lib/date-only";
 
@@ -50,13 +49,6 @@ export const LIBRARY_SORT_DIRECTION_STORAGE_KEY = "episodic.library.sortDirectio
 
 export const LIBRARY_SORT_STORAGE_KEY = "episodic.library.sort";
 
-export const LIBRARY_VIEW_MODE_STORAGE_KEY = "episodic.library.viewMode";
-
-export const LIBRARY_VIEW_MODES: Array<{ label: string; value: LibraryViewMode }> = [
-  { label: "Grid", value: "grid" },
-  { label: "List", value: "list" },
-];
-
 export const DISPLAY_STATUS_LABELS: Record<DisplayStatus, string> = {
   caught_up: "Caught up",
   completed: "Completed",
@@ -72,14 +64,6 @@ const STATUS_SORT_ORDER: Record<DisplayStatus, number> = {
   completed: 3,
   dropped: 4,
 };
-
-export function isLibraryViewMode(value: unknown): value is LibraryViewMode {
-  return value === "grid" || value === "list";
-}
-
-export function getInitialLibraryViewMode(storedValue: unknown): LibraryViewMode {
-  return isLibraryViewMode(storedValue) ? storedValue : "grid";
-}
 
 export function isLibrarySortOption(value: unknown): value is LibrarySortOption {
   return (

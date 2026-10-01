@@ -252,7 +252,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
             return (
               <Card
                 key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeAddedForPreferences(isAdded, preferences) && "opacity-60")}
+                className={cn("overflow-hidden", shouldFadeAddedForPreferences(isAdded, preferences) && "opacity-50")}
               >
                 <CardContent className="flex h-full flex-col gap-3 p-3 sm:p-4">
                   <ShowPoster detailHref={detailHref} isAdded={isAdded} show={show} />

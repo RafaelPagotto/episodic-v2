@@ -144,7 +144,7 @@ function EpisodeRow({
         variant={episode.watched ? "outline" : "default"}
       >
         {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        {episode.watched ? "Unwatch" : "Mark watched"}
+        {episode.watched ? "Mark unwatched" : "Mark watched"}
       </Button>
     </div>
   );
@@ -408,10 +408,6 @@ export function ShowDetailView({
     if (watched && !isShowDetailEpisodeTrackable(show.tmdbId, episode, { referenceDate, timeZone })) {
       return;
     }
-    if (!watched && !window.confirm(`Mark "${episode.title}" unwatched?`)) {
-      return;
-    }
-
     setWatchedOverrides((current) => ({ ...current, [episodeKey]: watched }));
     setMessage(null);
     episodeQueueRef.current?.enqueue({

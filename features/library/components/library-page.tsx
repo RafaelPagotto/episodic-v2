@@ -3,7 +3,6 @@ import { getUserPreferences, PreferencesDataError } from "@/features/preferences
 import type { UserPreferences } from "@/features/preferences";
 import { DEFAULT_USER_PREFERENCES } from "@/features/preferences/defaults";
 import { getUserDateOptions } from "@/features/profile/timezone";
-import { DEFAULT_TIME_ZONE } from "@/lib/date-only";
 
 import { getUserLibraryShows, LibraryDataError } from "../data";
 import type { LibraryShowCard } from "../types";
@@ -13,7 +12,6 @@ type LibraryPageState = {
   errorMessage: string;
   preferences: UserPreferences;
   shows: LibraryShowCard[];
-  timeZone: string;
 };
 
 async function getLibraryPageState(): Promise<LibraryPageState> {
@@ -24,7 +22,6 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
       errorMessage: "Supabase is not configured yet.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
-      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
@@ -37,7 +34,6 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
       errorMessage: "Sign in to view your library.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
-      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 
@@ -52,7 +48,6 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
       errorMessage: "",
       preferences,
       shows,
-      timeZone: dateOptions.timeZone,
     };
   } catch (error) {
     return {
@@ -62,17 +57,16 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
           : "Unable to load your library.",
       preferences: DEFAULT_USER_PREFERENCES,
       shows: [],
-      timeZone: DEFAULT_TIME_ZONE,
     };
   }
 }
 
 export async function LibraryPageContent() {
-  const { errorMessage, preferences, shows, timeZone } = await getLibraryPageState();
+  const { errorMessage, preferences, shows } = await getLibraryPageState();
 
   return (
     <section aria-label="Library" className="mx-auto w-full max-w-6xl">
-      <LibraryView initialShows={shows} loadError={errorMessage} preferences={preferences} timeZone={timeZone} />
+      <LibraryView initialShows={shows} loadError={errorMessage} preferences={preferences} />
     </section>
   );
 }
