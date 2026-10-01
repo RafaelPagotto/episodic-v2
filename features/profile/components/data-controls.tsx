@@ -3,7 +3,7 @@
 import { Download, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { FormEvent } from "react";
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { useFormStatus } from "react-dom";
 
 import {
@@ -62,19 +62,23 @@ function DeleteAccountButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button className="mt-4 gap-2" disabled={pending} type="submit" variant="destructive">
-      <Trash2 className="size-4" />
-      {pending ? "Deleting..." : "Delete account"}
-    </Button>
+    <fieldset className="mt-4" disabled={pending}>
+      <label className="flex items-start gap-2 text-sm">
+        <input className="mt-1" name="deleteAcknowledgement" required type="checkbox" />
+        <span>I understand that my account and all associated data will be permanently deleted.</span>
+      </label>
+      <Button className="mt-4 gap-2" disabled={pending} type="submit" variant="destructive">
+        <Trash2 className="size-4" />
+        {pending ? "Deleting..." : "Delete account"}
+      </Button>
+    </fieldset>
   );
 }
 
-function getActionConfirmationPrompt(kind: ActionKind) {
-  if (kind === "clear-watched") {
-    return `Clear all watched episode history? This cannot be undone. Type "${CLEAR_WATCHED_HISTORY_CONFIRMATION}" to continue.`;
-  }
-
-  return `Reset your library data? This removes all shows and watched history. Type "${RESET_LIBRARY_CONFIRMATION}" to continue.`;
+function getActionConfirmationTarget(kind: ActionKind) {
+  return kind === "clear-watched"
+    ? CLEAR_WATCHED_HISTORY_CONFIRMATION
+    : RESET_LIBRARY_CONFIRMATION;
 }
 
 export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
@@ -87,7 +91,10 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
     INITIAL_PROFILE_DATA_CONTROL_STATE,
   );
   const [isExporting, setIsExporting] = useState(false);
+  const [confirmationAction, setConfirmationAction] = useState<ActionKind | null>(null);
+  const [confirmation, setConfirmation] = useState("");
   const [pendingAction, setPendingAction] = useState<ActionKind | null>(null);
+  const actionInFlight = useRef(false);
   const [isPending, startTransition] = useTransition();
   const hasPendingDataAction = pendingAction !== null || isPending;
 
@@ -103,37 +110,52 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
     return undefined;
   }, [deleteState]);
 
-  function runDestructiveAction(
-    kind: ActionKind,
-    action: (confirmation: string) => Promise<ProfileDataControlState>,
-  ) {
-    const confirmation = window.prompt(getActionConfirmationPrompt(kind));
-
-    if (confirmation === null) {
+  function openConfirmation(kind: ActionKind) {
+    if (actionInFlight.current) {
       return;
     }
 
+    setConfirmation("");
+    setConfirmationAction(kind);
+    setDataActionState(INITIAL_PROFILE_DATA_CONTROL_STATE);
+  }
+
+  function handleConfirmationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (
+      !confirmationAction
+      || actionInFlight.current
+      || confirmation !== getActionConfirmationTarget(confirmationAction)
+    ) {
+      return;
+    }
+
+    const kind = confirmationAction;
+    const action = kind === "clear-watched" ? clearWatchedHistoryAction : resetLibraryDataAction;
+    actionInFlight.current = true;
     setPendingAction(kind);
     setDataActionState(INITIAL_PROFILE_DATA_CONTROL_STATE);
 
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await action(confirmation);
-          setDataActionState(result);
+    startTransition(async () => {
+      try {
+        const result = await action(confirmation);
+        setDataActionState(result);
 
-          if (result.status === "success") {
-            router.refresh();
-          }
-        } catch {
-          setDataActionState({
-            message: "Unable to update your data right now.",
-            status: "error",
-          });
-        } finally {
-          setPendingAction(null);
+        if (result.status === "success") {
+          setConfirmationAction(null);
+          setConfirmation("");
+          router.refresh();
         }
-      })();
+      } catch {
+        setDataActionState({
+          message: "Unable to update your data right now.",
+          status: "error",
+        });
+      } finally {
+        actionInFlight.current = false;
+        setPendingAction(null);
+      }
     });
   }
 
@@ -182,12 +204,6 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
     }
   }
 
-  function handleDeleteSubmit(event: FormEvent<HTMLFormElement>) {
-    if (!window.confirm("Delete your account and all associated data? This cannot be undone.")) {
-      event.preventDefault();
-    }
-  }
-
   return (
     <div className="grid gap-5">
       <ActionMessage state={dataActionState} />
@@ -206,7 +222,9 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         <Button
           className="gap-2"
           disabled={hasPendingDataAction}
-          onClick={() => runDestructiveAction("clear-watched", clearWatchedHistoryAction)}
+          aria-controls="data-action-confirmation"
+          aria-expanded={confirmationAction === "clear-watched"}
+          onClick={() => openConfirmation("clear-watched")}
           type="button"
           variant="outline"
         >
@@ -216,7 +234,9 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         <Button
           className="gap-2"
           disabled={hasPendingDataAction}
-          onClick={() => runDestructiveAction("reset-library", resetLibraryDataAction)}
+          aria-controls="data-action-confirmation"
+          aria-expanded={confirmationAction === "reset-library"}
+          onClick={() => openConfirmation("reset-library")}
           type="button"
           variant="outline"
         >
@@ -225,10 +245,68 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         </Button>
       </div>
 
+      {confirmationAction && (
+        <form
+          aria-labelledby="data-action-confirmation-title"
+          aria-busy={hasPendingDataAction}
+          className="rounded-md border border-destructive/40 p-4"
+          id="data-action-confirmation"
+          onSubmit={handleConfirmationSubmit}
+        >
+          <h3 className="text-sm font-medium" id="data-action-confirmation-title">
+            {confirmationAction === "clear-watched" ? "Clear watched history" : "Reset library data"}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground" id="data-action-confirmation-description">
+            {confirmationAction === "clear-watched"
+              ? "This clears all watched episode history."
+              : "This removes all shows and watched history."}
+            {" "}This cannot be undone.
+          </p>
+          <label className="mt-3 block text-sm" htmlFor="dataActionConfirmation">
+            Type <strong>{getActionConfirmationTarget(confirmationAction)}</strong> exactly to continue.
+          </label>
+          <input
+            aria-describedby="data-action-confirmation-description"
+            autoComplete="off"
+            autoFocus
+            className="mt-2 h-10 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            disabled={hasPendingDataAction}
+            id="dataActionConfirmation"
+            onChange={(event) => setConfirmation(event.target.value)}
+            required
+            type="text"
+            value={confirmation}
+          />
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button
+              disabled={hasPendingDataAction || confirmation !== getActionConfirmationTarget(confirmationAction)}
+              type="submit"
+              variant="destructive"
+            >
+              {pendingAction === "clear-watched"
+                ? "Clearing..."
+                : pendingAction === "reset-library"
+                  ? "Resetting..."
+                  : "Confirm"}
+            </Button>
+            <Button
+              disabled={hasPendingDataAction}
+              onClick={() => {
+                setConfirmationAction(null);
+                setConfirmation("");
+              }}
+              type="button"
+              variant="outline"
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+
       <form
         action={deleteFormAction}
         className="rounded-md border border-destructive/40 p-4"
-        onSubmit={handleDeleteSubmit}
       >
         <label className="block text-sm font-medium text-destructive" htmlFor="deleteConfirmation">
           Delete account
