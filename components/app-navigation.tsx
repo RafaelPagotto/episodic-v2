@@ -1,11 +1,12 @@
 "use client";
 
-import { BarChart3, Clapperboard, LayoutDashboard, LogOut, Search, UserCircle } from "lucide-react";
+import { BarChart3, Clapperboard, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
 
 import { BrandLogo } from "@/components/brand-logo";
+import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/features/auth/actions";
 import { APP_NAME, APP_NAV_ITEMS } from "@/lib/constants";
 import { cn } from "@/lib/utils";
@@ -19,14 +20,18 @@ const NAV_ICONS: Record<(typeof APP_NAV_ITEMS)[number]["label"], ComponentType<{
 };
 
 type AppNavigationProps = {
+  collapsed: boolean;
+  onToggleSidebar: () => void;
   userEmail: string | null | undefined;
 };
 
 function NavLink({
+  compact = false,
   href,
   icon: Icon,
   label,
 }: {
+  compact?: boolean;
   href: string;
   icon: ComponentType<{ className?: string }>;
   label: string;
@@ -37,39 +42,48 @@ function NavLink({
   return (
     <Link
       aria-current={isActive ? "page" : undefined}
+      aria-label={label}
       className={cn(
         "inline-flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isActive
           ? "bg-primary text-primary-foreground shadow-sm"
           : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+        compact && "h-11 justify-center px-0",
       )}
       href={href}
+      title={compact ? label : undefined}
     >
-      <Icon className="size-4 shrink-0" />
-      <span>{label}</span>
+      <Icon aria-hidden="true" className={cn("shrink-0", compact ? "size-5" : "size-4")} />
+      <span className={compact ? "sr-only" : undefined}>{label}</span>
     </Link>
   );
 }
 
-function SignOutButton({ compact = false }: { compact?: boolean }) {
+function SignOutButton({ compact = false, iconOnly = false }: { compact?: boolean; iconOnly?: boolean }) {
   return (
     <form action={signOutAction}>
       <button
+        aria-label="Sign out"
         className={cn(
           "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           compact ? "w-auto" : "w-full",
+          iconOnly && "size-10 p-0",
         )}
+        title={iconOnly ? "Sign out" : undefined}
         type="submit"
       >
-        <LogOut className="size-4" />
-        Sign out
+        <LogOut aria-hidden="true" className={iconOnly ? "size-5" : "size-4"} />
+        <span className={iconOnly ? "sr-only" : undefined}>Sign out</span>
       </button>
     </form>
   );
 }
 
-export function AppNavigation({ userEmail }: AppNavigationProps) {
+export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavigationProps) {
   const accountLabel = userEmail ?? "Unknown email";
+  const accountInitial = userEmail?.trim().charAt(0).toUpperCase() || "?";
+  const toggleLabel = collapsed ? "Expand sidebar" : "Collapse sidebar";
+  const ToggleIcon = collapsed ? PanelLeftOpen : PanelLeftClose;
 
   return (
     <>
@@ -92,24 +106,57 @@ export function AppNavigation({ userEmail }: AppNavigationProps) {
         </nav>
       </header>
 
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-card px-5 py-6 md:block">
-        <Link className="inline-flex items-center gap-3 text-xl font-semibold tracking-tight" href="/dashboard">
-          <BrandLogo className="size-8" />
-          <span>{APP_NAME}</span>
-        </Link>
-        <nav aria-label="Primary navigation" className="mt-8 flex flex-col gap-1">
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto border-r bg-card py-6 transition-[width] duration-200 motion-reduce:transition-none md:flex",
+          collapsed ? "px-2" : "px-5",
+        )}
+        id="desktop-sidebar"
+      >
+        <div className={cn("flex shrink-0 gap-3", collapsed ? "flex-col items-center" : "items-center justify-between")}>
+          <Link
+            aria-label={APP_NAME}
+            className="inline-flex min-w-0 items-center gap-3 text-xl font-semibold tracking-tight"
+            href="/dashboard"
+            title={collapsed ? APP_NAME : undefined}
+          >
+            <BrandLogo className="size-8" />
+            <span className={collapsed ? "sr-only" : undefined}>{APP_NAME}</span>
+          </Link>
+          <Button
+            aria-controls="desktop-sidebar"
+            aria-expanded={!collapsed}
+            aria-label={toggleLabel}
+            className="shrink-0"
+            onClick={onToggleSidebar}
+            size="icon"
+            title={toggleLabel}
+            type="button"
+            variant="ghost"
+          >
+            <ToggleIcon aria-hidden="true" className="size-5" />
+          </Button>
+        </div>
+        <nav aria-label="Primary navigation" className="mt-8 flex shrink-0 flex-col gap-1">
           {APP_NAV_ITEMS.map((item) => {
             const Icon = NAV_ICONS[item.label];
 
-            return <NavLink key={item.href} href={item.href} icon={Icon} label={item.label} />;
+            return <NavLink compact={collapsed} key={item.href} href={item.href} icon={Icon} label={item.label} />;
           })}
         </nav>
-        <div className="absolute inset-x-5 bottom-6 space-y-4">
-          <div className="rounded-md border bg-background p-3">
-            <p className="text-xs font-medium uppercase text-muted-foreground">Signed in as</p>
-            <p className="mt-1 truncate text-sm font-medium">{accountLabel}</p>
-          </div>
-          <SignOutButton />
+        <div className={cn("mt-auto shrink-0 space-y-4 pt-6", collapsed && "flex flex-col items-center")}>
+          {collapsed ? (
+            <div className="flex size-10 items-center justify-center rounded-full border bg-background font-semibold text-muted-foreground" title={`Signed in as ${accountLabel}`}>
+              <span aria-hidden="true">{accountInitial}</span>
+              <span className="sr-only">Signed in as {accountLabel}</span>
+            </div>
+          ) : (
+            <div className="rounded-md border bg-background p-3">
+              <p className="text-xs font-medium uppercase text-muted-foreground">Signed in as</p>
+              <p className="mt-1 truncate text-sm font-medium">{accountLabel}</p>
+            </div>
+          )}
+          <SignOutButton iconOnly={collapsed} />
         </div>
       </aside>
     </>

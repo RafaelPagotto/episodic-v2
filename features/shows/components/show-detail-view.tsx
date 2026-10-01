@@ -491,7 +491,6 @@ export function ShowDetailView({
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
                   <h1 className="truncate text-3xl font-semibold tracking-tight">{show.title}</h1>
-                  {show.favourite ? <Star className="size-5 shrink-0 fill-primary text-primary" /> : null}
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full border px-2 py-1">
@@ -502,13 +501,15 @@ export function ShowDetailView({
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
+              <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
                 <Button
                   aria-label={controls.favouriteAriaLabel}
                   aria-pressed={show.favourite}
-                  className="w-full gap-2 sm:w-36"
+                  className="size-11 [&_svg]:size-5"
                   disabled={isPending}
                   onClick={handleFavouriteToggle}
+                  size="icon"
+                  title={controls.favouriteButtonLabel}
                   type="button"
                   variant={show.favourite ? "secondary" : "outline"}
                 >
@@ -517,13 +518,14 @@ export function ShowDetailView({
                   ) : (
                     <Star className={cn("size-4", show.favourite && "fill-primary text-primary")} />
                   )}
-                  {controls.favouriteButtonLabel}
                 </Button>
                 <Button
                   aria-label={controls.toggleDroppedAriaLabel}
-                  className="w-full gap-2 sm:w-36"
+                  className="size-11 [&_svg]:size-5"
                   disabled={bulkDisabled}
                   onClick={handleDropToggle}
+                  size="icon"
+                  title={controls.toggleDroppedButtonLabel}
                   type="button"
                   variant={controls.isDropped ? "default" : "outline"}
                 >
@@ -534,12 +536,14 @@ export function ShowDetailView({
                   ) : (
                     <CircleSlash className="size-4" />
                   )}
-                  {controls.toggleDroppedButtonLabel}
                 </Button>
                 <Button
-                  className="w-full gap-2 sm:w-40"
+                  aria-label={`Mark all main episodes of ${show.title} watched`}
+                  className="size-11 [&_svg]:size-5"
                   disabled={bulkDisabled || displayShow.progress.totalEpisodeCount === 0 || showComplete}
                   onClick={handleMarkShowWatched}
+                  size="icon"
+                  title="Mark watched"
                   type="button"
                 >
                   {pendingAction === "show:watch" ? (
@@ -547,12 +551,14 @@ export function ShowDetailView({
                   ) : (
                     <Check className="size-4" />
                   )}
-                  Mark watched
                 </Button>
                 <Button
-                  className="w-full gap-2 sm:w-36"
+                  aria-label={`Reset all watched progress for ${show.title}`}
+                  className="size-11 [&_svg]:size-5"
                   disabled={bulkDisabled || displayShow.progress.watchedEpisodeCount === 0}
                   onClick={handleResetShow}
+                  size="icon"
+                  title="Reset"
                   type="button"
                   variant="outline"
                 >
@@ -561,13 +567,15 @@ export function ShowDetailView({
                   ) : (
                     <RotateCcw className="size-4" />
                   )}
-                  Reset
                 </Button>
                 <Button
                   aria-label={`Refresh metadata for ${show.title}`}
-                  className="w-full gap-2 sm:w-44"
+                  aria-busy={pendingAction === "show:refresh"}
+                  className="size-11 [&_svg]:size-5"
                   disabled={bulkDisabled || pendingAction === "show:refresh"}
                   onClick={handleRefreshMetadata}
+                  size="icon"
+                  title={pendingAction === "show:refresh" ? "Refreshing" : "Refresh metadata"}
                   type="button"
                   variant="outline"
                 >
@@ -576,7 +584,6 @@ export function ShowDetailView({
                   ) : (
                     <RefreshCw className="size-4" />
                   )}
-                  {pendingAction === "show:refresh" ? "Refreshing" : "Refresh metadata"}
                 </Button>
               </div>
             </div>
@@ -628,13 +635,13 @@ export function ShowDetailView({
           title="No episodes available"
         />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid min-w-0 grid-cols-1 gap-4">
           <Card>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
                 Season
                 <select
-                  className="h-9 min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs"
+                  className="h-9 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs"
                   onChange={(event) => updateActiveSeason(Number(event.target.value))}
                   value={seasonNavigation.activeSeasonNumber ?? ""}
                 >

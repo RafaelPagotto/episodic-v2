@@ -287,7 +287,7 @@ function findButton(text: string, tree: React.ReactNode) {
     tree,
     (element) =>
       typeof element.props.onClick === "function"
-      && getText(element.props.children as React.ReactNode).includes(text),
+      && (element.props.title === text || getText(element.props.children as React.ReactNode).includes(text)),
   )[0];
 
   if (!button) {
@@ -367,14 +367,23 @@ describe("ShowDetailView refresh metadata UI", () => {
     });
   });
 
-  it("renders Refresh metadata without replacing existing actions", () => {
+  it("renders all header actions as icon buttons with accessible labels and hover hints", () => {
     const tree = renderShowDetail();
 
-    expect(hasText("Refresh metadata", tree)).toBe(true);
-    expect(hasText("Favourite", tree)).toBe(true);
-    expect(hasText("Drop", tree)).toBe(true);
-    expect(hasText("Mark watched", tree)).toBe(true);
-    expect(hasText("Reset", tree)).toBe(true);
+    const actions = [
+      ["Favourite", "Add Arcane to favourites"],
+      ["Drop", "Drop Arcane"],
+      ["Mark watched", "Mark all main episodes of Arcane watched"],
+      ["Reset", "Reset all watched progress for Arcane"],
+      ["Refresh metadata", "Refresh metadata for Arcane"],
+    ];
+
+    for (const [title, label] of actions) {
+      const button = findButton(title, tree);
+      expect(button.props["aria-label"]).toBe(label);
+      expect(button.props.size).toBe("icon");
+      expect(getText(button.props.children as React.ReactNode)).toBe("");
+    }
   });
 
   it("calls refreshShowMetadataAction and refreshes the router after success", async () => {
@@ -394,7 +403,8 @@ describe("ShowDetailView refresh metadata UI", () => {
     const button = findButton("Refreshing", tree);
 
     expect(button.props.disabled).toBe(true);
-    expect(hasText("Refreshing", tree)).toBe(true);
+    expect(button.props["aria-busy"]).toBe(true);
+    expect(button.props["aria-label"]).toBe("Refresh metadata for Arcane");
   });
 
   it("shows safe success and error feedback", () => {
