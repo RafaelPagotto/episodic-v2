@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, Clapperboard, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
+import { Clapperboard, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
@@ -15,7 +15,6 @@ const NAV_ICONS: Record<(typeof APP_NAV_ITEMS)[number]["label"], ComponentType<{
   Dashboard: LayoutDashboard,
   Library: Clapperboard,
   Profile: UserCircle,
-  Progress: BarChart3,
   Search,
 };
 

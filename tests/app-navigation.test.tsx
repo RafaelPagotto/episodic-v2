@@ -58,6 +58,23 @@ describe("collapsible navigation", () => {
     expect(markup(true).mobile).toBe(markup(false).mobile);
   });
 
+  it.each([true, false])("retires Progress and preserves the remaining routes when collapsed=%s", (collapsed) => {
+    const { desktop, mobile } = markup(collapsed);
+    const expectedRoutes = [
+      ["Dashboard", "/dashboard"],
+      ["Library", "/library"],
+      ["Search", "/search"],
+      ["Profile", "/profile"],
+    ];
+    for (const navigation of [desktop, mobile]) {
+      expect(navigation).not.toContain('href="/progress"');
+      expect(navigation).not.toContain('aria-label="Progress"');
+      for (const [label, href] of expectedRoutes) {
+        expect(navigation).toMatch(new RegExp(`<a[^>]*aria-label="${label}"[^>]*href="${href}"`));
+      }
+    }
+  });
+
   it("preserves active route highlighting for nested pages", () => {
     pathname.value = "/profile/preferences";
     expect(markup(true).desktop).toMatch(/<a[^>]*aria-current="page"[^>]*aria-label="Profile"/);

@@ -1,5 +1,5 @@
-import { ProgressPageContent } from "@/features/progress/components/progress-page";
+import { redirect } from "next/navigation";
 
 export default function ProgressPage() {
-  return <ProgressPageContent />;
+  redirect("/library");
 }
