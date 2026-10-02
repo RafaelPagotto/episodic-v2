@@ -363,7 +363,11 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
             return (
               <Card
                 key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-50")}
+                className={cn(
+                  "overflow-hidden",
+                  shouldFadeShowForPreferences(show, preferences)
+                    && "opacity-50 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100 motion-reduce:transition-none",
+                )}
               >
                 <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
                   <LibraryGridPosterLink show={show} />
