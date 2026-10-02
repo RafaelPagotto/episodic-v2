@@ -60,7 +60,7 @@ type LibraryMessage = {
   status: "error" | "success";
 };
 
-function LibraryGridPosterLink({ faded, show }: { faded: boolean; show: LibraryShowCard }) {
+function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
   const linkClassName =
@@ -76,14 +76,14 @@ function LibraryGridPosterLink({ faded, show }: { faded: boolean; show: LibraryS
       {posterUrl ? (
         <Image
           alt={`${show.title} poster`}
-          className={cn("aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]", faded && "opacity-50")}
+          className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
           height={513}
           sizes="(max-width: 639px) 182px, 234px"
           src={posterUrl}
           width={342}
         />
       ) : (
-        <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]", faded && "opacity-50")}>
+        <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
           {show.title.charAt(0)}
         </div>
       )}
@@ -363,10 +363,10 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
             return (
               <Card
                 key={show.tmdbId}
-                className="overflow-hidden"
+                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-50")}
               >
                 <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
-                  <LibraryGridPosterLink faded={shouldFadeShowForPreferences(show, preferences)} show={show} />
+                  <LibraryGridPosterLink show={show} />
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
                     <div className="min-w-0">

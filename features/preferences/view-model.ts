@@ -11,7 +11,7 @@ export const PREFERENCE_ITEMS: Array<{
   >;
 }> = [
   {
-    description: "Dim dropped show artwork in your library and dashboard while keeping controls readable.",
+    description: "Dim dropped show cards in your library and their posters on the dashboard.",
     label: "Fade dropped shows",
     name: "fadeDropped",
   },
