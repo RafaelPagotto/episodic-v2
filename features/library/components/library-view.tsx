@@ -21,6 +21,7 @@ import { getShowDetailHref } from "@/features/shows";
 import { markShowWatchedAction } from "@/features/shows/actions";
 import { getTmdbImageUrl } from "@/lib/tmdb/images";
 import { cn } from "@/lib/utils";
+import { LibraryFilterStrip } from "./library-filter-strip";
 
 import {
   removeShowFromLibraryAction,
@@ -59,7 +60,7 @@ type LibraryMessage = {
   status: "error" | "success";
 };
 
-function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
+function LibraryGridPosterLink({ faded, show }: { faded: boolean; show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
   const linkClassName =
@@ -75,14 +76,14 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
       {posterUrl ? (
         <Image
           alt={`${show.title} poster`}
-          className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
+          className={cn("aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]", faded && "opacity-50")}
           height={513}
           sizes="(max-width: 639px) 182px, 234px"
           src={posterUrl}
           width={342}
         />
       ) : (
-        <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
+        <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]", faded && "opacity-50")}>
           {show.title.charAt(0)}
         </div>
       )}
@@ -280,7 +281,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
   return (
     <div className="flex min-w-0 flex-col gap-5 [container-type:inline-size]">
       <div className="flex min-w-0 flex-col gap-3 [@container_(min-width:70rem)]:flex-row [@container_(min-width:70rem)]:items-center [@container_(min-width:70rem)]:justify-between">
-        <div className="-m-1 flex min-w-0 gap-2 overflow-x-auto p-1 [@container_(min-width:70rem)]:flex-1" aria-label="Library filters">
+        <LibraryFilterStrip>
           {LIBRARY_FILTERS.map((option) => (
             <Button
               aria-pressed={filter === option.value}
@@ -293,12 +294,12 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
               {option.label}
             </Button>
           ))}
-        </div>
+        </LibraryFilterStrip>
 
         <label className="flex w-full min-w-0 max-w-sm items-center gap-2 text-sm text-muted-foreground [@container_(min-width:70rem)]:w-64 [@container_(min-width:70rem)]:shrink-0">
           Sort
           <select
-            className="h-10 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
             onChange={(event) => handleSortChoiceChange(event.target.value)}
             value={`${sort}:${sortDirection}`}
           >
@@ -360,10 +361,10 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
             return (
               <Card
                 key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-50")}
+                className="overflow-hidden"
               >
                 <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
-                  <LibraryGridPosterLink show={show} />
+                  <LibraryGridPosterLink faded={shouldFadeShowForPreferences(show, preferences)} show={show} />
 
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
                     <div className="min-w-0">
@@ -387,7 +388,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                       watchedEpisodeCount={show.watchedEpisodeCount}
                     />
 
-                    <div className="mt-auto grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-4 sm:justify-items-start">
+                    <div className="mt-auto grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-4 sm:justify-items-start sm:gap-1">
                       <Button
                         aria-label={`Mark all main episodes of ${show.title} watched`}
                         disabled={Boolean(pendingAction) || isPending || show.totalEpisodeCount === 0 || showComplete}

@@ -269,7 +269,7 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
             aria-describedby="data-action-confirmation-description"
             autoComplete="off"
             autoFocus
-            className="mt-2 h-10 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="mt-2 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
             disabled={hasPendingDataAction}
             id="dataActionConfirmation"
             onChange={(event) => setConfirmation(event.target.value)}
@@ -317,7 +317,7 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         </p>
         <input
           autoComplete="off"
-          className="mt-3 h-10 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="mt-3 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
           id="deleteConfirmation"
           name="deleteConfirmation"
           placeholder={deleteConfirmationTarget}

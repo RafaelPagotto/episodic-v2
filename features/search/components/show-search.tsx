@@ -3,8 +3,9 @@
 import { ListVideo, Loader2, Plus, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 import type { FormEvent } from "react";
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import {
   ACTION_FEEDBACK_AUTO_DISMISS_MS,
@@ -13,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { Notice } from "@/components/ui/notice";
 import { TmdbAttribution } from "@/components/tmdb-attribution";
 import type { UserPreferences } from "@/features/preferences/types";
@@ -24,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 import { addShowToLibraryAction } from "../actions";
 import type { SearchCardMessage } from "../types";
+import { forgetSearchResults, getSearchHref, readSearchResults, rememberSearchResults } from "../search-session";
 
 type ShowSearchProps = {
   initialAddedShowIds: number[];
@@ -53,10 +56,12 @@ function getYear(date: string | null) {
 
 function ShowPoster({
   detailHref,
+  faded,
   isAdded,
   show,
 }: {
   detailHref: string;
+  faded: boolean;
   isAdded: boolean;
   show: NormalizedTmdbSearchResult;
 }) {
@@ -64,14 +69,14 @@ function ShowPoster({
   const content = posterUrl ? (
     <Image
       alt={`${show.title} poster`}
-      className={cn("aspect-[2/3] w-full object-cover", isAdded && "transition group-hover:scale-[1.02]")}
+      className={cn("aspect-[2/3] w-full object-cover", faded && "opacity-50", isAdded && "transition group-hover:scale-[1.02]")}
       height={513}
       sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
       src={posterUrl}
       width={342}
     />
   ) : (
-    <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground", isAdded && "transition group-hover:scale-[1.02]")}>
+    <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground", faded && "opacity-50", isAdded && "transition group-hover:scale-[1.02]")}>
       {show.title.charAt(0)}
     </div>
   );
@@ -92,51 +97,73 @@ function ShowPoster({
 }
 
 export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const submittedQuery = (searchParams.get("q") ?? "").trim();
   const [addedShowIds, setAddedShowIds] = useState(() => new Set(initialAddedShowIds));
   const [cardMessages, setCardMessages] = useState<Record<number, SearchCardMessage>>({});
   const [errorMessage, setErrorMessage] = useState("");
   const [, startTransition] = useTransition();
   const [pendingTmdbId, setPendingTmdbId] = useState<number | null>(null);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<NormalizedTmdbSearchResult[]>([]);
-  const [status, setStatus] = useState<SearchStatus>("idle");
+  const [query, setQuery] = useState(submittedQuery);
+  const [searchAttempt, setSearchAttempt] = useState(0);
+  const [results, setResults] = useState<NormalizedTmdbSearchResult[]>(() => readSearchResults(submittedQuery) ?? []);
+  const [status, setStatus] = useState<SearchStatus>(() => {
+    if (!submittedQuery) return "idle";
+    const cached = readSearchResults(submittedQuery);
+    return cached ? (cached.length ? "success" : "empty") : "loading";
+  });
   const visibleResults = results.filter((show) =>
     !shouldHideAddedForPreferences(addedShowIds.has(show.tmdbId), preferences),
   );
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmedQuery = query.trim();
-
-    if (!trimmedQuery) {
-      setResults([]);
-      setStatus("idle");
-      setErrorMessage("");
-      return;
-    }
-
-    setStatus("loading");
+  useEffect(() => {
+    setQuery(submittedQuery);
     setErrorMessage("");
     setCardMessages({});
-
-    const params = new URLSearchParams({
-      query: trimmedQuery,
-    });
-
-    try {
-      const response = await fetch(`/api/tmdb/search?${params.toString()}`);
-
-      if (!response.ok) {
-        throw new Error(await readSearchError(response));
-      }
-
-      const body = (await response.json()) as NormalizedTmdbSearchResponse;
-      setResults(body.results);
-      setStatus(body.results.length > 0 ? "success" : "empty");
-    } catch (error) {
+    if (!submittedQuery) {
       setResults([]);
-      setErrorMessage(error instanceof Error ? error.message : "Unable to search TMDB.");
-      setStatus("error");
+      setStatus("idle");
+      return;
+    }
+    const cached = readSearchResults(submittedQuery);
+    if (cached) {
+      setResults(cached);
+      setStatus(cached.length ? "success" : "empty");
+      return;
+    }
+    const controller = new AbortController();
+    let cancelled = false;
+    setResults([]);
+    setStatus("loading");
+    void (async () => {
+      try {
+        const params = new URLSearchParams({ query: submittedQuery });
+        const response = await fetch(`/api/tmdb/search?${params}`, { signal: controller.signal });
+        if (!response.ok) throw new Error(await readSearchError(response));
+        const body = (await response.json()) as NormalizedTmdbSearchResponse;
+        if (cancelled) return;
+        rememberSearchResults(submittedQuery, body.results);
+        setResults(body.results);
+        setStatus(body.results.length ? "success" : "empty");
+      } catch (error) {
+        if (cancelled) return;
+        setResults([]);
+        setErrorMessage(error instanceof Error ? error.message : "Unable to search TMDB.");
+        setStatus("error");
+      }
+    })();
+    return () => { cancelled = true; controller.abort(); };
+  }, [submittedQuery, searchAttempt]);
+
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedQuery = query.trim();
+    if (trimmedQuery === submittedQuery) {
+      forgetSearchResults(trimmedQuery);
+      setSearchAttempt((attempt) => attempt + 1);
+    } else {
+      window.history.replaceState(null, "", getSearchHref(pathname, searchParams.toString(), trimmedQuery, window.location.hash));
     }
   }
 
@@ -197,7 +224,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             aria-label="Search TV shows"
-            className="h-10 w-full rounded-md border bg-background px-9 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="h-11 w-full rounded-md border bg-background px-9 py-2 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search TV shows"
             type="search"
@@ -252,13 +279,13 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
             return (
               <Card
                 key={show.tmdbId}
-                className={cn("overflow-hidden", shouldFadeAddedForPreferences(isAdded, preferences) && "opacity-50")}
+                className="overflow-hidden"
               >
                 <CardContent className="flex h-full flex-col gap-3 p-3 sm:p-4">
-                  <ShowPoster detailHref={detailHref} isAdded={isAdded} show={show} />
+                  <ShowPoster detailHref={detailHref} faded={shouldFadeAddedForPreferences(isAdded, preferences)} isAdded={isAdded} show={show} />
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
                     <div className="min-w-0">
-                      <h2 className="text-sm font-semibold leading-tight sm:text-base">
+                      <h2 className="min-h-10 text-sm font-semibold leading-5 sm:text-base">
                         {isAdded ? (
                           <Link
                             aria-label={`Track episodes for ${show.title}`}
@@ -279,9 +306,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                       </div>
                     </div>
 
-                    <p className="line-clamp-3 text-xs text-muted-foreground sm:text-sm">
-                      {show.overview || "No overview available."}
-                    </p>
+                    <ExpandableText className="text-xs sm:text-sm" label="Synopsis" text={show.overview || "No overview available."} />
 
                     {cardMessage ? (
                       <ActionFeedback
@@ -300,7 +325,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
 
                     <div className="mt-auto">
                       {isAdded ? (
-                        <Button asChild className="w-full gap-2" size="sm">
+                        <Button asChild className="h-11 w-full gap-2" size="sm">
                           <Link
                             aria-label={`Track episodes for ${show.title}`}
                             href={detailHref}
@@ -311,7 +336,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                         </Button>
                       ) : (
                         <Button
-                          className="w-full gap-2"
+                          className="h-11 w-full gap-2"
                           disabled={isAdding}
                           onClick={() => handleAddShow(show.tmdbId)}
                           size="sm"

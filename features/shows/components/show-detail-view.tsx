@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ExpandableText } from "@/components/ui/expandable-text";
 import { Notice } from "@/components/ui/notice";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { TmdbAttribution } from "@/components/tmdb-attribution";
@@ -60,12 +61,22 @@ function getSeasonActionId(seasonNumber: number, watched: boolean) {
   return `season:${seasonNumber}:${watched ? "watch" : "unwatch"}`;
 }
 
+function episodeSectionId(tmdbId: number, episode: ShowDetailEpisode) {
+  return `show-${tmdbId}-episode-${episode.seasonNumber}-${episode.episodeNumber}`;
+}
+
+function focusSection(id: string) {
+  const target = document.getElementById(id);
+  target?.scrollIntoView({ block: "start" });
+  target?.focus({ preventScroll: true });
+}
+
 function ShowPoster({ show }: { show: ShowDetail }) {
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
 
   if (!posterUrl) {
     return (
-      <div className="flex aspect-[2/3] w-36 shrink-0 items-center justify-center rounded-md bg-secondary text-3xl font-semibold text-muted-foreground">
+      <div className="flex aspect-[2/3] w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-3xl font-semibold text-muted-foreground sm:w-24 md:row-span-3 md:w-36">
         {show.title.charAt(0)}
       </div>
     );
@@ -74,10 +85,10 @@ function ShowPoster({ show }: { show: ShowDetail }) {
   return (
     <Image
       alt={`${show.title} poster`}
-      className="aspect-[2/3] w-36 shrink-0 rounded-md object-cover"
+      className="aspect-[2/3] w-20 shrink-0 rounded-md object-cover sm:w-24 md:row-span-3 md:w-36"
       height={513}
       priority
-      sizes="144px"
+      sizes="(min-width: 768px) 144px, (min-width: 640px) 96px, 80px"
       src={posterUrl}
       width={342}
     />
@@ -90,12 +101,14 @@ function EpisodeRow({
   episode,
   onToggle,
   pending,
+  showTmdbId,
 }: {
   canMarkWatched: boolean;
   disabled: boolean;
   episode: ShowDetailEpisode;
   onToggle: (episode: ShowDetailEpisode, watched: boolean) => void;
   pending: boolean;
+  showTmdbId: number;
 }) {
   const nextWatched = !episode.watched;
   const airDate = formatDateOnly(episode.airDate);
@@ -105,7 +118,7 @@ function EpisodeRow({
   const actionDisabled = disabled || pending || (!episode.watched && !canMarkWatched);
 
   return (
-    <div className="grid gap-3 border-t py-4 first:border-t-0 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
+    <div className="grid scroll-mt-36 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t py-3 first:border-t-0 md:scroll-mt-20" id={episodeSectionId(showTmdbId, episode)} tabIndex={-1}>
       <div className="min-w-0">
         <div className="flex items-start gap-3">
           <div
@@ -117,22 +130,20 @@ function EpisodeRow({
             {episode.watched ? <Check className="size-4" /> : episode.episodeNumber}
           </div>
           <div className="min-w-0">
-            <h3 className="font-medium">
+            <h3 className="break-words text-sm font-medium leading-5 md:text-base">
               {episode.episodeNumber}. {episode.title}
             </h3>
             <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              {airDate ? <span>{airDate}</span> : null}
+              {airDate ? <span>{releaseAvailability ?? airDate}</span> : null}
               {episode.runtimeMinutes ? <span>{episode.runtimeMinutes} min</span> : null}
             </div>
-            {episode.overview ? (
-              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{episode.overview}</p>
-            ) : null}
           </div>
         </div>
       </div>
       <Button
-        aria-label={releaseAvailability ? `Mark watched — ${releaseAvailability}` : undefined}
-        className="w-full gap-2 sm:w-auto md:w-36"
+        aria-label={releaseAvailability ? `Mark watched — ${releaseAvailability}` : `${episode.watched ? "Mark unwatched" : "Mark watched"}: ${episode.episodeNumber}. ${episode.title}`}
+        aria-pressed={episode.watched}
+        className="size-11 gap-2 px-0 md:w-36 md:px-2"
         disabled={actionDisabled}
         onClick={() => {
           if (!actionDisabled) {
@@ -143,9 +154,10 @@ function EpisodeRow({
         type="button"
         variant={episode.watched ? "outline" : "default"}
       >
-        {pending ? <Loader2 className="size-4 animate-spin" /> : null}
-        {episode.watched ? "Mark unwatched" : "Mark watched"}
+        {pending ? <Loader2 className="size-4 animate-spin" /> : episode.watched ? <RotateCcw className="size-4" /> : <Check className="size-4" />}
+        <span className="sr-only md:not-sr-only">{episode.watched ? "Mark unwatched" : "Mark watched"}</span>
       </Button>
+      {episode.overview ? <ExpandableText className="col-span-2" label="Synopsis" preview={false} text={episode.overview} /> : null}
     </div>
   );
 }
@@ -180,6 +192,7 @@ function SeasonPanel({
   const actionId = getSeasonActionId(season.seasonNumber, nextWatched);
   const isPending = pendingAction === actionId;
   const airDate = formatDateOnly(season.airDate);
+  const nextUnwatched = season.episodes.find((episode) => !episode.watched && isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone }));
 
   return (
     <Card>
@@ -189,10 +202,10 @@ function SeasonPanel({
             {getSeasonLabel(season)}
             {airDate ? <span className="ml-2 text-sm font-normal text-muted-foreground">{airDate}</span> : null}
           </CardTitle>
-          {season.overview ? <p className="mt-2 text-sm text-muted-foreground">{season.overview}</p> : null}
+          {season.overview ? <ExpandableText className="mt-2" text={season.overview} /> : null}
         </div>
         <Button
-          className="w-full gap-2 sm:w-auto md:w-40"
+          className="w-full shrink-0 gap-2 sm:w-auto md:w-40"
           disabled={bulkDisabled || season.progress.totalEpisodeCount === 0 || isPending}
           onClick={() => onSeasonToggle(season, nextWatched)}
           type="button"
@@ -222,6 +235,10 @@ function SeasonPanel({
           />
         ) : (
           <div>
+            <div className="sticky top-16 z-20 mb-2 flex flex-wrap items-center justify-between gap-2 border-b bg-card/95 py-2 backdrop-blur md:top-0">
+              {nextUnwatched ? <Button onClick={() => focusSection(episodeSectionId(showTmdbId, nextUnwatched))} type="button" variant="outline">Next unwatched</Button> : null}
+              <Button onClick={() => focusSection("season-controls")} type="button" variant="ghost">Season controls</Button>
+            </div>
             {season.episodes.map((episode) => (
               <EpisodeRow
                 canMarkWatched={isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone })}
@@ -230,6 +247,7 @@ function SeasonPanel({
                 episode={episode}
                 onToggle={onToggleEpisode}
                 pending={pendingEpisodeKeys.has(getShowDetailEpisodeKey(episode))}
+                showTmdbId={showTmdbId}
               />
             ))}
           </div>
@@ -480,13 +498,13 @@ export function ShowDetailView({
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <Card>
-        <CardContent className="flex flex-col gap-6 p-5 pt-5 sm:p-6 sm:pt-6 md:flex-row">
+        <CardContent className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-4 p-4 sm:grid-cols-[6rem_minmax(0,1fr)] sm:p-5 md:grid-cols-[9rem_minmax(0,1fr)] md:p-6">
           <ShowPoster show={show} />
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="contents">
+            <div className="contents">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="truncate text-3xl font-semibold tracking-tight">{show.title}</h1>
+                  <h1 className="break-words text-xl font-semibold leading-tight tracking-tight sm:text-2xl md:text-3xl">{show.title}</h1>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
                   <span className="rounded-full border px-2 py-1">
@@ -497,7 +515,7 @@ export function ShowDetailView({
                 </div>
               </div>
 
-              <div className="flex shrink-0 flex-wrap gap-2 lg:justify-end">
+              <div className="col-span-2 flex flex-wrap gap-2 md:col-span-1 md:col-start-2">
                 <Button
                   aria-label={controls.favouriteAriaLabel}
                   aria-pressed={show.favourite}
@@ -584,18 +602,20 @@ export function ShowDetailView({
               </div>
             </div>
 
-            {show.overview ? <p className="mt-5 max-w-3xl text-sm text-muted-foreground">{show.overview}</p> : null}
+            <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-2">
+            {show.overview ? <ExpandableText className="max-w-3xl" text={show.overview} /> : null}
             {lastSyncedAt ? (
               <p className="mt-3 text-xs text-muted-foreground">Metadata last refreshed {lastSyncedAt}</p>
             ) : null}
 
-            <div className="mt-6">
+            <div className="mt-4">
               <ProgressBar
                 label="Main progress"
                 progressPercentage={displayShow.progress.progressPercentage}
                 totalEpisodeCount={displayShow.progress.totalEpisodeCount}
                 watchedEpisodeCount={displayShow.progress.watchedEpisodeCount}
               />
+            </div>
             </div>
           </div>
         </CardContent>
@@ -632,12 +652,12 @@ export function ShowDetailView({
         />
       ) : (
         <div className="grid min-w-0 grid-cols-1 gap-4">
-          <Card>
+          <Card className="scroll-mt-20" id="season-controls" tabIndex={-1}>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
               <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
                 Season
                 <select
-                  className="h-9 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-sm text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs"
+                  className="h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs sm:text-sm"
                   onChange={(event) => updateActiveSeason(Number(event.target.value))}
                   value={seasonNavigation.activeSeasonNumber ?? ""}
                 >

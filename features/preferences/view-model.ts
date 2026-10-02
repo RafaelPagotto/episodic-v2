@@ -11,12 +11,12 @@ export const PREFERENCE_ITEMS: Array<{
   >;
 }> = [
   {
-    description: "Dim dropped shows in library, dashboard, and progress views while keeping them visible.",
+    description: "Dim dropped show artwork in your library and dashboard while keeping controls readable.",
     label: "Fade dropped shows",
     name: "fadeDropped",
   },
   {
-    description: "Hide dropped shows from library, dashboard, and progress views.",
+    description: "Hide dropped shows from your library and dashboard.",
     label: "Hide dropped shows",
     name: "hideDropped",
   },
@@ -26,7 +26,7 @@ export const PREFERENCE_ITEMS: Array<{
     name: "hideCompleted",
   },
   {
-    description: "Dim TMDB search results for shows already in your library.",
+    description: "Dim artwork in search results for shows already in your library.",
     label: "Fade added search results",
     name: "fadeAdded",
   },

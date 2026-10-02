@@ -17,10 +17,10 @@ type LibrarySummaryTilesProps = {
 function SummaryTile({ icon: Icon, label, value }: SummaryTileProps) {
   return (
     <Card className="flex h-full min-w-0 bg-card/80">
-      <CardContent className="flex min-h-16 min-w-0 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
+      <CardContent className="flex min-h-14 min-w-0 flex-1 items-center gap-2 p-2 sm:min-h-16 sm:gap-3 sm:p-3">
         <div
           aria-hidden="true"
-          className="flex size-8 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground"
+          className="flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary text-muted-foreground sm:size-8"
         >
           <Icon className="size-4" />
         </div>

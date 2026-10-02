@@ -75,7 +75,7 @@ function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
           <h3 className="min-w-0 text-sm font-medium leading-6">
             <Link
               aria-label={`View details for ${item.showTitle}`}
-              className="block truncate rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="line-clamp-2 break-words rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               href={item.detailHref}
             >
               {item.showTitle}
@@ -123,7 +123,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
         {posterUrl ? (
           <span
             aria-hidden="true"
-            className="pointer-events-none invisible absolute inset-x-0 bottom-0 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible"
+            className="pointer-events-none invisible absolute inset-x-0 bottom-0 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible"
           >
             <span className="line-clamp-3 break-words">{item.showTitle}</span>
           </span>
@@ -141,7 +141,7 @@ function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
   if (!posterUrl) {
     return (
       <Link aria-label={`View details for ${item.title} poster`} className={linkClassName} href={href}>
-        <div className="flex aspect-[2/3] w-20 items-center justify-center rounded-md bg-secondary text-lg font-semibold text-muted-foreground">
+        <div className={cn("flex aspect-[2/3] w-20 items-center justify-center rounded-md bg-secondary text-lg font-semibold text-muted-foreground", item.isFaded && "opacity-50")}>
           {item.title.charAt(0)}
         </div>
       </Link>
@@ -152,7 +152,7 @@ function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
     <Link aria-label={`View details for ${item.title} poster`} className={linkClassName} href={href}>
       <Image
         alt={`${item.title} poster`}
-        className="aspect-[2/3] w-20 rounded-md object-cover"
+        className={cn("aspect-[2/3] w-20 rounded-md object-cover", item.isFaded && "opacity-50")}
         height={278}
         sizes="80px"
         src={posterUrl}
@@ -174,7 +174,7 @@ function ContinueWatchingCard({
   const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
 
   return (
-    <Card className={cn("group/continue overflow-hidden", item.isFaded && "opacity-60")}>
+    <Card className="group/continue overflow-hidden">
       <CardContent className="flex items-center gap-3 p-3 sm:p-4">
         <div className="relative w-20 shrink-0">
           <ContinuePoster item={item} />
@@ -197,16 +197,16 @@ function ContinueWatchingCard({
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center self-stretch">
           <div className="min-w-0">
-            <h3 className="min-w-0 text-base font-semibold">
+            <h3 className="line-clamp-2 min-w-0 break-words text-base font-semibold leading-5">
               <Link
                 aria-label={`View details for ${item.title}`}
-                className="block truncate rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 href={`/shows/${item.tmdbId}`}
               >
                 {item.title}
               </Link>
             </h3>
-            <p className="mt-1 truncate text-sm text-muted-foreground" title={`${nextEpisodeLabel} - ${item.nextEpisode.title}`}>
+            <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground" title={`${nextEpisodeLabel} - ${item.nextEpisode.title}`}>
               <span className="font-medium text-foreground">{nextEpisodeLabel}</span> - {item.nextEpisode.title}
             </p>
           </div>
@@ -340,7 +340,7 @@ export function DashboardView({ data }: DashboardViewProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-6 [container-type:inline-size]">
       <section aria-label="Library summary">
         <LibrarySummaryTiles summary={data.summary} />
       </section>
@@ -365,7 +365,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             hasShows={hasShows}
           />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 [@container_(min-width:40rem)]:grid-cols-2 [@container_(min-width:64rem)]:grid-cols-3">
             {data.continueWatching.map((item) => (
               <ContinueWatchingCard
                 key={item.tmdbId}
@@ -390,7 +390,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-2 lg:grid-cols-2">
+          <div className="grid gap-2 [@container_(min-width:40rem)]:grid-cols-2">
             {data.upcomingEpisodes.map((item) => (
               <UpcomingEpisodeCard key={`${item.tmdbId}:${item.seasonNumber}:${item.episodeNumber}`} item={item} />
             ))}

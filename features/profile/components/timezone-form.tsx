@@ -84,7 +84,7 @@ export function TimeZoneForm({ persistedTimeZone }: TimeZoneFormProps) {
         </label>
         <input
           autoComplete="off"
-          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-md"
+          className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-md"
           id="profile-time-zone"
           list="profile-time-zones"
           name="timeZone"

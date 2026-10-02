@@ -117,6 +117,10 @@ vi.mock("@/components/ui/empty-state", () => ({
   },
 }));
 
+vi.mock("@/components/ui/expandable-text", () => ({
+  ExpandableText: ({ text }: { text: string }) => <details><summary>Synopsis</summary><p>{text}</p></details>,
+}));
+
 vi.mock("@/components/ui/notice", () => ({
   Notice: function NoticeMock() {
     return null;
@@ -388,6 +392,30 @@ describe("ShowDetailView refresh metadata UI", () => {
       expect(button.props.size).toBe("icon");
       expect(getText(button.props.children as React.ReactNode)).toBe("");
     }
+  });
+
+  it("jumps to the next released unwatched episode without altering navigation or progress", () => {
+    const scrollIntoView = vi.fn();
+    const focus = vi.fn();
+    const getElementById = vi.fn(() => ({ scrollIntoView, focus }));
+    const replaceState = vi.fn();
+    vi.stubGlobal("document", { getElementById });
+    vi.stubGlobal("window", { history: { replaceState } });
+    const tree = renderShowDetail(showDetail(), "UTC", "2026-09-20");
+    (findButton("Next unwatched", tree).props.onClick as () => void)();
+    expect(getElementById).toHaveBeenCalledWith("show-100-episode-1-2");
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(replaceState).not.toHaveBeenCalled();
+    expect(setEpisodeWatchedActionMock).not.toHaveBeenCalled();
+    (findButton("Season controls", tree).props.onClick as () => void)();
+    expect(getElementById).toHaveBeenLastCalledWith("season-controls");
+  });
+
+  it("offers no unwatched jump when only future or watched episodes remain", () => {
+    const show = showDetail({ seasons: [season(1, [episode(1, 1, { watched: true }), episode(1, 2, { airDate: "2027-01-01" })])] });
+    const tree = renderShowDetail(show, "UTC", "2026-09-20");
+    expect(() => findButton("Next unwatched", tree)).toThrow("Button not found");
   });
 
   it("calls refreshShowMetadataAction and refreshes the router after success", async () => {

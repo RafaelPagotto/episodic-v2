@@ -21,7 +21,7 @@ export function AuthField({ className, error, id, label, name, ...props }: AuthF
         aria-describedby={error ? errorId : undefined}
         aria-invalid={Boolean(error)}
         className={cn(
-          "h-10 w-full rounded-md border bg-background px-3 py-2 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20",
+          "h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20",
           error && "border-destructive focus:border-destructive focus:ring-destructive/20",
           className,
         )}

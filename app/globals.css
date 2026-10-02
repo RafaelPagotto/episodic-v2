@@ -73,3 +73,28 @@
     @apply bg-primary text-primary-foreground;
   }
 }
+
+@layer utilities {
+  .filter-scroll-strip {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.55) transparent;
+  }
+
+  .filter-scroll-strip::-webkit-scrollbar {
+    height: 10px;
+  }
+
+  .filter-scroll-strip::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.55);
+    border: 2px solid hsl(var(--background));
+    border-radius: 999px;
+  }
+
+  .filter-scroll-strip::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.85);
+  }
+
+  .filter-scroll-strip::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}

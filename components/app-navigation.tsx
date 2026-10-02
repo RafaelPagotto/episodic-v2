@@ -69,7 +69,7 @@ function SignOutButton({ compact = false, iconOnly = false }: { compact?: boolea
         className={cn(
           "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           compact ? "w-auto" : "w-full",
-          iconOnly && "size-10 p-0",
+          iconOnly && "size-11 p-0",
         )}
         title={iconOnly ? "Sign out" : undefined}
         type="submit"
@@ -90,23 +90,23 @@ export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavi
   return (
     <>
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur md:hidden">
-        <div className="flex min-h-16 items-center justify-between gap-3 px-4">
-          <Link className="inline-flex items-center gap-3 text-lg font-semibold tracking-tight" href="/dashboard">
-            <BrandLogo className="size-8" />
-            <span>{APP_NAME}</span>
+        <div className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:px-4">
+          <Link aria-label={APP_NAME} className="inline-flex shrink-0 items-center gap-3 text-lg font-semibold tracking-tight" href="/dashboard">
+            <BrandLogo className="size-8 shrink-0" />
+            <span className="hidden min-[480px]:inline">{APP_NAME}</span>
           </Link>
+          <nav
+            aria-label="Primary navigation"
+            className="flex min-w-0 items-center justify-center gap-1 sm:gap-2"
+          >
+            {APP_NAV_ITEMS.map((item) => {
+              const Icon = NAV_ICONS[item.label];
+
+              return <NavLink className="w-11 shrink-0" compact key={item.href} href={item.href} icon={Icon} label={item.label} />;
+            })}
+          </nav>
           <SignOutButton compact iconOnly />
         </div>
-        <nav
-          aria-label="Primary navigation"
-          className="flex justify-center gap-2 overflow-x-auto border-t px-4 py-2"
-        >
-          {APP_NAV_ITEMS.map((item) => {
-            const Icon = NAV_ICONS[item.label];
-
-            return <NavLink className="w-11 shrink-0" compact key={item.href} href={item.href} icon={Icon} label={item.label} />;
-          })}
-        </nav>
       </header>
 
       <aside

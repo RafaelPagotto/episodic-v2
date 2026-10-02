@@ -47,7 +47,7 @@ describe("preferences view model", () => {
           name: "hideCompleted",
         }),
         expect.objectContaining({
-          description: "Dim TMDB search results for shows already in your library.",
+          description: "Dim artwork in search results for shows already in your library.",
           label: "Fade added search results",
           name: "fadeAdded",
         }),
