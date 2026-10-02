@@ -270,7 +270,9 @@ describe("Library URL filters", () => {
   it("keeps confirmation before removing a show from the library", () => {
     window.confirm = vi.fn(() => false);
     click(render(), "Remove Alpha from library");
-    expect(window.confirm).toHaveBeenCalledWith("Remove Alpha from your library?");
+    expect(window.confirm).toHaveBeenCalledWith(
+      "Remove Alpha from your library?\n\nThis permanently deletes all your watched progress for this show, including specials. If you add it again, every episode will be unwatched.",
+    );
     expect(remove).not.toHaveBeenCalled();
     expect(titles(render())).toContain("Alpha");
   });

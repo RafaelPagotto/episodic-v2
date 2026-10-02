@@ -212,7 +212,9 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
       return;
     }
 
-    const confirmed = window.confirm(`Remove ${show.title} from your library?`);
+    const confirmed = window.confirm(
+      `Remove ${show.title} from your library?\n\nThis permanently deletes all your watched progress for this show, including specials. If you add it again, every episode will be unwatched.`,
+    );
 
     if (!confirmed) {
       return;
