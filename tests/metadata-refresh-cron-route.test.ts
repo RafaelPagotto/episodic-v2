@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "../app/api/cron/refresh-metadata/route";
 import { middleware } from "../middleware";
 
+vi.mock("server-only", () => ({}));
+
 const selectCandidates = vi.hoisted(() => vi.fn());
 const refreshMetadata = vi.hoisted(() => vi.fn());
 const createMetadataClient = vi.hoisted(() => vi.fn());
@@ -12,11 +14,12 @@ const consumeUserRateLimit = vi.hoisted(() => vi.fn());
 const createUserClient = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/shows/metadata-refresh-candidates", () => ({ getMetadataRefreshCandidates: selectCandidates }));
-vi.mock("@/features/shows/metadata-refresh", () => ({ refreshTmdbShowMetadata: refreshMetadata }));
+vi.mock("@/features/shows/scheduled-metadata-refresh", () => ({ refreshScheduledTmdbShowMetadata: refreshMetadata }));
 vi.mock("@/lib/supabase/admin", () => ({ createOptionalSupabaseServiceRoleClient: createMetadataClient }));
 vi.mock("@/lib/supabase/middleware", () => ({ updateSupabaseSession: updateSession }));
 vi.mock("@/lib/tmdb/rate-limit", () => ({ consumeTmdbRateLimit: consumeUserRateLimit }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: createUserClient }));
+vi.mock("@/lib/tmdb/scheduled-requests", () => import("../lib/tmdb/scheduled-requests"));
 
 const SECRET = "test-cron-secret";
 const metadataClient = {
@@ -85,7 +88,9 @@ describe("metadata refresh cron route", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(createMetadataClient).toHaveBeenCalledTimes(1);
     expect(selectCandidates.mock.calls).toEqual([[metadataClient]]);
-    expect(refreshMetadata.mock.calls).toEqual([[20, metadataClient], [10, metadataClient], [30, metadataClient]]);
+    const control = refreshMetadata.mock.calls[0][2];
+    expect(control).toEqual(expect.objectContaining({ run: expect.any(Function), checkTime: expect.any(Function) }));
+    expect(refreshMetadata.mock.calls).toEqual([[20, metadataClient, control], [10, metadataClient, control], [30, metadataClient, control]]);
     expect(await response.json()).toEqual({
       ok: true, considered: 3, refreshed: 3, failed: 0,
       results: [20, 10, 30].map((tmdbId) => ({ tmdbId, status: "refreshed" })),
@@ -98,7 +103,7 @@ describe("metadata refresh cron route", () => {
     refreshMetadata.mockImplementationOnce(async () => { await gate; });
     const pendingResponse = GET(request());
     await vi.waitFor(() => expect(refreshMetadata).toHaveBeenCalledTimes(1));
-    expect(refreshMetadata).toHaveBeenCalledWith(20, metadataClient);
+    expect(refreshMetadata).toHaveBeenCalledWith(20, metadataClient, expect.any(Object));
     release();
     const response = await pendingResponse;
     expect(refreshMetadata.mock.calls.map(([id]) => id)).toEqual([20, 10, 30]);

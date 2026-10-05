@@ -138,7 +138,19 @@ This is the only configured schedule. On Hobby, the invocation may occur anywher
 - After null timestamps, prioritize active lifecycle, then oldest sync time, then ascending TMDB ID.
 - Each invocation selects at most the default 5 candidates and refreshes them sequentially. The selector's hard cap remains 10, but the route does not override its default.
 
-Policy and pagination live in `features/shows/metadata-refresh-candidates.ts`; refresh execution uses `features/shows/metadata-refresh.ts`. These thresholds determine eligibility, not a guarantee that every eligible show is refreshed that day.
+Policy and pagination live in `features/shows/metadata-refresh-candidates.ts`; scheduled execution uses `features/shows/scheduled-metadata-refresh.ts` and its plan in `features/shows/metadata-refresh-plan.ts`. These thresholds determine eligibility, not a guarantee that every eligible show is refreshed that day.
+
+### Selective Scheduled Refresh
+
+- Always fetch general TV details and update all returned season summaries. Read stored summary counts and the complete paginated episode catalogue before writing.
+- For active/unknown shows, fetch details for last-aired/next-airing main seasons and the preceding main season (fallback: highest two main seasons). Also fetch new/count-changed/incomplete seasons, main seasons with unresolved or future dates, and any season whose successful detail sync is missing, pending, or at least 180 days old.
+- Specials participate in new/count-changed/incomplete/periodic detail refresh, not main-series scheduling signals. Newly fetched Ended/Canceled/Cancelled lifecycle triggers a full detail refresh, including Specials.
+- `seasons.last_synced_at` describes summary sync. Season JSON `episodesLastSyncedAt` describes successful episode-detail sync. Skipped episodes retain their timestamps and fields. `episodesRefreshPending` survives an interrupted write so overwritten summary counts cannot hide unfinished details.
+- Existing seasons without a detail marker get a conservative detail fetch. Full initial imports and manual refresh remain comprehensive and unchanged; they replace season JSON, so the following scheduled refresh may need to establish detail markers again.
+- Fetch and validate selected responses before any writes. Reject changed season/episode TMDB identities or renumbering rather than reassigning watched coordinates. Upsert summaries, selected episodes, successful detail markers, then show freshness last. Never delete missing rows or write tracking tables.
+- Season requests are batched at five concurrent requests; a failed batch drains its siblings before failing the show. Shared invocation controls pace starts at 100ms apart, use 15-second request timeouts, and honor a shared 429 Retry-After cooldown with one retry per request. Database operations have up to 10 seconds each. No raw errors, user data, credentials, or request URLs are logged.
+- The route declares `maxDuration = 300`, with an internal 240-second deadline measured from invocation start and 20-second headroom before starting fetches/writes. Candidates lacking time fail safely and remain eligible. Confirm the deployed Vercel project supports this duration. Batch size, sequential show execution, and daily schedule are unchanged.
+- Logs include season-selection reasons, request/retry totals, per-show timing/failure stage, and batch summary. Compare a long-running show's steady-state detail count against its total seasons before considering higher capacity.
 
 ### Security And Configuration
 
@@ -176,9 +188,9 @@ If there were no stale candidates, the real endpoint should return zero counts. 
 
 ### Operational Limitations
 
-- Metadata upserts are not transactional. `shows.last_synced_at` may look fresh after a later season/episode write fails.
+- Metadata upserts are not transactional. Scheduled refresh advances show freshness last and leaves unfinished detail writes pending, but earlier successful row writes are not rolled back. The unchanged manual/full writer still advances show freshness before later writes.
 - Invocations are not locked; overlapping manual/cron requests may duplicate work.
-- Large shows fetch many seasons and may reach function runtime limits. The small batch limits load but does not guarantee completion within the deployed runtime budget.
+- First-pass/detail-marker recovery and inactive full refreshes can still fetch many seasons. Deadline and request controls bound work but do not guarantee a large show completes; inspect repeated failures and runtime metrics.
 - Vercel does not automatically retry failed invocations, and delivery may be missed or duplicated. Monitor results and logs. See [Vercel cron operations](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
 - Five shows per day may leave a stale backlog. This initial schedule intentionally favors low resource use.
 - Already-open browser pages do not update automatically. App pages read Supabase dynamically on subsequent server renders; there is no polling or cron-driven browser refresh.

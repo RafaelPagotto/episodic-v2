@@ -2,6 +2,7 @@ import "server-only";
 
 import { TmdbClientError } from "./errors";
 import { DEFAULT_TMDB_LANGUAGE } from "./validation";
+import type { TmdbRequestControl } from "./scheduled-requests";
 import {
   normalizeFullShowDetails,
   normalizeSearchResponse,
@@ -28,6 +29,7 @@ export type SearchTmdbShowsOptions = {
 
 export type GetTmdbShowDetailsOptions = {
   language?: string;
+  requestControl?: TmdbRequestControl;
 };
 
 export function getTmdbApiKey() {
@@ -40,7 +42,14 @@ export function getTmdbApiKey() {
   return apiKey;
 }
 
-async function requestTmdb<TResponse>(path: string, params: TmdbRequestParams = {}) {
+async function requestTmdb<TResponse>(path: string, params: TmdbRequestParams = {}, control?: TmdbRequestControl): Promise<TResponse> {
+  if (control) {
+    return control.run((signal) => requestTmdbOnce<TResponse>(path, params, signal));
+  }
+  return requestTmdbOnce<TResponse>(path, params);
+}
+
+async function requestTmdbOnce<TResponse>(path: string, params: TmdbRequestParams, signal?: AbortSignal) {
   const apiKey = getTmdbApiKey();
 
   if (!apiKey) {
@@ -64,6 +73,7 @@ async function requestTmdb<TResponse>(path: string, params: TmdbRequestParams = 
 
   try {
     response = await fetch(url, {
+      signal,
       cache: "no-store",
       headers: {
         accept: "application/json",
@@ -144,20 +154,20 @@ async function mapInBatches<TInput, TOutput>(
   return results;
 }
 
-async function fetchTvShowDetails(tmdbId: number, { language }: GetTmdbShowDetailsOptions = {}) {
+export async function getTmdbShowDetails(tmdbId: number, { language, requestControl }: GetTmdbShowDetailsOptions = {}) {
   return requestTmdb<TmdbTvDetailsResponse>(`/tv/${tmdbId}`, {
     language: language || DEFAULT_TMDB_LANGUAGE,
-  });
+  }, requestControl);
 }
 
-async function fetchTvSeasonDetails(
+export async function getTmdbSeasonDetails(
   tmdbId: number,
   seasonNumber: number,
-  { language }: GetTmdbShowDetailsOptions = {},
+  { language, requestControl }: GetTmdbShowDetailsOptions = {},
 ) {
   return requestTmdb<TmdbTvSeasonDetailsResponse>(`/tv/${tmdbId}/season/${seasonNumber}`, {
     language: language || DEFAULT_TMDB_LANGUAGE,
-  });
+  }, requestControl);
 }
 
 export async function searchTmdbShows({
@@ -180,7 +190,7 @@ export async function getFullTmdbShowDetails(
   tmdbId: number,
   options: GetTmdbShowDetailsOptions = {},
 ): Promise<NormalizedTmdbFullShow> {
-  const showDetails = await fetchTvShowDetails(tmdbId, options);
+  const showDetails = await getTmdbShowDetails(tmdbId, options);
   const seasons = Array.isArray(showDetails.seasons) ? showDetails.seasons : [];
   const seasonNumbers = seasons
     .map((season) => season.season_number)
@@ -192,7 +202,7 @@ export async function getFullTmdbShowDetails(
   const seasonDetails = await mapInBatches(
     seasonNumbers,
     SEASON_FETCH_BATCH_SIZE,
-    (seasonNumber) => fetchTvSeasonDetails(tmdbId, seasonNumber, options),
+    (seasonNumber) => getTmdbSeasonDetails(tmdbId, seasonNumber, options),
   );
 
   return normalizeFullShowDetails(showDetails, seasonDetails);

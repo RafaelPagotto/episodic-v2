@@ -1,10 +1,12 @@
 import type { NextRequest } from "next/server";
 
 import { getMetadataRefreshCandidates } from "@/features/shows/metadata-refresh-candidates";
-import { refreshTmdbShowMetadata } from "@/features/shows/metadata-refresh";
+import { refreshScheduledTmdbShowMetadata } from "@/features/shows/scheduled-metadata-refresh";
 import { createOptionalSupabaseServiceRoleClient } from "@/lib/supabase/admin";
+import { createScheduledTmdbRequestControl } from "@/lib/tmdb/scheduled-requests";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type RefreshResult = { tmdbId: number; status: "refreshed" | "failed" };
 
@@ -17,6 +19,7 @@ function jsonError(message: string, status: number) {
 }
 
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const cronSecret = process.env.CRON_SECRET;
   if (!cronSecret) {
     return jsonError("Metadata refresh is not configured.", 503);
@@ -57,9 +60,10 @@ export async function GET(request: NextRequest) {
   }
 
   const results: RefreshResult[] = [];
+  const control = createScheduledTmdbRequestControl(startedAt + 240_000);
   for (const candidate of candidates) {
     try {
-      await refreshTmdbShowMetadata(candidate.tmdbId, metadataClient);
+      await refreshScheduledTmdbShowMetadata(candidate.tmdbId, metadataClient, control);
       results.push({ tmdbId: candidate.tmdbId, status: "refreshed" });
       console.info("[metadata-refresh-cron] Show refreshed.", { tmdbId: candidate.tmdbId });
     } catch {
@@ -70,7 +74,7 @@ export async function GET(request: NextRequest) {
 
   const refreshed = results.filter((result) => result.status === "refreshed").length;
   const summary = { considered: candidates.length, refreshed, failed: results.length - refreshed };
-  console.info("[metadata-refresh-cron] Completed.", summary);
+  console.info("[metadata-refresh-cron] Completed.", { ...summary, ...control.metrics(), elapsedMs: Date.now() - startedAt });
 
   // App pages load Supabase data dynamically; cron does not invalidate a user's client router cache.
   return json({ ok: true, ...summary, results });

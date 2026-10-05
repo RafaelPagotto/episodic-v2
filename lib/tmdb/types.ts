@@ -77,6 +77,8 @@ export type TmdbTvDetailsResponse = {
   in_production?: boolean;
   languages?: string[];
   last_air_date?: string;
+  last_episode_to_air?: TmdbTvEpisodeResponse | null;
+  next_episode_to_air?: TmdbTvEpisodeResponse | null;
   name?: string;
   networks?: TmdbNamedResponse[];
   number_of_episodes?: number;
