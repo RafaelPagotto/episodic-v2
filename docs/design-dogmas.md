@@ -1,84 +1,73 @@
 # Design Dogmas
 
-## Core principle
+## A philosophy for Episodic
 
 **Episodic should be clear, unconvoluted, uncomplicated, uncluttered and feel snappy.**
 
-Every design decision should support users in understanding their library, choosing what to watch and tracking progress with minimal effort.
+This is the starting point for design judgment. It should help us reason about unfamiliar situations and explain why a decision serves the person using the website. The examples in this document express that philosophy in the current interface; they cannot anticipate every future design problem.
 
-## Purpose and simplicity
+Episodic exists to help people understand their library, choose what to watch and keep reliable track of their progress. Design succeeds when those activities feel straightforward and the interface asks for little effort or interpretation.
 
-- Every element should communicate content, state or an action.
-- Remove redundant labels, symbols, controls and explanations.
-- Keep interactions predictable and avoid unnecessary steps.
-- Preserve information needed to make informed decisions.
-- Use recognizable icons with accessible names; retain visible text when an icon alone would be ambiguous.
+## Respect attention
 
-## Consistency
+Attention is limited. Every label, symbol, visual effect and interruption asks for some of it. What we place on the screen should repay that attention by conveying useful content, explaining a state or making an action understandable.
 
-- Equivalent actions should use the same symbols, terminology, states and behavior throughout the website.
-- Reuse shared components and styles.
-- Keep spacing, alignment and visual hierarchy consistent.
-- Clickable titles should underline on hover and keyboard focus.
-- Form fields should indicate focus by changing the color of their existing border, without an additional outline, ring or translucent halo. Associate text labels with their controls without making unrelated blank layout space activate the field. Deliberate checkbox option cards may retain their full clickable area.
-- Equivalent faded states should use the same opacity and restore visibility immediately on hover or keyboard focus.
+Simplicity requires judgment. Removing an explanation that prevents accidental data loss would make the screen smaller while making the experience worse. Removing two symbols that communicate the same watched state can make the interface easier to understand. We seek the least visual and behavioral complexity that still communicates what people need.
 
-## Motion
+An element's usefulness depends on its context. A vignette on a clickable poster can communicate that navigation is available. Applying it to a poster that leads nowhere makes that same visual treatment misleading. A familiar effect should carry a dependable meaning wherever it appears.
 
-**Motion must earn its place through a clear, useful function.**
+## Make interaction honest
 
-- Use motion only when it materially helps users understand an ongoing process, a change of state or an action's result.
-- Prefer immediate, static feedback when it communicates equally well.
-- Decorative animations, transitions and zoom effects are prohibited.
-- "Looks cool," "adds personality" and "is fun" are insufficient reasons.
-- Loading spinners are an established functional exception, not an exhaustive list of permitted motion.
-- Any new exception should document what information the motion conveys and why it improves understanding.
+The interface should make clear what can be done, what is happening and what has happened. Visual cues should correspond to real capabilities. Labels, hit areas and feedback should agree with the action they represent.
 
-## Depth and appearance
+Predictability reduces the need to relearn the website. Equivalent actions should share language, symbols and behavior. Shared components help preserve that agreement, but consistency also requires understanding the purpose of an interaction. A whole checkbox option card can reasonably activate its option; unrelated blank space beside a field label should not focus that field.
 
-### Shadows
+Current applications include underlining clickable titles, using a subtle vignette only on posters that navigate, and changing a form field's existing border color to show focus. These communicate interaction without adding redundant outlines or halos. Faded cards share one treatment and restore visibility immediately on hover or keyboard focus so their contents and controls remain usable. These are established patterns to reuse and evaluate through their purpose, rather than visual recipes to apply indiscriminately.
 
-Shadows are permitted because they provide depth without movement.
+## Give appearance a purpose
 
-Use restrained shadows to separate elements from their backgrounds and each other, establish hierarchy and direct attention. Users should perceive the resulting structure without being distracted by the effect itself.
+Visual hierarchy helps people distinguish content, locate controls and understand relationships. Spacing, alignment, typography, flat colors and restrained borders should make that structure legible without competing with the content.
 
-### Glows and gradients
+Shadows are useful because they suggest depth without movement. They can separate elements from the background and each other, or direct attention to something important, while the mechanism creating that separation stays unobtrusive. Their value comes from the clarity they provide.
 
-- Decorative glows and interface gradients are prohibited.
-- Use flat colors, borders and restrained shadows to communicate structure and state.
-- Meaningful color remains appropriate for selection, progress, favourites, errors and destructive actions.
-- Supplied third-party branding and poster artwork are evaluated separately from interface decoration.
+Decorative glows and interface gradients add attention without useful information and do not belong in Episodic. A functional treatment needs a specific explanation of what it communicates. The subtle radial vignette on a clickable poster is such an application: it signals navigation, stays confined to the artwork and leaves badges and controls above it. This justification does not extend to other gradients merely because they look appealing.
 
-### Blur
+Color can communicate selection, progress, favourites, errors and consequential actions. Poster artwork and supplied third-party branding have their own visual character. Existing blur treatments are acceptable for now; further use should be judged by readability, clarity and the attention it consumes.
 
-Existing blur treatments are acceptable for now. Evaluate additional uses for readability, clarity and visual clutter.
+## Let feedback explain the process
 
-## Feedback and responsiveness
+Motion must earn its place through a clear, useful function. It should materially help someone understand an ongoing process, a change of state or an action's result. If static feedback explains the same thing equally well, use it. Decorative animations, transitions and zoom effects add unnecessary work for the eye.
 
-- Acknowledge actions promptly and make ongoing work apparent.
-- Keep feedback concise and consistent.
-- Notifications should not shift the page layout.
-- Avoid redundant feedback indicators.
-- Preserve stable layouts and usable controls across screen sizes.
-- Optimize actual loading and navigation speed alongside perceived responsiveness.
+A loading spinner communicates that work is still underway. That makes it a useful example of this principle, rather than the only possible motion exception. Any other use needs its own explanation of the information it conveys and why motion helps convey it. Novelty, personality and amusement are insufficient reasons.
 
-## Accessibility and safeguards
+Feedback should acknowledge actions promptly, remain concise and preserve the user's place. A notification should not move the content being used. Showing that something is loading can make a delay understandable, but we should also reduce the delay itself. Snappiness comes from responsive behavior, stable layouts and efficient work.
 
-- Preserve visible keyboard focus, readable contrast and keyboard access.
-- Essential controls must remain available without hover.
-- Communicate consequential actions clearly.
-- Keep appropriate safeguards for destructive or bulk actions.
-- Never compromise tracking correctness or data completeness to simplify the interface or improve speed.
+## Design for varying circumstances
+
+People encounter Episodic through different screen sizes, input methods, abilities, devices and connections. A usable design accommodates those circumstances. Its layout may change while its meaning and essential capabilities remain dependable.
+
+Keyboard focus, readable contrast and access without hover are part of clear communication. Controls should have understandable accessible names. Icons can reduce clutter when their meaning is recognizable; visible words remain useful when an icon would leave people guessing.
+
+Start with understandable content and dependable core interactions, then add enhancements that improve them. Where practical, an enhancement's absence or failure should leave the underlying task usable. This approach is informed by Jeremy Keith's [Resilient Web Design](https://resilientwebdesign.com/), particularly its discussion of [layers and progressive enhancement](https://resilientwebdesign.com/chapter5/).
+
+For Episodic, tracking correctness and data completeness are foundational. A faster or simpler interface cannot justify incorrect progress. Consequential actions need clear explanations and safeguards appropriate to their scope; a single episode toggle and deleting a library have different consequences.
+
+## Apply judgment and preserve the reasoning
+
+Begin a change by identifying the user's task and the difficulty being addressed. Explain how the proposed design helps, what information it communicates and what attention or complexity it adds. Judge it in the contexts where it will actually be used.
+
+Existing decisions remain the shared starting point. When a better application of the philosophy emerges, explain the reason, update the shared pattern and record the decision here. New situations require reasoning from the principles; an effect is not justified simply because it is absent from a prohibited list, and an existing pattern is not justified in a context where it no longer serves its purpose.
 
 ## Review checklist
 
-Before accepting a UI/UX change, check:
+Use these questions to examine the reasoning and the result:
 
-- Does it make the task easier to understand or complete?
-- Does every added element serve a clear purpose?
-- Does it follow existing interaction and visual patterns?
-- Is any motion functionally justified?
-- Is the layout stable, readable and usable across screen sizes?
-- Are accessibility, feedback and data safeguards preserved?
+- What task does this help someone understand or complete?
+- What does each element or effect communicate, and is that meaning truthful?
+- Does the benefit justify the attention and complexity it introduces?
+- Will familiar actions remain predictable across the website?
+- Would simpler or static feedback communicate equally well?
+- Does the experience remain clear and usable across screen sizes and input methods?
+- Are accessibility, feedback, tracking correctness and data safeguards preserved?
 
-**Record justified exceptions explicitly. Update shared patterns and this document when a design decision changes.**
+The answers should explain the design decision. Checking boxes alone does not establish that a design is good.

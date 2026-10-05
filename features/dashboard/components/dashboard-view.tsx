@@ -55,7 +55,7 @@ function UpcomingEpisodeCard({ item }: { item: UpcomingEpisodeItem }) {
       <CardContent className="flex min-h-24 flex-1 items-center gap-3 p-3 pt-3 sm:p-3 sm:pt-3">
         <Link
           aria-label={`View details for ${item.showTitle} poster`}
-          className="poster-link shrink-0"
+          className="poster-link poster-surface shrink-0"
           href={item.detailHref}
         >
           {posterUrl ? (
@@ -107,7 +107,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
       className="poster-link group/start relative min-w-0"
       href={item.detailHref}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-md bg-secondary">
+      <div className="poster-surface aspect-[2/3] bg-secondary">
         {posterUrl ? (
           <Image
             alt={`${item.showTitle} poster`}
@@ -125,7 +125,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
         {posterUrl ? (
           <span
             aria-hidden="true"
-            className="pointer-events-none invisible absolute inset-x-0 bottom-0 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible"
+            className="pointer-events-none invisible absolute inset-x-0 bottom-0 z-10 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible"
           >
             <span className="line-clamp-3 break-words">{item.showTitle}</span>
           </span>
@@ -138,7 +138,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
 function ContinuePoster({ item }: { item: ContinueWatchingItem }) {
   const posterUrl = getTmdbImageUrl(item.posterPath, "w185");
   const href = `/shows/${item.tmdbId}`;
-  const linkClassName = "poster-link shrink-0";
+  const linkClassName = "poster-link poster-surface shrink-0";
 
   if (!posterUrl) {
     return (
@@ -184,7 +184,7 @@ function ContinueWatchingCard({
             aria-label={pending ? `Marking ${item.title} ${nextEpisodeLabel} watched` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
             aria-busy={pending}
             className={cn(
-              "absolute bottom-1.5 left-1/2 -translate-x-1/2 shadow-md",
+              "absolute bottom-1.5 left-1/2 z-10 -translate-x-1/2 shadow-md",
               // Hover-capable pointers reveal on hover/focus; touch keeps the action visible.
               !pending && "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/continue:pointer-events-auto group-hover/continue:opacity-100 group-focus-within/continue:pointer-events-auto group-focus-within/continue:opacity-100",
             )}

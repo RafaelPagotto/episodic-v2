@@ -78,6 +78,34 @@
   .poster-link {
     @apply block overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
   }
+
+  .poster-surface {
+    @apply relative isolate overflow-hidden rounded-md;
+  }
+
+  a.poster-link[href].poster-surface::after,
+  a.poster-link[href] .poster-surface::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    border-radius: inherit;
+    background: radial-gradient(ellipse at center, transparent 50%, rgb(0 0 0 / 0.3) 100%);
+    opacity: 0;
+  }
+
+  a.poster-link[href].poster-surface:focus-visible::after,
+  a.poster-link[href]:focus-visible .poster-surface::after {
+    opacity: 1;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    a.poster-link[href].poster-surface:hover::after,
+    a.poster-link[href]:hover .poster-surface::after {
+      opacity: 1;
+    }
+  }
 }
 
 @layer utilities {

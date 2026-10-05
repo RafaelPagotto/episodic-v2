@@ -66,7 +66,7 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
   const linkClassName =
-    "poster-link relative bg-secondary";
+    "poster-link poster-surface bg-secondary";
 
   return (
     <Link

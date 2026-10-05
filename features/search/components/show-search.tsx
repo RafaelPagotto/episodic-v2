@@ -84,7 +84,7 @@ function ShowPoster({
     return (
       <Link
         aria-label={`Track episodes for ${show.title}`}
-        className="poster-link bg-secondary"
+        className="poster-link poster-surface bg-secondary"
         href={detailHref}
       >
         {content}
