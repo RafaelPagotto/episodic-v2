@@ -80,12 +80,12 @@ export function TimeZoneForm({ persistedTimeZone }: TimeZoneFormProps) {
       ) : null}
 
       <div className="space-y-2">
-        <label className="block text-sm font-medium" htmlFor="profile-time-zone">
+        <label className="block w-fit text-sm font-medium" htmlFor="profile-time-zone">
           Account timezone
         </label>
         <input
           autoComplete="off"
-          className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-md"
+          className="field-focus flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm shadow-sm sm:max-w-md"
           id="profile-time-zone"
           list="profile-time-zones"
           name="timeZone"

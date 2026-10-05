@@ -20,6 +20,7 @@ Every design decision should support users in understanding their library, choos
 - Reuse shared components and styles.
 - Keep spacing, alignment and visual hierarchy consistent.
 - Clickable titles should underline on hover and keyboard focus.
+- Form fields should indicate focus by changing the color of their existing border, without an additional outline, ring or translucent halo. Associate text labels with their controls without making unrelated blank layout space activate the field. Deliberate checkbox option cards may retain their full clickable area.
 - Equivalent faded states should use the same opacity and restore visibility immediately on hover or keyboard focus.
 
 ## Motion

@@ -666,10 +666,11 @@ export function ShowDetailView({
         <div className="grid min-w-0 grid-cols-1 gap-4">
           <Card className="scroll-mt-20" id="season-controls" tabIndex={-1}>
             <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-              <label className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
-                Season
+              <div className="flex min-w-0 flex-1 items-center gap-2 text-sm text-muted-foreground">
+                <label className="shrink-0" htmlFor={`show-${show.tmdbId}-season`}>Season</label>
                 <select
-                  className="h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:max-w-xs sm:text-sm"
+                  className="field-focus h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground sm:max-w-xs sm:text-sm"
+                  id={`show-${show.tmdbId}-season`}
                   onChange={(event) => updateActiveSeason(Number(event.target.value))}
                   value={seasonNavigation.activeSeasonNumber ?? ""}
                 >
@@ -679,7 +680,7 @@ export function ShowDetailView({
                     </option>
                   ))}
                 </select>
-              </label>
+              </div>
 
               <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center">
                 <Button

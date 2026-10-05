@@ -263,14 +263,14 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
               : "This removes all shows and watched history."}
             {" "}This cannot be undone.
           </p>
-          <label className="mt-3 block text-sm" htmlFor="dataActionConfirmation">
+          <label className="mt-3 block w-fit text-sm" htmlFor="dataActionConfirmation">
             Type <strong>{getActionConfirmationTarget(confirmationAction)}</strong> exactly to continue.
           </label>
           <input
             aria-describedby="data-action-confirmation-description"
             autoComplete="off"
             autoFocus
-            className="mt-2 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="field-focus mt-2 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground"
             disabled={hasPendingDataAction}
             id="dataActionConfirmation"
             onChange={(event) => setConfirmation(event.target.value)}
@@ -309,7 +309,7 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         action={deleteFormAction}
         className="rounded-md border border-destructive/40 p-4"
       >
-        <label className="block text-sm font-medium text-destructive" htmlFor="deleteConfirmation">
+        <label className="block w-fit text-sm font-medium text-destructive" htmlFor="deleteConfirmation">
           Delete account
         </label>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -318,7 +318,7 @@ export function DataControls({ deleteConfirmationTarget }: DataControlsProps) {
         </p>
         <input
           autoComplete="off"
-          className="mt-3 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20"
+          className="field-focus mt-3 h-11 w-full rounded-md border bg-background px-3 py-2 text-base sm:text-sm placeholder:text-muted-foreground"
           id="deleteConfirmation"
           name="deleteConfirmation"
           placeholder={deleteConfirmationTarget}

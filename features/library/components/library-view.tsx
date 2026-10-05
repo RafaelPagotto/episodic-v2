@@ -300,10 +300,11 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
           ))}
         </LibraryFilterStrip>
 
-        <label className="flex w-full min-w-0 max-w-sm items-center gap-2 text-sm text-muted-foreground [@container_(min-width:70rem)]:w-64 [@container_(min-width:70rem)]:shrink-0">
-          Sort
+        <div className="flex w-full min-w-0 max-w-sm items-center gap-2 text-sm text-muted-foreground [@container_(min-width:70rem)]:w-64 [@container_(min-width:70rem)]:shrink-0">
+          <label className="shrink-0" htmlFor="library-sort">Sort</label>
           <select
-            className="h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
+            className="field-focus h-11 w-full min-w-0 flex-1 rounded-md border bg-background px-3 py-1 text-base text-foreground sm:text-sm"
+            id="library-sort"
             onChange={(event) => handleSortChoiceChange(event.target.value)}
             value={`${sort}:${sortDirection}`}
           >
@@ -313,7 +314,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
               </option>
             ))}
           </select>
-        </label>
+        </div>
       </div>
 
       {message ? (

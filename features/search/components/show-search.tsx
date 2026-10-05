@@ -223,7 +223,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             aria-label="Search TV shows"
-            className="h-11 w-full rounded-md border bg-background px-9 py-2 text-base outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
+            className="field-focus h-11 w-full rounded-md border bg-background px-9 py-2 text-base placeholder:text-muted-foreground sm:text-sm"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search TV shows"
             type="search"
