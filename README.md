@@ -4,6 +4,10 @@ Episodic is a focused TV tracking app for people who want to know exactly what t
 
 Build a personal library from TMDB, follow episode-by-episode progress, keep favourites close, and let the dashboard surface the shows that need attention. Episodic is designed around the everyday viewing loop: add a show, track what you have watched, pick up from the next episode, and keep the rest of the library clean.
 
+## Design Principles
+
+Episodic should be clear, unconvoluted, uncomplicated, uncluttered and feel snappy. Follow [Design Dogmas](docs/design-dogmas.md) when designing, implementing or reviewing UI/UX changes.
+
 ## What It Does
 
 ### A Dashboard For Your Next Episode

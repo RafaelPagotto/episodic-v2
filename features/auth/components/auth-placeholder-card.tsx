@@ -15,7 +15,7 @@ export function AuthPlaceholderCard({ title, description }: AuthPlaceholderCardP
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <Link className="text-sm font-medium text-primary hover:underline" href="/library">
+        <Link className="text-link text-sm font-medium text-primary" href="/library">
           Continue to app shell
         </Link>
       </CardContent>

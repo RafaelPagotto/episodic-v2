@@ -49,7 +49,7 @@ export function SignUpForm() {
       <AuthSubmitButton pendingText="Creating account...">Create account</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link className="font-medium text-primary hover:underline" href="/sign-in">
+        <Link className="text-link font-medium text-primary" href="/sign-in">
           Sign in
         </Link>
       </p>

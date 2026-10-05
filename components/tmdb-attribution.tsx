@@ -24,7 +24,7 @@ export function TmdbAttribution({ className, tmdbId }: TmdbAttributionProps) {
     >
       <p>{TMDB_ATTRIBUTION.notice}</p>
       <a
-        className="inline-flex shrink-0 items-center gap-1 font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="text-link inline-flex shrink-0 items-center gap-1 font-medium text-foreground"
         href={sourceUrl}
         rel="noopener noreferrer"
         target="_blank"

@@ -536,7 +536,7 @@ export function ShowDetailView({
                   size="icon"
                   title={controls.favouriteButtonLabel}
                   type="button"
-                  variant={show.favourite ? "secondary" : "outline"}
+                  variant="outline"
                 >
                   {pendingAction === "show:favourite" ? (
                     <Loader2 className="size-4 animate-spin" />
@@ -552,7 +552,7 @@ export function ShowDetailView({
                   size="icon"
                   title={controls.toggleDroppedButtonLabel}
                   type="button"
-                  variant={controls.isDropped ? "default" : "outline"}
+                  variant="outline"
                 >
                   {pendingAction === "show:drop" ? (
                     <Loader2 className="size-4 animate-spin" />

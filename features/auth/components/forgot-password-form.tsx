@@ -27,7 +27,7 @@ export function ForgotPasswordForm() {
       <AuthSubmitButton pendingText="Sending link...">Send reset link</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         Remembered it?{" "}
-        <Link className="font-medium text-primary hover:underline" href="/sign-in">
+        <Link className="text-link font-medium text-primary" href="/sign-in">
           Back to sign in
         </Link>
       </p>

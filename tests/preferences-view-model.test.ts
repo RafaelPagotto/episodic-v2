@@ -47,7 +47,7 @@ describe("preferences view model", () => {
           name: "hideCompleted",
         }),
         expect.objectContaining({
-          description: "Dim artwork in search results for shows already in your library.",
+          description: "Dim search result cards for shows already in your library. Hover or focus a card to restore its brightness.",
           label: "Fade added search results",
           name: "fadeAdded",
         }),

@@ -37,14 +37,14 @@ export function SignInForm({ initialState = INITIAL_AUTH_FORM_STATE }: SignInFor
         type="password"
       />
       <div className="flex justify-end">
-        <Link className="text-sm text-muted-foreground hover:text-foreground" href="/forgot-password">
+        <Link className="text-link text-sm text-muted-foreground hover:text-foreground" href="/forgot-password">
           Forgot password?
         </Link>
       </div>
       <AuthSubmitButton pendingText="Signing in...">Sign in</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         New here?{" "}
-        <Link className="font-medium text-primary hover:underline" href="/sign-up">
+        <Link className="text-link font-medium text-primary" href="/sign-up">
           Create an account
         </Link>
       </p>

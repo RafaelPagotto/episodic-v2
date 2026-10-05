@@ -11,7 +11,7 @@ export const PREFERENCE_ITEMS: Array<{
   >;
 }> = [
   {
-    description: "Dim dropped show cards in your library and their posters on the dashboard.",
+    description: "Dim dropped show cards in your library and dashboard. Hover or focus a card to restore its brightness.",
     label: "Fade dropped shows",
     name: "fadeDropped",
   },
@@ -26,7 +26,7 @@ export const PREFERENCE_ITEMS: Array<{
     name: "hideCompleted",
   },
   {
-    description: "Dim artwork in search results for shows already in your library.",
+    description: "Dim search result cards for shows already in your library. Hover or focus a card to restore its brightness.",
     label: "Fade added search results",
     name: "fadeAdded",
   },

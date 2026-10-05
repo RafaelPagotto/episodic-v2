@@ -14,7 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ExpandableText } from "@/components/ui/expandable-text";
 import { Notice } from "@/components/ui/notice";
 import { TmdbAttribution } from "@/components/tmdb-attribution";
 import type { UserPreferences } from "@/features/preferences/types";
@@ -27,6 +26,8 @@ import { cn } from "@/lib/utils";
 import { addShowToLibraryAction } from "../actions";
 import type { SearchCardMessage } from "../types";
 import { forgetSearchResults, getSearchHref, readSearchResults, rememberSearchResults } from "../search-session";
+import { SearchSynopsis } from "./search-synopsis";
+import { FADED_SHOW_CARD_CLASS_NAME } from "../../preferences/card-appearance";
 
 type ShowSearchProps = {
   initialAddedShowIds: number[];
@@ -56,12 +57,10 @@ function getYear(date: string | null) {
 
 function ShowPoster({
   detailHref,
-  faded,
   isAdded,
   show,
 }: {
   detailHref: string;
-  faded: boolean;
   isAdded: boolean;
   show: NormalizedTmdbSearchResult;
 }) {
@@ -69,14 +68,14 @@ function ShowPoster({
   const content = posterUrl ? (
     <Image
       alt={`${show.title} poster`}
-      className={cn("aspect-[2/3] w-full object-cover", faded && "opacity-50", isAdded && "transition group-hover:scale-[1.02]")}
+      className="aspect-[2/3] w-full object-cover"
       height={513}
       sizes="(min-width: 1280px) 18vw, (min-width: 1024px) 22vw, (min-width: 768px) 30vw, 45vw"
       src={posterUrl}
       width={342}
     />
   ) : (
-    <div className={cn("flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground", faded && "opacity-50", isAdded && "transition group-hover:scale-[1.02]")}>
+    <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground">
       {show.title.charAt(0)}
     </div>
   );
@@ -85,7 +84,7 @@ function ShowPoster({
     return (
       <Link
         aria-label={`Track episodes for ${show.title}`}
-        className="group block overflow-hidden rounded-md bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="poster-link bg-secondary"
         href={detailHref}
       >
         {content}
@@ -93,7 +92,7 @@ function ShowPoster({
     );
   }
 
-  return <div className="group overflow-hidden rounded-md bg-secondary">{content}</div>;
+  return <div className="overflow-hidden rounded-md bg-secondary">{content}</div>;
 }
 
 export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps) {
@@ -224,7 +223,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
             aria-label="Search TV shows"
-            className="h-11 w-full rounded-md border bg-background px-9 py-2 text-base outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
+            className="h-11 w-full rounded-md border bg-background px-9 py-2 text-base outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 sm:text-sm"
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search TV shows"
             type="search"
@@ -293,23 +292,23 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
             return (
               <Card
                 key={show.tmdbId}
-                className="overflow-hidden"
+                className={cn("overflow-hidden", shouldFadeAddedForPreferences(isAdded, preferences) && FADED_SHOW_CARD_CLASS_NAME)}
               >
                 <CardContent className="flex h-full flex-col gap-3 p-3 sm:p-4">
-                  <ShowPoster detailHref={detailHref} faded={shouldFadeAddedForPreferences(isAdded, preferences)} isAdded={isAdded} show={show} />
+                  <ShowPoster detailHref={detailHref} isAdded={isAdded} show={show} />
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
                     <div className="min-w-0">
-                      <h2 className="min-h-10 text-sm font-semibold leading-5 sm:text-base">
+                      <h2 className="line-clamp-2 min-h-10 text-sm font-semibold leading-5 sm:text-base">
                         {isAdded ? (
                           <Link
                             aria-label={`Track episodes for ${show.title}`}
-                            className="line-clamp-2 rounded-sm underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="title-link"
                             href={detailHref}
                           >
                             {show.title}
                           </Link>
                         ) : (
-                          <span className="line-clamp-2">{show.title}</span>
+                          <span>{show.title}</span>
                         )}
                       </h2>
                       <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
@@ -320,7 +319,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                       </div>
                     </div>
 
-                    <ExpandableText className="text-xs sm:text-sm" label="Synopsis" text={show.overview || "No overview available."} />
+                    <SearchSynopsis showTitle={show.title} text={show.overview || "No overview available."} />
 
                     <div className="mt-auto">
                       {isAdded ? (

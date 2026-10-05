@@ -45,7 +45,7 @@ function NavLink({
       aria-current={isActive ? "page" : undefined}
       aria-label={label}
       className={cn(
-        "inline-flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         isActive
           ? "bg-primary text-primary-foreground shadow-sm"
           : "text-muted-foreground hover:bg-secondary hover:text-foreground",
@@ -67,7 +67,7 @@ function SignOutButton({ compact = false, iconOnly = false }: { compact?: boolea
       <button
         aria-label="Sign out"
         className={cn(
-          "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-border bg-background px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           compact ? "w-auto" : "w-full",
           iconOnly && "size-11 p-0",
         )}
@@ -91,7 +91,7 @@ export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavi
     <>
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur md:hidden">
         <div className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:px-4">
-          <Link aria-label={APP_NAME} className="inline-flex shrink-0 items-center gap-3 text-lg font-semibold tracking-tight" href="/dashboard">
+          <Link aria-label={APP_NAME} className="focus-ring inline-flex shrink-0 items-center gap-3 text-lg font-semibold tracking-tight" href="/dashboard">
             <BrandLogo className="size-8 shrink-0" />
             <span className="hidden min-[480px]:inline">{APP_NAME}</span>
           </Link>
@@ -111,7 +111,7 @@ export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavi
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto border-r bg-card py-6 transition-[width] duration-200 motion-reduce:transition-none md:flex",
+          "fixed inset-y-0 left-0 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto border-r bg-card py-6 md:flex",
           collapsed ? "px-2" : "px-5",
         )}
         id="desktop-sidebar"
@@ -119,7 +119,7 @@ export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavi
         <div className={cn("flex shrink-0 gap-3", collapsed ? "flex-col items-center" : "items-center justify-between")}>
           <Link
             aria-label={APP_NAME}
-            className="inline-flex min-w-0 items-center gap-3 text-xl font-semibold tracking-tight"
+            className="focus-ring inline-flex min-w-0 items-center gap-3 text-xl font-semibold tracking-tight"
             href="/dashboard"
             title={collapsed ? APP_NAME : undefined}
           >

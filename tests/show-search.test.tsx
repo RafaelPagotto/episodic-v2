@@ -30,7 +30,6 @@ vi.mock("next/link", () => ({ default: () => null }));
 vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/card", () => ({ Card: () => null, CardContent: () => null }));
 vi.mock("@/components/ui/empty-state", () => ({ EmptyState: () => null }));
-vi.mock("@/components/ui/expandable-text", () => ({ ExpandableText: () => null }));
 vi.mock("@/components/ui/notice", () => ({ Notice: () => null }));
 vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 3000, ActionFeedback: () => null }));
 vi.mock("@/components/tmdb-attribution", () => ({ TmdbAttribution: () => null }));
@@ -115,6 +114,37 @@ describe("Search restoration and request safety", () => {
     expect(nodes(render()).some((n) => n.props.children === "Search unavailable")).toBe(true);
     submit(render(), "Star Trek"); render(); await settle();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("passes the full synopsis to the text toggle without a separate disclosure control", async () => {
+    const overview = "Twenty years after modern civilization has been destroyed, two survivors travel together across the country. ".repeat(4);
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ results: [{ ...result, overview }] }) });
+    navigation.href += "?q=Star+Trek";
+    render(); await settle();
+    const tree = render();
+    const synopsis = nodes(tree).find((node) => node.props.text === overview);
+    expect(synopsis).toBeDefined();
+    expect(synopsis?.props.showTitle).toBe("Star Trek");
+    expect(nodes(tree).some((node) => node.type === "details" || node.type === "summary")).toBe(false);
+  });
+
+  it("keeps the fallback for missing synopses visible", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ results: [{ ...result, overview: "" }] }) });
+    navigation.href += "?q=Star+Trek";
+    render(); await settle();
+    expect(nodes(render()).some((node) => node.props.text === "No overview available.")).toBe(true);
+  });
+
+  it("fades the whole added card and respects the fade preference", async () => {
+    navigation.href += "?q=Star+Trek";
+    render([253]); await settle();
+    const tree = render([253]);
+    const fadedCard = nodes(tree).find((node) => String(node.props.className).includes("opacity-50"));
+    expect(fadedCard?.props.className).toContain("hover:opacity-100");
+    expect(fadedCard?.props.className).toContain("focus-within:opacity-100");
+    expect(nodes(fadedCard).some((node) => node.props.showTitle === "Star Trek")).toBe(true);
+    const unfaded = render([253], { ...DEFAULT_USER_PREFERENCES, fadeAdded: false });
+    expect(nodes(unfaded).some((node) => String(node.props.className).includes("opacity-50"))).toBe(false);
   });
 
   it("keeps add feedback as a toast even when preferences hide the newly added card", async () => {

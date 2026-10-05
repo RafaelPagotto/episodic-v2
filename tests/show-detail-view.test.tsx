@@ -390,6 +390,26 @@ describe("ShowDetailView refresh metadata UI", () => {
     }
   });
 
+  it.each([false, true])("uses Library's outline favourite style for favourite=%s", (favourite) => {
+    const button = findButton(favourite ? "Unfavourite" : "Favourite", renderShowDetail(showDetail({ favourite })));
+    const markup = renderToStaticMarkup(<>{button.props.children as React.ReactNode}</>);
+    expect(button.props.variant).toBe("outline");
+    expect(button.props["aria-label"]).toBe(favourite ? "Remove Arcane from favourites" : "Add Arcane to favourites");
+    expect(markup).toContain("lucide-star");
+    expect(markup.includes("fill-primary text-primary")).toBe(favourite);
+  });
+
+  it.each(["watching", "dropped"] as const)("uses Library's outline drop/resume style for status=%s", (status) => {
+    const show = showDetail();
+    show.progress.status = status;
+    show.progress.displayStatus = status;
+    const button = findButton(status === "dropped" ? "Resume" : "Drop", renderShowDetail(show));
+    const markup = renderToStaticMarkup(<>{button.props.children as React.ReactNode}</>);
+    expect(button.props.variant).toBe("outline");
+    expect(button.props["aria-label"]).toBe(status === "dropped" ? "Resume Arcane" : "Drop Arcane");
+    expect(markup).toContain(status === "dropped" ? "lucide-play" : "lucide-circle-slash");
+  });
+
   it("omits the extra episode navigation strip while retaining normal season navigation", () => {
     const tree = renderShowDetail(showDetail(), "UTC", "2026-09-20");
     expect(() => findButton("Next unwatched", tree)).toThrow("Button not found");

@@ -229,6 +229,18 @@ describe("Dashboard view", () => {
     expect(imagePoster.find((element) => element.props.alt === "Show 100 poster")).toBeDefined();
   });
 
+  it("fades the entire dropped card without compounding poster opacity", () => {
+    const baseline = data();
+    baseline.continueWatching[0].isFaded = true;
+    const card = renderCard(renderDashboard(baseline), baseline.continueWatching[0].tmdbId) as React.ReactElement<Record<string, unknown>>;
+    expect(card.props.className).toContain("opacity-50");
+    expect(card.props.className).toContain("hover:opacity-100");
+    expect(card.props.className).toContain("focus-within:opacity-100");
+    const poster = elements(card).find((element) => typeof element.type === "function" && element.type.name === "ContinuePoster")!;
+    const posterTree = (poster.type as (props: Record<string, unknown>) => React.ReactNode)(poster.props);
+    expect(elements(posterTree).some((element) => String(element.props.className).includes("opacity-50"))).toBe(false);
+  });
+
   it.each([null, "/poster.jpg"])("links Upcoming poster and title to the episode's season with poster path %s", (posterPath) => {
     const baseline = data();
     const upcoming = baseline.upcomingEpisodes[0];

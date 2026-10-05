@@ -1,5 +1,7 @@
 "use client";
 
+import { FADED_SHOW_CARD_CLASS_NAME } from "../../preferences/card-appearance";
+
 import { Check, CircleSlash, Loader2, Play, Star, Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -64,7 +66,7 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
   const linkClassName =
-    "group relative block overflow-hidden rounded-md bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+    "poster-link relative bg-secondary";
 
   return (
     <Link
@@ -76,14 +78,14 @@ function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
       {posterUrl ? (
         <Image
           alt={`${show.title} poster`}
-          className="aspect-[2/3] w-full object-cover transition group-hover:scale-[1.02]"
+          className="aspect-[2/3] w-full object-cover"
           height={513}
           sizes="(max-width: 639px) 182px, 234px"
           src={posterUrl}
           width={342}
         />
       ) : (
-        <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground transition group-hover:scale-[1.02]">
+        <div className="flex aspect-[2/3] items-center justify-center text-3xl font-semibold text-muted-foreground">
           {show.title.charAt(0)}
         </div>
       )}
@@ -367,7 +369,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                 className={cn(
                   "overflow-hidden",
                   shouldFadeShowForPreferences(show, preferences)
-                    && "opacity-50 transition-opacity duration-150 hover:opacity-100 focus-within:opacity-100 motion-reduce:transition-none",
+                    && FADED_SHOW_CARD_CLASS_NAME,
                 )}
               >
                 <CardContent className="flex h-full flex-col gap-2 p-2 sm:p-3 sm:px-4">
@@ -376,10 +378,10 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                   <div className="flex min-h-0 flex-1 flex-col gap-2">
                     <div className="min-w-0">
                       <div className="min-h-10 min-w-0">
-                        <h2 className="min-w-0 text-sm font-semibold leading-5 sm:text-base sm:leading-5">
+                        <h2 className="line-clamp-2 min-w-0 text-sm font-semibold leading-5 sm:text-base sm:leading-5">
                           <Link
                             aria-label={`View details for ${show.title}`}
-                            className="line-clamp-2 rounded-sm underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="title-link"
                             href={detailHref}
                           >
                             {show.title}

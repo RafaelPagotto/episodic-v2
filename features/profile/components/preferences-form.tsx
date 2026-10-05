@@ -48,7 +48,7 @@ export function PreferencesForm({ preferences }: PreferencesFormProps) {
         {PREFERENCE_ITEMS.map((item) => (
           <label
             key={item.name}
-            className="flex min-h-20 items-start gap-3 rounded-md border bg-background p-4 transition hover:bg-secondary/60"
+            className="flex min-h-20 items-start gap-3 rounded-md border bg-background p-4 hover:bg-secondary/60"
           >
             <input
               className="mt-1 size-4 accent-primary"

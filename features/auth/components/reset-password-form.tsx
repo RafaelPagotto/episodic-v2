@@ -33,7 +33,7 @@ export function ResetPasswordForm() {
       <AuthSubmitButton pendingText="Updating password...">Update password</AuthSubmitButton>
       {state.status === "success" ? (
         <p className="text-center text-sm text-muted-foreground">
-          <Link className="font-medium text-primary hover:underline" href="/library">
+          <Link className="text-link font-medium text-primary" href="/library">
             Continue to library
           </Link>
         </p>

@@ -57,6 +57,24 @@
   }
 }
 
+@layer components {
+  .focus-ring {
+    @apply rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .title-link, .text-link {
+    @apply rounded-sm underline-offset-2 hover:underline focus-visible:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+
+  .title-link {
+    @apply break-words;
+  }
+
+  .poster-link {
+    @apply block overflow-hidden rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring;
+  }
+}
+
 @layer utilities {
   .filter-scroll-strip {
     scrollbar-width: thin;

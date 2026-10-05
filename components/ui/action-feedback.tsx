@@ -111,13 +111,13 @@ export function ActionFeedback({
       <button
         aria-label="Dismiss notification"
         className={cn(
-          "shrink-0 rounded-sm text-current opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "shrink-0 rounded-sm text-current opacity-70 hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           presentation === "toast" ? "-my-2 -mr-2 flex size-11 items-center justify-center" : "-m-1 p-1",
         )}
         onClick={dismiss}
         type="button"
       >
-        <X aria-hidden="true" className="size-4" />
+        <X aria-hidden="true" className={presentation === "toast" ? "size-5" : "size-4"} />
       </button>
     </div>
   ) : children;

@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { FADED_SHOW_CARD_CLASS_NAME } from "../../preferences/card-appearance";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -73,7 +74,7 @@ export function ProgressView({ preferences, shows }: ProgressViewProps) {
       {visibleShows.map((show) => (
         <Card
           key={show.tmdbId}
-          className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && "opacity-60")}
+          className={cn("overflow-hidden", shouldFadeShowForPreferences(show, preferences) && FADED_SHOW_CARD_CLASS_NAME)}
         >
           <CardContent className="flex gap-4 p-4 sm:p-5">
             <ProgressPoster show={show} />
