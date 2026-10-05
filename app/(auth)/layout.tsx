@@ -16,7 +16,7 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
           <BrandLogo className="mx-auto size-14" />
           <p className="mt-4 text-3xl font-semibold tracking-tight">Episodic</p>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Track your shows without the clutter.
+            Build your personal library and track your shows.
           </p>
         </div>
         {children}
