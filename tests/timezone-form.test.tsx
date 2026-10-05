@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/components/ui/action-feedback", () => ({
-  ACTION_FEEDBACK_AUTO_DISMISS_MS: 5_000,
+  ACTION_FEEDBACK_AUTO_DISMISS_MS: 3_000,
   ActionFeedback: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 

@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const hookMocks = vi.hoisted(() => ({
   effects: [] as Array<() => void | (() => void)>,
   setState: vi.fn(),
+  toastRegion: null as HTMLDivElement | null,
+  createPortal: vi.fn((node: ReactNode) => node),
 }));
 
 vi.mock("react", async () => {
@@ -17,9 +19,11 @@ vi.mock("react", async () => {
       hookMocks.effects.push(effect);
     }),
     useRef: vi.fn((initialValue: unknown) => ({ current: initialValue })),
-    useState: vi.fn((initialValue: unknown) => [initialValue, hookMocks.setState]),
+    useState: vi.fn((initialValue: unknown) => [initialValue === null ? hookMocks.toastRegion : initialValue, hookMocks.setState]),
   };
 });
+
+vi.mock("react-dom", () => ({ createPortal: hookMocks.createPortal }));
 
 vi.mock("@/lib/utils", () => ({
   cn: (...values: unknown[]) => values.filter(Boolean).join(" "),
@@ -71,6 +75,8 @@ describe("ActionFeedback", () => {
     (globalThis as typeof globalThis & { React: typeof React }).React = React;
     hookMocks.effects = [];
     hookMocks.setState.mockReset();
+    hookMocks.toastRegion = null;
+    hookMocks.createPortal.mockClear();
     vi.useFakeTimers();
   });
 
@@ -89,7 +95,7 @@ describe("ActionFeedback", () => {
     });
     hookMocks.effects[0]();
 
-    vi.advanceTimersByTime(4_999);
+    vi.advanceTimersByTime(2_999);
     expect(hookMocks.setState).not.toHaveBeenCalled();
 
     vi.advanceTimersByTime(1);
@@ -145,6 +151,23 @@ describe("ActionFeedback", () => {
     expect(closeButton).not.toBeNull();
     (closeButton?.props.onClick as () => void)();
     expect(hookMocks.setState).toHaveBeenCalledWith(feedbackKey);
+  });
+
+  it("does not render an inline placeholder for a toast before mounting", () => {
+    expect(ActionFeedback({ children: "Saved", feedbackKey: "Saved", presentation: "toast", tone: "success" })).toBeNull();
+    expect(hookMocks.createPortal).not.toHaveBeenCalled();
+  });
+
+  it.each(["success", "error"] as const)("portals %s feedback outside the page with accessible dismissal", (tone) => {
+    hookMocks.toastRegion = {} as HTMLDivElement;
+    const key = { message: "Updated" };
+    const tree = ActionFeedback({ children: key.message, feedbackKey: key, presentation: "toast", dismissible: true, tone });
+    expect(hookMocks.createPortal).toHaveBeenCalledWith(tree, hookMocks.toastRegion);
+    const notification = findElement(tree, (element) => element.props.role === (tone === "error" ? "alert" : "status"));
+    expect(notification?.props["aria-atomic"]).toBe("true");
+    const close = findElement(tree, (element) => element.props["aria-label"] === "Dismiss notification");
+    (close?.props.onClick as () => void)();
+    expect(hookMocks.setState).toHaveBeenCalledWith(key);
   });
 
   it("keeps generic informational notices persistent with appropriate roles", () => {

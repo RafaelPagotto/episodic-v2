@@ -48,7 +48,7 @@ vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("next/link", () => ({ default: () => null }));
 vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/card", () => ({ Card: () => null, CardContent: () => null }));
-vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 5000, ActionFeedback: () => null }));
+vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 3000, ActionFeedback: () => null }));
 vi.mock("@/components/ui/empty-state", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/notice", () => ({ Notice: () => null }));
 vi.mock("@/components/ui/progress-bar", () => ({ ProgressBar: () => null }));

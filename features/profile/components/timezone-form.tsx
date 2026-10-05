@@ -72,6 +72,7 @@ export function TimeZoneForm({ persistedTimeZone }: TimeZoneFormProps) {
           autoDismissMs={state.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
           dismissible
           feedbackKey={state}
+          presentation="toast"
           tone={state.status === "error" ? "error" : "success"}
         >
           {state.message}

@@ -55,7 +55,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 vi.mock("next/image", () => ({ default: () => null }));
 vi.mock("next/link", () => ({ default: () => null }));
 vi.mock("@/components/library-summary-tiles", () => ({ LibrarySummaryTiles: () => null }));
-vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 5_000, ActionFeedback: () => null }));
+vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 3_000, ActionFeedback: () => null }));
 vi.mock("@/components/ui/button", () => ({ Button: () => null }));
 vi.mock("@/components/ui/card", () => ({ Card: () => null, CardContent: () => null }));
 vi.mock("@/components/ui/empty-state", () => ({ EmptyState: () => null }));
@@ -377,6 +377,7 @@ describe("Dashboard view", () => {
     expect(cardPending(afterFailure, 200)).toBe(true);
     expect(markButton(afterFailure, 100).props.disabled).toBe(false);
     expect(componentProps(afterFailure, "ActionFeedback")[0]?.children).toBe("The next episode has changed.");
+    expect(componentProps(afterFailure, "ActionFeedback")[0]?.presentation).toBe("toast");
     expect(markWatched).toHaveBeenCalledTimes(2);
 
     second.resolve(success);

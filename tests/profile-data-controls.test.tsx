@@ -45,7 +45,7 @@ vi.mock("@/features/profile/actions", () => ({
 vi.mock("@/features/profile/confirmation", async () => vi.importActual("../features/profile/confirmation"));
 vi.mock("@/features/profile/data-control-state", async () => vi.importActual("../features/profile/data-control-state"));
 vi.mock("@/components/ui/action-feedback", () => ({
-  ACTION_FEEDBACK_AUTO_DISMISS_MS: 5_000,
+  ACTION_FEEDBACK_AUTO_DISMISS_MS: 3_000,
   ActionFeedback: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("@/components/ui/button", () => ({

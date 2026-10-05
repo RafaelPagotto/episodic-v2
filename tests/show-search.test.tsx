@@ -32,7 +32,7 @@ vi.mock("@/components/ui/card", () => ({ Card: () => null, CardContent: () => nu
 vi.mock("@/components/ui/empty-state", () => ({ EmptyState: () => null }));
 vi.mock("@/components/ui/expandable-text", () => ({ ExpandableText: () => null }));
 vi.mock("@/components/ui/notice", () => ({ Notice: () => null }));
-vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 5000, ActionFeedback: () => null }));
+vi.mock("@/components/ui/action-feedback", () => ({ ACTION_FEEDBACK_AUTO_DISMISS_MS: 3000, ActionFeedback: () => null }));
 vi.mock("@/components/tmdb-attribution", () => ({ TmdbAttribution: () => null }));
 vi.mock("@/features/preferences/view-model", async () => vi.importActual("../features/preferences/view-model"));
 vi.mock("@/features/shows", () => ({ getShowDetailHref: (id: number) => `/shows/${id}` }));
@@ -46,9 +46,9 @@ function nodes(node: React.ReactNode): React.ReactElement<Record<string, unknown
   const element = node as React.ReactElement<Record<string, unknown>>;
   return [element, ...nodes(element.props.children as React.ReactNode)];
 }
-function render(ids: number[] = []) {
+function render(ids: number[] = [], preferences = DEFAULT_USER_PREFERENCES) {
   hooks.index = 0;
-  const tree = ShowSearch({ initialAddedShowIds: ids, preferences: DEFAULT_USER_PREFERENCES });
+  const tree = ShowSearch({ initialAddedShowIds: ids, preferences });
   for (const effect of hooks.effects.splice(0)) hooks.cleanup = effect() || undefined;
   return tree;
 }
@@ -115,5 +115,19 @@ describe("Search restoration and request safety", () => {
     expect(nodes(render()).some((n) => n.props.children === "Search unavailable")).toBe(true);
     submit(render(), "Star Trek"); render(); await settle();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps add feedback as a toast even when preferences hide the newly added card", async () => {
+    navigation.href += "?q=Star+Trek";
+    render(); await settle();
+    add.mockResolvedValue({ status: "success", message: "Star Trek added to your library." });
+    const addButton = nodes(render()).find((node) => node.props.children && Array.isArray(node.props.children) && node.props.children.includes("Add"))!;
+    (addButton.props.onClick as () => void)();
+    await settle();
+    const tree = render([], { ...DEFAULT_USER_PREFERENCES, hideAdded: true });
+    const feedback = nodes(tree).find((node) => node.props.children === "Star Trek added to your library.");
+    expect(feedback?.props.presentation).toBe("toast");
+    expect(feedback?.props.dismissible).toBe(true);
+    expect(nodes(tree).some((node) => node.props.children === "Star Trek")).toBe(false);
   });
 });

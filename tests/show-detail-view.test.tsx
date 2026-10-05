@@ -90,7 +90,7 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("@/components/ui/action-feedback", () => ({
-  ACTION_FEEDBACK_AUTO_DISMISS_MS: 5_000,
+  ACTION_FEEDBACK_AUTO_DISMISS_MS: 3_000,
   ActionFeedback: function ActionFeedbackMock() {
     return null;
   },
@@ -115,10 +115,6 @@ vi.mock("@/components/ui/empty-state", () => ({
   EmptyState: function EmptyStateMock() {
     return null;
   },
-}));
-
-vi.mock("@/components/ui/expandable-text", () => ({
-  ExpandableText: ({ text }: { text: string }) => <details><summary>Synopsis</summary><p>{text}</p></details>,
 }));
 
 vi.mock("@/components/ui/notice", () => ({
@@ -308,8 +304,8 @@ function findEpisodeButton(text: string, tree: React.ReactNode, title?: string) 
     tree,
     (element) =>
       typeof element.props.onClick === "function"
-      && typeof element.props.className === "string"
-      && element.props.className.includes("md:w-36")
+      && typeof element.props["aria-label"] === "string"
+      && /^Mark (?:unwatched|watched):/.test(element.props["aria-label"])
       && getText(element.props.children as React.ReactNode).includes(text)
       && (title === undefined || element.props.title === title),
   )[0];
@@ -325,8 +321,8 @@ function episodeButtons(tree: React.ReactNode) {
   return findElements(
     tree,
     (element) => typeof element.props.onClick === "function"
-      && typeof element.props.className === "string"
-      && element.props.className.includes("md:w-36"),
+      && typeof element.props["aria-label"] === "string"
+      && /^Mark (?:unwatched|watched):/.test(element.props["aria-label"]),
   );
 }
 
@@ -394,28 +390,58 @@ describe("ShowDetailView refresh metadata UI", () => {
     }
   });
 
-  it("jumps to the next released unwatched episode without altering navigation or progress", () => {
-    const scrollIntoView = vi.fn();
-    const focus = vi.fn();
-    const getElementById = vi.fn(() => ({ scrollIntoView, focus }));
-    const replaceState = vi.fn();
-    vi.stubGlobal("document", { getElementById });
-    vi.stubGlobal("window", { history: { replaceState } });
+  it("omits the extra episode navigation strip while retaining normal season navigation", () => {
     const tree = renderShowDetail(showDetail(), "UTC", "2026-09-20");
-    (findButton("Next unwatched", tree).props.onClick as () => void)();
-    expect(getElementById).toHaveBeenCalledWith("show-100-episode-1-2");
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" });
-    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
-    expect(replaceState).not.toHaveBeenCalled();
-    expect(setEpisodeWatchedActionMock).not.toHaveBeenCalled();
-    (findButton("Season controls", tree).props.onClick as () => void)();
-    expect(getElementById).toHaveBeenLastCalledWith("season-controls");
+    expect(() => findButton("Next unwatched", tree)).toThrow("Button not found");
+    expect(() => findButton("Season controls", tree)).toThrow("Button not found");
+    expect(findButton("Previous", tree)).toBeDefined();
+    expect(findButton("Next", tree)).toBeDefined();
+    expect(findElements(tree, (element) => element.type === "select")[0]?.props.onChange).toBeTypeOf("function");
   });
 
-  it("offers no unwatched jump when only future or watched episodes remain", () => {
-    const show = showDetail({ seasons: [season(1, [episode(1, 1, { watched: true }), episode(1, 2, { airDate: "2027-01-01" })])] });
-    const tree = renderShowDetail(show, "UTC", "2026-09-20");
-    expect(() => findButton("Next unwatched", tree)).toThrow("Button not found");
+  it("shows full show, season, and episode synopses without disclosures", () => {
+    const show = showDetail({
+      overview: "Full show synopsis. ".repeat(20),
+      seasons: [season(1, [episode(1, 1, { overview: "Full episode synopsis. ".repeat(20) })], {
+        overview: "Full season synopsis. ".repeat(20),
+      })],
+    });
+    const markup = renderToStaticMarkup(renderShowDetail(show));
+    expect(markup).toContain(show.overview);
+    expect(markup).toContain(show.seasons[0]?.overview);
+    expect(markup).toContain(show.seasons[0]?.episodes[0]?.overview);
+    expect(markup).not.toContain("<details");
+    expect(markup).not.toContain("<summary");
+  });
+
+  it.each([
+    [true, "Mark unwatched", "lucide-undo2", "outline"],
+    [false, "Mark watched", "lucide-check", "default"],
+  ] as const)("renders an accessible icon-only episode action for watched=%s", (watched, label, icon, variant) => {
+    const show = showDetail({ seasons: [season(1, [episode(1, 1, { watched })])] });
+    const button = findEpisodeButton(label, renderShowDetail(show));
+    const markup = renderToStaticMarkup(<>{button.props.children as React.ReactNode}</>);
+    expect(markup).toContain(icon);
+    expect(markup).toContain(`class="sr-only">${label}</span>`);
+    expect(button.props.size).toBe("icon");
+    expect(button.props.variant).toBe(variant);
+    expect(button.props["aria-label"]).toBe(`${label}: 1. S1E1`);
+    expect(button.props.title).toBe(`${label}: 1. S1E1`);
+  });
+
+  it.each([
+    [true, "Unwatch season", "unwatched", "lucide-undo2", "outline"],
+    [false, "Watch season", "watched", "lucide-check-check", "default"],
+  ] as const)("renders an accessible icon-only season action for complete=%s", (watched, label, state, icon, variant) => {
+    const show = showDetail({ seasons: [season(1, [episode(1, 1, { watched })])] });
+    const button = findButton(label, renderShowDetail(show));
+    const markup = renderToStaticMarkup(<>{button.props.children as React.ReactNode}</>);
+    expect(markup).toContain(icon);
+    expect(markup).toContain(`class="sr-only">${label}</span>`);
+    expect(button.props.size).toBe("icon");
+    expect(button.props.variant).toBe(variant);
+    expect(button.props["aria-label"]).toBe(`Mark Season 1 ${state}`);
+    expect(button.props.title).toBe(`Mark Season 1 ${state}`);
   });
 
   it("calls refreshShowMetadataAction and refreshes the router after success", async () => {
@@ -442,6 +468,7 @@ describe("ShowDetailView refresh metadata UI", () => {
   it("shows safe success and error feedback", () => {
     hookState.states = [{ message: "Refreshed metadata for Arcane.", status: "success" }, null];
     expect(hasText("Refreshed metadata for Arcane.", renderShowDetail())).toBe(true);
+    expect(findElements(renderShowDetail(), (element) => typeof element.type === "function" && element.type.name === "ActionFeedbackMock")[0]?.props.presentation).toBe("toast");
 
     hookState.states = [{ message: "Unable to refresh metadata right now.", status: "error" }, null];
     expect(hasText("Unable to refresh metadata right now.", renderShowDetail())).toBe(true);
@@ -478,8 +505,8 @@ describe("ShowDetailView refresh metadata UI", () => {
     const button = findEpisodeButton("Mark watched", tree);
 
     expect(button.props.disabled).toBe(true);
-    expect(button.props.title).toBe("Available Sep 21, 2026");
-    expect(button.props["aria-label"]).toBe("Mark watched — Available Sep 21, 2026");
+    expect(button.props.title).toBe("Mark watched: 1. S1E1 — Available Sep 21, 2026");
+    expect(button.props["aria-label"]).toBe("Mark watched: 1. S1E1 — Available Sep 21, 2026");
     (button.props.onClick as () => void)();
     await flushPromises();
     expect(setEpisodeWatchedActionMock).not.toHaveBeenCalled();
@@ -495,7 +522,7 @@ describe("ShowDetailView refresh metadata UI", () => {
     );
 
     expect(button.props.disabled).toBe(false);
-    expect(button.props.title).toBeUndefined();
+    expect(button.props.title).toBe("Mark watched: 1. S1E1");
   });
 
   it("keeps a released episode actionable", () => {
@@ -535,7 +562,7 @@ describe("ShowDetailView refresh metadata UI", () => {
     );
 
     expect(button.props.disabled).toBe(false);
-    expect(button.props.title).toBeUndefined();
+    expect(button.props.title).toBe("Mark unwatched: 1. S1E1");
   });
 
   it("keeps a released episode disabled while its mutation is pending", () => {
@@ -577,7 +604,7 @@ describe("ShowDetailView refresh metadata UI", () => {
 
     expect(findButton("Watch season", tree).props.disabled).toBe(false);
     expect(findButton("Mark watched", tree).props.disabled).toBe(false);
-    expect(findEpisodeButton("Mark watched", tree, "Available Sep 21, 2026").props.disabled).toBe(true);
+    expect(findEpisodeButton("Mark watched", tree, "Mark watched: 2. S1E2 — Available Sep 21, 2026").props.disabled).toBe(true);
   });
 
   it("reconciles one optimistic episode from action props without an explicit refresh", async () => {

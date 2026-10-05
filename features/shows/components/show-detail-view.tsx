@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RefreshCw, RotateCcw, Star } from "lucide-react";
+import { Check, CheckCheck, ChevronLeft, ChevronRight, CircleSlash, Loader2, Play, RefreshCw, RotateCcw, Star, Undo2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
-import { ExpandableText } from "@/components/ui/expandable-text";
 import { Notice } from "@/components/ui/notice";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { TmdbAttribution } from "@/components/tmdb-attribution";
@@ -65,33 +64,54 @@ function episodeSectionId(tmdbId: number, episode: ShowDetailEpisode) {
   return `show-${tmdbId}-episode-${episode.seasonNumber}-${episode.episodeNumber}`;
 }
 
-function focusSection(id: string) {
-  const target = document.getElementById(id);
-  target?.scrollIntoView({ block: "start" });
-  target?.focus({ preventScroll: true });
-}
-
 function ShowPoster({ show }: { show: ShowDetail }) {
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
+  const posterRef = useRef<HTMLDivElement>(null);
 
-  if (!posterUrl) {
-    return (
-      <div className="flex aspect-[2/3] w-20 shrink-0 items-center justify-center rounded-md bg-secondary text-3xl font-semibold text-muted-foreground sm:w-24 md:row-span-3 md:w-36">
-        {show.title.charAt(0)}
-      </div>
-    );
-  }
+  useEffect(() => {
+    const poster = posterRef.current;
+    const header = poster?.parentElement;
+    const content = header?.querySelector<HTMLElement>("[data-show-header-content]");
+    if (!poster || !header || !content || typeof ResizeObserver === "undefined") return;
+
+    let frame = 0;
+    const resizePoster = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        // On phones this content uses display: contents and the poster keeps its compact width.
+        if (content.offsetHeight === 0) return;
+        // Preserve the poster ratio; bound exceptionally long summaries so text stays readable.
+        const width = Math.min(content.offsetHeight * 2 / 3, header.clientWidth * 0.3);
+        poster.style.setProperty("--show-poster-width", `${width}px`);
+      });
+    };
+    const observer = new ResizeObserver(resizePoster);
+    observer.observe(content);
+    observer.observe(header);
+    resizePoster();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
-    <Image
-      alt={`${show.title} poster`}
-      className="aspect-[2/3] w-20 shrink-0 rounded-md object-cover sm:w-24 md:row-span-3 md:w-36"
-      height={513}
-      priority
-      sizes="(min-width: 768px) 144px, (min-width: 640px) 96px, 80px"
-      src={posterUrl}
-      width={342}
-    />
+    <div className="relative aspect-[2/3] w-20 shrink-0 overflow-hidden rounded-md bg-secondary sm:w-24 md:w-[var(--show-poster-width,9rem)] md:self-start" ref={posterRef}>
+      {posterUrl ? (
+        <Image
+          alt={`${show.title} poster`}
+          className="object-cover"
+          fill
+          priority
+          sizes="(min-width: 768px) 240px, (min-width: 640px) 96px, 80px"
+          src={posterUrl}
+        />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-3xl font-semibold text-muted-foreground">
+          {show.title.charAt(0)}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -116,48 +136,39 @@ function EpisodeRow({
     ? `Available ${airDate}`
     : undefined;
   const actionDisabled = disabled || pending || (!episode.watched && !canMarkWatched);
+  const actionLabel = `${episode.watched ? "Mark unwatched" : "Mark watched"}: ${episode.episodeNumber}. ${episode.title}${releaseAvailability ? ` — ${releaseAvailability}` : ""}`;
 
   return (
-    <div className="grid scroll-mt-36 grid-cols-[minmax(0,1fr)_auto] items-start gap-2 border-t py-3 first:border-t-0 md:scroll-mt-20" id={episodeSectionId(showTmdbId, episode)} tabIndex={-1}>
-      <div className="min-w-0">
-        <div className="flex items-start gap-3">
-          <div
-            className={cn(
-              "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-medium",
-              episode.watched && "border-primary bg-primary text-primary-foreground",
-            )}
-          >
-            {episode.watched ? <Check className="size-4" /> : episode.episodeNumber}
-          </div>
-          <div className="min-w-0">
-            <h3 className="break-words text-sm font-medium leading-5 md:text-base">
-              {episode.episodeNumber}. {episode.title}
-            </h3>
-            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              {airDate ? <span>{releaseAvailability ?? airDate}</span> : null}
-              {episode.runtimeMinutes ? <span>{episode.runtimeMinutes} min</span> : null}
-            </div>
-          </div>
-        </div>
-      </div>
+    <div className="grid scroll-mt-36 grid-cols-[auto_minmax(0,1fr)] items-start gap-3 border-t py-3 first:border-t-0 md:scroll-mt-20" id={episodeSectionId(showTmdbId, episode)} tabIndex={-1}>
       <Button
-        aria-label={releaseAvailability ? `Mark watched — ${releaseAvailability}` : `${episode.watched ? "Mark unwatched" : "Mark watched"}: ${episode.episodeNumber}. ${episode.title}`}
+        aria-label={actionLabel}
         aria-pressed={episode.watched}
-        className="size-11 gap-2 px-0 md:w-36 md:px-2"
+        aria-busy={pending}
+        className="size-11 shrink-0"
         disabled={actionDisabled}
         onClick={() => {
           if (!actionDisabled) {
             onToggle(episode, nextWatched);
           }
         }}
-        title={releaseAvailability}
+        size="icon"
+        title={actionLabel}
         type="button"
         variant={episode.watched ? "outline" : "default"}
       >
-        {pending ? <Loader2 className="size-4 animate-spin" /> : episode.watched ? <RotateCcw className="size-4" /> : <Check className="size-4" />}
-        <span className="sr-only md:not-sr-only">{episode.watched ? "Mark unwatched" : "Mark watched"}</span>
+        {pending ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : episode.watched ? <Undo2 aria-hidden="true" className="size-5" /> : <Check aria-hidden="true" className="size-5" />}
+        <span className="sr-only">{episode.watched ? "Mark unwatched" : "Mark watched"}</span>
       </Button>
-      {episode.overview ? <ExpandableText className="col-span-2" label="Synopsis" preview={false} text={episode.overview} /> : null}
+      <div className="min-w-0">
+        <h3 className="break-words text-sm font-medium leading-5 md:text-base">
+          {episode.episodeNumber}. {episode.title}
+        </h3>
+        <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          {airDate ? <span>{releaseAvailability ?? airDate}</span> : null}
+          {episode.runtimeMinutes ? <span>{episode.runtimeMinutes} min</span> : null}
+        </div>
+        {episode.overview ? <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">{episode.overview}</p> : null}
+      </div>
     </div>
   );
 }
@@ -192,28 +203,32 @@ function SeasonPanel({
   const actionId = getSeasonActionId(season.seasonNumber, nextWatched);
   const isPending = pendingAction === actionId;
   const airDate = formatDateOnly(season.airDate);
-  const nextUnwatched = season.episodes.find((episode) => !episode.watched && isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone }));
+  const actionLabel = `Mark ${getSeasonLabel(season)} ${seasonComplete ? "unwatched" : "watched"}`;
 
   return (
     <Card>
-      <CardHeader className="gap-4 md:flex-row md:items-start md:justify-between md:space-y-0">
-        <div className="min-w-0">
+      <CardHeader className="flex-row items-start gap-3 space-y-0">
+        <Button
+          aria-label={actionLabel}
+          aria-busy={isPending}
+          className="size-11 shrink-0"
+          disabled={bulkDisabled || season.progress.totalEpisodeCount === 0 || isPending}
+          onClick={() => onSeasonToggle(season, nextWatched)}
+          size="icon"
+          title={actionLabel}
+          type="button"
+          variant={seasonComplete ? "outline" : "default"}
+        >
+          {isPending ? <Loader2 aria-hidden="true" className="size-5 animate-spin" /> : seasonComplete ? <Undo2 aria-hidden="true" className="size-5" /> : <CheckCheck aria-hidden="true" className="size-5" />}
+          <span className="sr-only">{seasonComplete ? "Unwatch season" : "Watch season"}</span>
+        </Button>
+        <div className="min-w-0 flex-1">
           <CardTitle>
             {getSeasonLabel(season)}
             {airDate ? <span className="ml-2 text-sm font-normal text-muted-foreground">{airDate}</span> : null}
           </CardTitle>
-          {season.overview ? <ExpandableText className="mt-2" text={season.overview} /> : null}
+          {season.overview ? <p className="mt-2 break-words text-sm leading-6 text-muted-foreground">{season.overview}</p> : null}
         </div>
-        <Button
-          className="w-full shrink-0 gap-2 sm:w-auto md:w-40"
-          disabled={bulkDisabled || season.progress.totalEpisodeCount === 0 || isPending}
-          onClick={() => onSeasonToggle(season, nextWatched)}
-          type="button"
-          variant={seasonComplete ? "outline" : "default"}
-        >
-          {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
-          {seasonComplete ? "Unwatch season" : "Watch season"}
-        </Button>
       </CardHeader>
       <CardContent className="space-y-4">
         {season.seasonNumber === 0 ? (
@@ -235,10 +250,6 @@ function SeasonPanel({
           />
         ) : (
           <div>
-            <div className="sticky top-16 z-20 mb-2 flex flex-wrap items-center justify-between gap-2 border-b bg-card/95 py-2 backdrop-blur md:top-0">
-              {nextUnwatched ? <Button onClick={() => focusSection(episodeSectionId(showTmdbId, nextUnwatched))} type="button" variant="outline">Next unwatched</Button> : null}
-              <Button onClick={() => focusSection("season-controls")} type="button" variant="ghost">Season controls</Button>
-            </div>
             {season.episodes.map((episode) => (
               <EpisodeRow
                 canMarkWatched={isShowDetailEpisodeTrackable(showTmdbId, episode, { referenceDate, timeZone })}
@@ -498,9 +509,9 @@ export function ShowDetailView({
   return (
     <section className="mx-auto flex w-full max-w-6xl flex-col gap-6">
       <Card>
-        <CardContent className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-4 p-4 sm:grid-cols-[6rem_minmax(0,1fr)] sm:p-5 md:grid-cols-[9rem_minmax(0,1fr)] md:p-6">
+        <CardContent className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-4 p-4 sm:grid-cols-[6rem_minmax(0,1fr)] sm:p-5 md:flex md:items-stretch md:p-6">
           <ShowPoster show={show} />
-          <div className="contents">
+          <div className="contents md:flex md:min-w-0 md:flex-1 md:flex-col md:gap-4 md:self-start" data-show-header-content>
             <div className="contents">
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
@@ -603,7 +614,7 @@ export function ShowDetailView({
             </div>
 
             <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-2">
-            {show.overview ? <ExpandableText className="max-w-3xl" text={show.overview} /> : null}
+            {show.overview ? <p className="max-w-3xl break-words text-sm leading-6 text-muted-foreground">{show.overview}</p> : null}
             {lastSyncedAt ? (
               <p className="mt-3 text-xs text-muted-foreground">Metadata last refreshed {lastSyncedAt}</p>
             ) : null}
@@ -639,6 +650,7 @@ export function ShowDetailView({
           autoDismissMs={message.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
           dismissible
           feedbackKey={message}
+          presentation="toast"
           tone={message.status === "error" ? "error" : "success"}
         >
           {message.message}

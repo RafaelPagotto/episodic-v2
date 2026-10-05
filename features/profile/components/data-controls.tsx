@@ -51,6 +51,7 @@ function ActionMessage({ state }: { state: ProfileDataControlState }) {
       }
       dismissible
       feedbackKey={state}
+      presentation="toast"
       tone={state.status === "error" ? "error" : "success"}
     >
       {state.message}

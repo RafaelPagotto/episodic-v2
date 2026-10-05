@@ -1,5 +1,5 @@
 import type { AuthFormState } from "@/features/auth/state";
-import { Notice } from "@/components/ui/notice";
+import { ActionFeedback } from "@/components/ui/action-feedback";
 
 type AuthFormMessageProps = {
   state: AuthFormState;
@@ -8,5 +8,9 @@ type AuthFormMessageProps = {
 export function AuthFormMessage({ state }: AuthFormMessageProps) {
   if (!state.message) return null;
 
-  return <Notice tone={state.status === "error" ? "error" : "success"}>{state.message}</Notice>;
+  return (
+    <ActionFeedback dismissible feedbackKey={state} presentation="toast" tone={state.status === "error" ? "error" : "success"}>
+      {state.message}
+    </ActionFeedback>
+  );
 }

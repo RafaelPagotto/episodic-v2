@@ -319,6 +319,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
           autoDismissMs={message.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
           dismissible
           feedbackKey={message}
+          presentation="toast"
           tone={message.status === "error" ? "error" : "success"}
         >
           {message.message}

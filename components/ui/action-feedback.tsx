@@ -3,13 +3,15 @@
 import { X } from "lucide-react";
 import type { FocusEvent, MouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
 
 import { ActionFeedbackTimer } from "./action-feedback-timer";
+import { acquireActionToastRegion } from "./action-toast-region";
 import { Notice } from "./notice";
 
-export const ACTION_FEEDBACK_AUTO_DISMISS_MS = 5_000;
+export const ACTION_FEEDBACK_AUTO_DISMISS_MS = 3_000;
 
 type ActionFeedbackProps = {
   autoDismissMs?: number;
@@ -17,7 +19,7 @@ type ActionFeedbackProps = {
   className?: string;
   dismissible?: boolean;
   feedbackKey: unknown;
-  presentation?: "inline" | "notice";
+  presentation?: "inline" | "notice" | "toast";
   tone: "error" | "success";
 };
 
@@ -33,6 +35,7 @@ export function ActionFeedback({
   tone,
 }: ActionFeedbackProps) {
   const [dismissedFeedbackKey, setDismissedFeedbackKey] = useState<unknown>(NO_DISMISSED_FEEDBACK);
+  const [toastRegion, setToastRegion] = useState<HTMLDivElement | null>(null);
   const feedbackTimerRef = useRef<ActionFeedbackTimer | null>(null);
   const latestFeedbackKeyRef = useRef(feedbackKey);
 
@@ -71,6 +74,13 @@ export function ActionFeedback({
     return () => feedbackTimer?.dispose();
   }, []);
 
+  useEffect(() => {
+    if (presentation !== "toast" || isDismissed) return;
+    const acquired = acquireActionToastRegion();
+    setToastRegion(acquired.element);
+    return acquired.release;
+  }, [presentation, isDismissed]);
+
   if (isDismissed) {
     return null;
   }
@@ -100,7 +110,10 @@ export function ActionFeedback({
       <div className="min-w-0 flex-1">{children}</div>
       <button
         aria-label="Dismiss notification"
-        className="-m-1 shrink-0 rounded-sm p-1 text-current opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className={cn(
+          "shrink-0 rounded-sm text-current opacity-70 transition hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          presentation === "toast" ? "-my-2 -mr-2 flex size-11 items-center justify-center" : "-m-1 p-1",
+        )}
         onClick={dismiss}
         type="button"
       >
@@ -109,14 +122,27 @@ export function ActionFeedback({
     </div>
   ) : children;
 
-  return (
+  const feedback = (
     <div
+      className={presentation === "toast" ? "pointer-events-auto w-full max-w-md shrink-0" : undefined}
       onBlurCapture={resumeDismissal}
       onFocusCapture={pauseDismissal}
       onMouseEnter={pauseDismissal}
       onMouseLeave={resumeDismissal}
     >
-      {presentation === "inline" ? (
+      {presentation === "toast" ? (
+        <div
+          aria-atomic="true"
+          className={cn(
+            "pointer-events-auto w-full max-w-md rounded-lg border bg-card/85 px-4 py-3 text-sm leading-6 text-card-foreground shadow-xl backdrop-blur-md",
+            tone === "error" ? "border-destructive/50" : "border-primary/40",
+            className,
+          )}
+          role={tone === "error" ? "alert" : "status"}
+        >
+          {content}
+        </div>
+      ) : presentation === "inline" ? (
         <div
           className={cn(
             "text-sm",
@@ -134,4 +160,7 @@ export function ActionFeedback({
       )}
     </div>
   );
+
+  // Escape layout containment on Dashboard and take no space in the page's flow.
+  return presentation === "toast" ? (toastRegion ? createPortal(feedback, toastRegion) : null) : feedback;
 }

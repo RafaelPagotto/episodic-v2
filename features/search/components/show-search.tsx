@@ -257,8 +257,23 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
       ) : null}
 
       {status === "error" ? (
-        <Notice tone="error">{errorMessage}</Notice>
+        <ActionFeedback dismissible feedbackKey={errorMessage} presentation="toast" tone="error">
+          {errorMessage}
+        </ActionFeedback>
       ) : null}
+
+      {Object.entries(cardMessages).map(([tmdbId, cardMessage]) => (
+        <ActionFeedback
+          key={tmdbId}
+          autoDismissMs={cardMessage.status === "success" ? ACTION_FEEDBACK_AUTO_DISMISS_MS : undefined}
+          dismissible
+          feedbackKey={cardMessage}
+          presentation="toast"
+          tone={cardMessage.status === "error" ? "error" : "success"}
+        >
+          {cardMessage.message}
+        </ActionFeedback>
+      ))}
 
       {status === "success" && visibleResults.length === 0 ? (
         <EmptyState
@@ -272,7 +287,6 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
           {visibleResults.map((show) => {
             const isAdded = addedShowIds.has(show.tmdbId);
             const isAdding = pendingTmdbId === show.tmdbId;
-            const cardMessage = cardMessages[show.tmdbId];
             const detailHref = getShowDetailHref(show.tmdbId);
             const year = getYear(show.firstAirDate);
 
@@ -307,21 +321,6 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
                     </div>
 
                     <ExpandableText className="text-xs sm:text-sm" label="Synopsis" text={show.overview || "No overview available."} />
-
-                    {cardMessage ? (
-                      <ActionFeedback
-                        autoDismissMs={
-                          cardMessage.status === "success"
-                            ? ACTION_FEEDBACK_AUTO_DISMISS_MS
-                            : undefined
-                        }
-                        feedbackKey={cardMessage}
-                        presentation="inline"
-                        tone={cardMessage.status === "error" ? "error" : "success"}
-                      >
-                        {cardMessage.message}
-                      </ActionFeedback>
-                    ) : null}
 
                     <div className="mt-auto">
                       {isAdded ? (
