@@ -48,6 +48,8 @@ People encounter Episodic through different screen sizes, input methods, abiliti
 
 Keyboard focus, readable contrast and access without hover are part of clear communication. Controls should have understandable accessible names. Icons can reduce clutter when their meaning is recognizable; visible words remain useful when an icon would leave people guessing.
 
+Library cards keep their four actions together in one row. Below 640px, those controls use 36px height, 16px icons and equal flexible widths capped at 44px. This makes the relationship between actions clearer and reduces card height while preserving every action, accessible name and safeguard. The smaller touch targets are a deliberate density trade-off to review on narrow phones. At larger widths, the existing 44px controls remain; this sizing is local to Library card actions.
+
 Start with understandable content and dependable core interactions, then add enhancements that improve them. Where practical, an enhancement's absence or failure should leave the underlying task usable. This approach is informed by Jeremy Keith's [Resilient Web Design](https://resilientwebdesign.com/), particularly its discussion of [layers and progressive enhancement](https://resilientwebdesign.com/chapter5/).
 
 For Episodic, tracking correctness and data completeness are foundational. A faster or simpler interface cannot justify incorrect progress. Consequential actions need clear explanations and safeguards appropriate to their scope; a single episode toggle and deleting a library have different consequences.

@@ -62,6 +62,9 @@ type LibraryMessage = {
   status: "error" | "success";
 };
 
+const LIBRARY_CARD_ACTION_CLASS_NAME =
+  "h-9 w-full min-w-0 max-w-11 [&_svg]:size-4 sm:h-11 sm:w-11 sm:[&_svg]:size-5";
+
 function LibraryGridPosterLink({ show }: { show: LibraryShowCard }) {
   const href = getShowDetailHref(show.tmdbId);
   const posterUrl = getTmdbImageUrl(show.posterPath, "w342");
@@ -351,7 +354,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
       ) : null}
 
       {visibleShows.length > 0 ? (
-        // Phones use two compact columns and a two-row action layout. Wider
+        // Phones use two compact columns with a single row of compact actions. Wider
         // layouts need 220px per column plus 12px gaps, with tracks capped at 260px.
         <div className="grid min-w-0 grid-cols-[repeat(2,minmax(0,12.5rem))] justify-center gap-2 max-[299px]:grid-cols-[minmax(0,12.5rem)] sm:grid-cols-[repeat(var(--library-columns),minmax(0,16.25rem))] sm:gap-3 [--library-columns:1] [@container_(min-width:28.25rem)]:[--library-columns:2] [@container_(min-width:42.75rem)]:[--library-columns:3] [@container_(min-width:57.25rem)]:[--library-columns:4] [@container_(min-width:71.75rem)]:[--library-columns:5]">
           {visibleShows.map((show) => {
@@ -398,9 +401,10 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                       watchedEpisodeCount={show.watchedEpisodeCount}
                     />
 
-                    <div className="mt-auto grid grid-cols-2 justify-items-center gap-2 sm:grid-cols-4 sm:justify-items-start sm:gap-1">
+                    <div className="mt-auto grid grid-cols-4 justify-items-center gap-0.5 sm:justify-items-start sm:gap-1">
                       <Button
                         aria-label={`Mark all main episodes of ${show.title} watched`}
+                        className={LIBRARY_CARD_ACTION_CLASS_NAME}
                         disabled={Boolean(pendingAction) || isPending || show.totalEpisodeCount === 0 || showComplete}
                         onClick={() => handleMarkWatched(show)}
                         size="icon"
@@ -418,6 +422,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
                             : `Add ${show.title} to favourites`
                         }
                         aria-pressed={show.favourite}
+                        className={LIBRARY_CARD_ACTION_CLASS_NAME}
                         disabled={isPending}
                         onClick={() => handleFavourite(show)}
                         size="icon"
@@ -434,6 +439,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
 
                       <Button
                         aria-label={show.status === "dropped" ? `Resume ${show.title}` : `Drop ${show.title}`}
+                        className={LIBRARY_CARD_ACTION_CLASS_NAME}
                         disabled={isPending}
                         onClick={() => handleDropToggle(show)}
                         size="icon"
@@ -452,6 +458,7 @@ export function LibraryView({ initialShows, loadError, preferences }: LibraryVie
 
                       <Button
                         aria-label={`Remove ${show.title} from library`}
+                        className={LIBRARY_CARD_ACTION_CLASS_NAME}
                         disabled={isPending}
                         onClick={() => handleRemove(show)}
                         size="icon"
