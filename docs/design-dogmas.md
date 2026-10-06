@@ -54,6 +54,8 @@ Start with understandable content and dependable core interactions, then add enh
 
 For Episodic, tracking correctness and data completeness are foundational. A faster or simpler interface cannot justify incorrect progress. Consequential actions need clear explanations and safeguards appropriate to their scope; a single episode toggle and deleting a library have different consequences.
 
+Progress percentages use whole numbers, but rounding must not imply completion: incomplete episode progress is capped at 99%, and 100% is reserved for all eligible episodes being watched. Episode counts remain the source of truth for completion and tracking status.
+
 ## Apply judgment and preserve the reasoning
 
 Begin a change by identifying the user's task and the difficulty being addressed. Explain how the proposed design helps, what information it communicates and what attention or complexity it adds. Judge it in the contexts where it will actually be used.

@@ -77,6 +77,42 @@ function season(
 }
 
 describe("show detail view model", () => {
+  it("updates show and season percentages when the final episode is marked and unmarked", () => {
+    const episodes = Array.from({ length: 1181 }, (_, index) =>
+      episode(1, index + 1, { watched: index < 1180 }),
+    );
+    const progress = {
+      displayStatus: "watching" as const,
+      progressPercentage: 99,
+      status: "watching" as const,
+      totalEpisodeCount: 1181,
+      watchedEpisodeCount: 1180,
+    };
+    const show = showDetail({ progress, seasons: [season(1, episodes, { progress })] });
+    const options = { referenceDate: "2026-10-06" };
+
+    const marked = applyOptimisticEpisodeWatched(show, { "1:1181": true }, options);
+    expect(marked.progress).toMatchObject({
+      progressPercentage: 100,
+      watchedEpisodeCount: 1181,
+      displayStatus: "caught_up",
+      status: "watched",
+    });
+    expect(marked.seasons[0].progress).toMatchObject({ progressPercentage: 100, watchedEpisodeCount: 1181 });
+    expect(marked.seasons[0].episodes[1180].watched).toBe(true);
+
+    const unmarked = applyOptimisticEpisodeWatched(marked, { "1:1181": false }, options);
+    expect(unmarked.progress).toMatchObject({
+      progressPercentage: 99,
+      watchedEpisodeCount: 1180,
+      displayStatus: "watching",
+      status: "watching",
+    });
+    expect(unmarked.seasons[0].progress).toMatchObject({ progressPercentage: 99, watchedEpisodeCount: 1180 });
+    expect(unmarked.seasons[0].episodes[1180].watched).toBe(false);
+    expect(show.progress.watchedEpisodeCount).toBe(1180);
+  });
+
   it("updates main and season progress while leaving Specials out of main progress", () => {
     const show = showDetail({
       progress: { displayStatus: "watching", progressPercentage: 50, status: "watching", totalEpisodeCount: 2, watchedEpisodeCount: 1 },

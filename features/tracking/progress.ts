@@ -125,7 +125,12 @@ export function calculateProgressPercentage({
     return 0;
   }
 
-  return Math.min(100, Math.round((watchedEpisodeCount / totalEpisodeCount) * 100));
+  if (watchedEpisodeCount >= totalEpisodeCount) {
+    return 100;
+  }
+
+  // Whole-number rounding must not imply completion while episodes remain unwatched.
+  return Math.min(99, Math.round((watchedEpisodeCount / totalEpisodeCount) * 100));
 }
 
 export function getNextEpisodeToWatch<TEpisode extends EpisodeProgress>(

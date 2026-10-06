@@ -156,6 +156,19 @@ describe("tracking progress helpers", () => {
     expect(calculateProgressPercentage({ totalEpisodeCount: 3, watchedEpisodeCount: 4 })).toBe(100);
   });
 
+  it.each([
+    [1181, 1179],
+    [1181, 1180],
+    [200, 199],
+    [200, 198],
+  ])("keeps incomplete progress below 100%% for %i total and %i watched episodes", (totalEpisodeCount, watchedEpisodeCount) => {
+    expect(calculateProgressPercentage({ totalEpisodeCount, watchedEpisodeCount })).toBe(99);
+  });
+
+  it("shows 100% when every episode is watched", () => {
+    expect(calculateProgressPercentage({ totalEpisodeCount: 1181, watchedEpisodeCount: 1181 })).toBe(100);
+  });
+
   it("finds the first unwatched episode in season order", () => {
     const episodes = [episode(2, 1), episode(1, 2), episode(1, 1)];
     const nextEpisode = getNextEpisodeToWatch(episodes, [watched(1, 1)]);

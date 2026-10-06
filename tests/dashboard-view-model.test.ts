@@ -93,6 +93,26 @@ function record({
 }
 
 describe("dashboard view model", () => {
+  it("keeps a nearly finished long show in Continue Watching with a percentage below 100", () => {
+    const show = record({
+      showTmdbId: 37854,
+      title: "One Piece",
+      status: "watching",
+      episodes: Array.from({ length: 1181 }, (_, index) => episode(37854, 1, index + 1)),
+      watchedEpisodes: Array.from({ length: 1179 }, (_, index) => watched(37854, 1, index + 1)),
+    });
+
+    const items = getContinueWatchingItems([show], preferences());
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      progressPercentage: 99,
+      totalEpisodeCount: 1181,
+      watchedEpisodeCount: 1179,
+      displayStatus: "watching",
+      nextEpisode: { seasonNumber: 1, episodeNumber: 1180 },
+    });
+  });
+
   it("summarizes library counts using derived progress status", () => {
     const summary = createDashboardSummary([
       record({ showTmdbId: 1, status: "watchlist" }),
