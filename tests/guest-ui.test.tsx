@@ -17,6 +17,7 @@ vi.mock("../features/guest/actions", () => ({ startGuestDemoAction: actions.star
 vi.mock("@/features/auth/state", async () => vi.importActual("../features/auth/state"));
 vi.mock("@/features/auth/components/auth-submit-button", async () => vi.importActual("../features/auth/components/auth-submit-button"));
 vi.mock("@/features/auth/components/turnstile", async () => vi.importActual("../features/auth/components/turnstile"));
+vi.mock("@/features/auth/components/shared-auth-captcha", async () => vi.importActual("../features/auth/components/shared-auth-captcha"));
 vi.mock("@/features/auth/components/auth-field", () => ({ AuthField: ({ label, name }: { label: string; name: string }) => <label>{label}<input name={name} /></label> }));
 vi.mock("@/features/auth/components/auth-form-message", () => ({ AuthFormMessage: ({ state }: { state: AuthFormState }) => state.message ? <p role={state.status === "error" ? "alert" : "status"}>{state.message}</p> : null }));
 vi.mock("@/components/ui/button", () => ({ Button: ({ variant: _variant, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }) => { void _variant; return <button {...props} />; } }));

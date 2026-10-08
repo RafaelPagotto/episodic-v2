@@ -88,6 +88,14 @@ direct SQL permissions, forged user metadata, expiry/missing registration,
 transaction rollback/retry, reset invariants, catalogue restriction, permanent
 metadata demand, cleanup cascades/dry-run/100-account cap and converted protection.
 Action/service/UI tests cover cached search/add, safe feedback and CAPTCHA tokens.
+Sign-in and demo entry share one Turnstile widget while retaining separate forms.
+Either submission reserves its single-use token, disables both submit buttons,
+and refreshes the check after completion, including failed attempts. Signup and
+recovery retain their standalone checks; guest resume does not require a new one.
+For deterministic browser QA, run `node tests/browser/shared-captcha-fixture.mjs`
+after a build. It serves the real client forms with fake CAPTCHA/actions on a
+loopback-only ephemeral port, never calls Supabase, and exposes test controls for
+pending completion, expiry, errors and attempted concurrent submission.
 
 Before production enablement, run live Supabase staging QA with two browsers and
 a permanent account: signin/signup/recovery; CAPTCHA rejection/expiry/retry; demo

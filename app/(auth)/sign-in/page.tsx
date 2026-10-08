@@ -5,6 +5,7 @@ import type { AuthFormState } from "@/features/auth/state";
 import { DemoEntry } from "@/features/guest/components/demo-entry";
 import { isDemoEnabled } from "@/features/guest/server";
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
+import { SharedAuthCaptcha } from "@/features/auth/components/shared-auth-captcha";
 
 type SignInPageProps = {
   searchParams?: Promise<{
@@ -39,6 +40,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   const initialState = getCallbackErrorState(queryParams?.error);
   const client = await createOptionalSupabaseServerClient();
   const user = client ? (await client.auth.getUser()).data.user : null;
+  const demoEnabled = isDemoEnabled();
 
   return (
     <Card>
@@ -47,8 +49,13 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         <CardDescription>Use your account to open your library.</CardDescription>
       </CardHeader>
       <CardContent>
-        {user?.is_anonymous ? <p className="text-sm text-muted-foreground">Your demo is expired or not ready. Resume it if available, or exit to sign in.</p> : <SignInForm initialState={initialState} />}
-        {isDemoEnabled() || user?.is_anonymous ? <DemoEntry enabled={isDemoEnabled()} hasGuestSession={Boolean(user?.is_anonymous)} /> : null}
+        {user?.is_anonymous ? <>
+          <p className="text-sm text-muted-foreground">Your demo is expired or not ready. Resume it if available, or exit to sign in.</p>
+          <DemoEntry enabled={demoEnabled} hasGuestSession />
+        </> : demoEnabled ? <SharedAuthCaptcha>
+          <SignInForm initialState={initialState} />
+          <DemoEntry />
+        </SharedAuthCaptcha> : <SignInForm initialState={initialState} />}
       </CardContent>
     </Card>
   );

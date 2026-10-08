@@ -10,14 +10,15 @@ import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
 import { AuthField } from "./auth-field";
 import { AuthFormMessage } from "./auth-form-message";
 import { AuthSubmitButton } from "./auth-submit-button";
-import { Turnstile } from "./turnstile";
+import { AuthCaptcha, useSharedCaptchaAction } from "./shared-auth-captcha";
 
 type SignInFormProps = {
   initialState?: AuthFormState;
 };
 
 export function SignInForm({ initialState = INITIAL_AUTH_FORM_STATE }: SignInFormProps) {
-  const [state, formAction] = useActionState(signInAction, initialState);
+  const captcha = useSharedCaptchaAction(signInAction);
+  const [state, formAction] = useActionState(captcha.action, initialState);
 
   return (
     <form action={formAction} className="space-y-5">
@@ -42,8 +43,8 @@ export function SignInForm({ initialState = INITIAL_AUTH_FORM_STATE }: SignInFor
           Forgot password?
         </Link>
       </div>
-      <Turnstile />
-      <AuthSubmitButton pendingText="Signing in...">Sign in</AuthSubmitButton>
+      <AuthCaptcha />
+      <AuthSubmitButton disabled={captcha.disabled} pendingText="Signing in...">Sign in</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         New here?{" "}
         <Link className="text-link font-medium text-primary" href="/sign-up">

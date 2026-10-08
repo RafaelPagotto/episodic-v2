@@ -71,6 +71,10 @@ Try demo is secondary to sign-in. Demo search shows the available cached titles
 immediately rather than asking visitors to guess which titles are available.
 CAPTCHA appears only when configured and uses the provider's familiar widget;
 its third-party appearance is a security requirement, not decorative UI.
+Sign-in and Try demo share one security check above the sign-in action rather
+than duplicating widgets. Their forms stay separate so demo entry never requires
+credentials. Either submission temporarily disables both actions and the check
+refreshes afterward; a single-use token is never reused between requests.
 
 Use these questions to examine the reasoning and the result:
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Script from "next/script";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useFormStatus } from "react-dom";
 
 type TurnstileApi = {
@@ -11,7 +11,7 @@ type TurnstileApi = {
 };
 declare global { interface Window { turnstile?: TurnstileApi } }
 
-export function Turnstile() {
+export function Turnstile({ onTokenChange, resetKey }: { onTokenChange?: (token: string) => void; resetKey?: number } = {}) {
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const container = useRef<HTMLDivElement>(null);
   const widget = useRef<string | null>(null);
@@ -20,6 +20,11 @@ export function Turnstile() {
   const [failed, setFailed] = useState(false);
   const [compact, setCompact] = useState(false);
   const { pending } = useFormStatus();
+
+  const updateToken = useCallback((value: string) => {
+    setToken(value);
+    onTokenChange?.(value);
+  }, [onTokenChange]);
 
   useEffect(() => {
     const element = container.current;
@@ -34,22 +39,29 @@ export function Turnstile() {
   useEffect(() => {
     if (!ready || !siteKey || !container.current || !window.turnstile) return;
     const api = window.turnstile;
-    setToken("");
+    updateToken("");
     widget.current = api.render(container.current, {
       sitekey: siteKey, size: compact ? "compact" : "flexible", "response-field": false,
-      callback: (value: string) => { setToken(value); setFailed(false); },
-      "expired-callback": () => setToken(""),
-      "error-callback": () => { setToken(""); setFailed(true); },
+      callback: (value: string) => { updateToken(value); setFailed(false); },
+      "expired-callback": () => updateToken(""),
+      "error-callback": () => { updateToken(""); setFailed(true); },
     });
     return () => { if (widget.current !== null) api.remove(widget.current); widget.current = null; };
-  }, [ready, siteKey, compact]);
+  }, [ready, siteKey, compact, updateToken]);
 
   useEffect(() => {
-    if (pending && widget.current !== null) {
-      setToken("");
+    if (!onTokenChange && pending && widget.current !== null) {
+      updateToken("");
       window.turnstile?.reset(widget.current);
     }
-  }, [pending]);
+  }, [pending, onTokenChange, updateToken]);
+
+  useEffect(() => {
+    if (resetKey !== undefined && widget.current !== null) {
+      updateToken("");
+      window.turnstile?.reset(widget.current);
+    }
+  }, [resetKey, updateToken]);
 
   if (!siteKey) return null;
   return (
@@ -57,7 +69,7 @@ export function Turnstile() {
       <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive"
         onLoad={() => setReady(true)} onReady={() => setReady(true)} onError={() => setFailed(true)} />
       <div ref={container} aria-label="Security check" className="min-h-16 [@container(max-width:299px)]:min-h-36" />
-      <input name="captchaToken" type="hidden" value={token} />
+      {!onTokenChange ? <input name="captchaToken" type="hidden" value={token} /> : null}
       {failed ? <p role="alert" className="text-sm text-destructive">Security check unavailable. Reload and try again.</p> : null}
     </div>
   );
