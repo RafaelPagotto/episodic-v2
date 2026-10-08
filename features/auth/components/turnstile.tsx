@@ -55,7 +55,7 @@ export function Turnstile() {
   return (
     <div className="min-w-0 [container-type:inline-size]">
       <Script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" strategy="afterInteractive"
-        onReady={() => setReady(true)} onError={() => setFailed(true)} />
+        onLoad={() => setReady(true)} onReady={() => setReady(true)} onError={() => setFailed(true)} />
       <div ref={container} aria-label="Security check" className="min-h-16 [@container(max-width:299px)]:min-h-36" />
       <input name="captchaToken" type="hidden" value={token} />
       {failed ? <p role="alert" className="text-sm text-destructive">Security check unavailable. Reload and try again.</p> : null}

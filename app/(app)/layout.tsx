@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 
 import { AppShell } from "@/components/app-shell";
 import { requireCurrentUser } from "@/features/auth/session";
@@ -26,7 +26,7 @@ export default async function ProtectedAppLayout({ children }: ProtectedAppLayou
       <TimeZoneInitializer persistedTimeZone={persistedTimeZone} />
       <AppShell userEmail={user.is_anonymous ? "Guest demo" : user.email}>
         {guest ? <GuestControls expiresAt={guest.expires_at} timeZone={resolveTimeZone(persistedTimeZone)} /> : null}
-        {children}
+        {guest ? <Fragment key={guest.seeded_at}>{children}</Fragment> : children}
       </AppShell>
     </>
   );
