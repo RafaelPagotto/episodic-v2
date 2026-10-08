@@ -9,6 +9,7 @@ import {
 } from "@/lib/supabase/server";
 
 import type { AuthFormState } from "./state";
+import { isCaptchaRequired, readCaptchaToken } from "./captcha";
 import {
   readFormString,
   validateDisplayName,
@@ -63,6 +64,8 @@ function authOperationError(
 }
 
 export async function signInAction(_state: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const captchaToken = readCaptchaToken(formData);
+  if (isCaptchaRequired() && !captchaToken) return authError("Complete the security check and try again.");
   const email = readFormString(formData, "email");
   const password = readFormString(formData, "password", { trim: false });
   const fieldErrors: Record<string, string> = {};
@@ -86,10 +89,11 @@ export async function signInAction(_state: AuthFormState, formData: FormData): P
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      ...(captchaToken ? { options: { captchaToken } } : {}),
     });
 
     if (error) {
-      return authError(error.message || "Unable to sign in.");
+      return authError("Unable to sign in. Check your credentials and security check.");
     }
   } catch (error) {
     return authOperationError(error, "Unable to sign in.");
@@ -99,6 +103,8 @@ export async function signInAction(_state: AuthFormState, formData: FormData): P
 }
 
 export async function signUpAction(_state: AuthFormState, formData: FormData): Promise<AuthFormState> {
+  const captchaToken = readCaptchaToken(formData);
+  if (isCaptchaRequired() && !captchaToken) return authError("Complete the security check and try again.");
   const name = readFormString(formData, "name");
   const email = readFormString(formData, "email");
   const password = readFormString(formData, "password", { trim: false });
@@ -136,6 +142,7 @@ export async function signUpAction(_state: AuthFormState, formData: FormData): P
       email,
       password,
       options: {
+        captchaToken,
         data: {
           display_name: name,
         },
@@ -144,7 +151,7 @@ export async function signUpAction(_state: AuthFormState, formData: FormData): P
     });
 
     if (error) {
-      return authError(error.message || "Unable to create account.");
+      return authError("Unable to create account. Check your details and security check.");
     }
 
     hasSession = Boolean(data.session);
@@ -163,6 +170,8 @@ export async function forgotPasswordAction(
   _state: AuthFormState,
   formData: FormData,
 ): Promise<AuthFormState> {
+  const captchaToken = readCaptchaToken(formData);
+  if (isCaptchaRequired() && !captchaToken) return authError("Complete the security check and try again.");
   const email = readFormString(formData, "email");
   const emailError = validateEmail(email);
 
@@ -178,10 +187,11 @@ export async function forgotPasswordAction(
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: getAuthCallbackUrl("/reset-password"),
+      captchaToken,
     });
 
     if (error) {
-      return authError(error.message || "Unable to send reset link.");
+      return authError("Unable to send reset link. Please try again.");
     }
   } catch (error) {
     return authOperationError(
@@ -221,12 +231,14 @@ export async function resetPasswordAction(
   }
 
   try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user || user.is_anonymous) return authError("Sign in with a permanent account to update your password.");
     const { error } = await supabase.auth.updateUser({
       password,
     });
 
     if (error) {
-      return authError(error.message || "Unable to update password.");
+      return authError("Unable to update password. Please try again.");
     }
   } catch (error) {
     return authOperationError(

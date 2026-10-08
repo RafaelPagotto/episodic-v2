@@ -2,6 +2,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { SignInForm } from "@/features/auth/components/sign-in-form";
 import { redirectAuthenticatedUser } from "@/features/auth/session";
 import type { AuthFormState } from "@/features/auth/state";
+import { DemoEntry } from "@/features/guest/components/demo-entry";
+import { isDemoEnabled } from "@/features/guest/server";
+import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
 
 type SignInPageProps = {
   searchParams?: Promise<{
@@ -34,6 +37,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   await redirectAuthenticatedUser();
   const queryParams = await searchParams;
   const initialState = getCallbackErrorState(queryParams?.error);
+  const client = await createOptionalSupabaseServerClient();
+  const user = client ? (await client.auth.getUser()).data.user : null;
 
   return (
     <Card>
@@ -42,7 +47,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         <CardDescription>Use your account to open your library.</CardDescription>
       </CardHeader>
       <CardContent>
-        <SignInForm initialState={initialState} />
+        {user?.is_anonymous ? <p className="text-sm text-muted-foreground">Your demo is expired or not ready. Resume it if available, or exit to sign in.</p> : <SignInForm initialState={initialState} />}
+        {isDemoEnabled() || user?.is_anonymous ? <DemoEntry enabled={isDemoEnabled()} hasGuestSession={Boolean(user?.is_anonymous)} /> : null}
       </CardContent>
     </Card>
   );

@@ -30,6 +30,12 @@ class FakeSupabase {
   failCall: number | null = null;
   nullCall: number | null = null;
 
+  rpc(name: string) {
+    expect(name).toBe("metadata_refresh_eligible_library_rows");
+    // The service-only RPC enforces non-dropped permanent ownership in SQL.
+    return this.from("user_shows").neq("status", "dropped");
+  }
+
   from(table: Table) {
     if (table !== "user_shows" && table !== "shows") throw new Error("Unexpected table access");
     let columns = "";

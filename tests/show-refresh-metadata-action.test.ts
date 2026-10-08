@@ -257,7 +257,7 @@ function setupRefreshAction({
   db?: FakeDatabase;
   metadataClient?: FakeSupabase | null;
   tmdbShow?: NormalizedTmdbFullShow;
-  user?: { id: string } | null;
+  user?: { id: string; is_anonymous?: boolean } | null;
   userClient?: FakeSupabase;
 } = {}) {
   userClient.auth.getUser.mockResolvedValue({
@@ -677,6 +677,13 @@ describe("refreshTmdbShowMetadata", () => {
 });
 
 describe("refreshShowMetadataAction", () => {
+  it("rejects guests before metadata client creation or TMDB requests", async () => {
+    setupRefreshAction({ user: { id: USER_ID, is_anonymous: true } });
+    expect(await refreshShowMetadataAction(SHOW_TMDB_ID)).toEqual({ status: "error", message: "Metadata refresh is unavailable in the demo." });
+    expect(createOptionalSupabaseServiceRoleClientMock).not.toHaveBeenCalled();
+    expect(getFullTmdbShowDetailsMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
   it("requires authentication", async () => {
     setupRefreshAction({ user: null });
 

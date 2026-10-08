@@ -215,6 +215,13 @@ npm audit --omit=dev
 
 The production audit currently has a documented moderate Next.js bundled PostCSS finding. See `docs/dependency-audit.md`.
 
+## Guest Demo Rollout
+
+Guest demo is disabled by default. Follow [Guest Demo](guest-demo.md) for the
+required migration-first deployment, cached-catalogue bootstrap, auth-wide
+Turnstile configuration, staging QA and enablement order. The new guest cleanup
+cron runs daily at 06:00 UTC; the existing metadata refresh schedule is unchanged.
+
 ## Security Notes
 
 - Keep `SUPABASE_SERVICE_ROLE_KEY` server-only.

@@ -64,6 +64,14 @@ Existing decisions remain the shared starting point. When a better application o
 
 ## Review checklist
 
+Guest sessions use an unframed, restrained identity/expiration band with an Exit
+demo command and a collapsed Reset demo confirmation. Expiration and reset copy
+explain data loss; the typed confirmation protects the visitor's demo changes.
+Try demo is secondary to sign-in. Demo search shows the available cached titles
+immediately rather than asking visitors to guess which titles are available.
+CAPTCHA appears only when configured and uses the provider's familiar widget;
+its third-party appearance is a security requirement, not decorative UI.
+
 Use these questions to examine the reasoning and the result:
 
 - What task does this help someone understand or complete?

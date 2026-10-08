@@ -30,6 +30,8 @@ import { SearchSynopsis } from "./search-synopsis";
 import { FADED_SHOW_CARD_CLASS_NAME } from "../../preferences/card-appearance";
 
 type ShowSearchProps = {
+  demoMode?: boolean;
+  demoResults?: NormalizedTmdbSearchResult[];
   initialAddedShowIds: number[];
   preferences: UserPreferences;
 };
@@ -95,7 +97,9 @@ function ShowPoster({
   return <div className="overflow-hidden rounded-md bg-secondary">{content}</div>;
 }
 
-export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps) {
+const NO_DEMO_RESULTS: NormalizedTmdbSearchResult[] = [];
+
+export function ShowSearch({ initialAddedShowIds, preferences, demoMode = false, demoResults = NO_DEMO_RESULTS }: ShowSearchProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const submittedQuery = (searchParams.get("q") ?? "").trim();
@@ -106,10 +110,10 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
   const [pendingTmdbId, setPendingTmdbId] = useState<number | null>(null);
   const [query, setQuery] = useState(submittedQuery);
   const [searchAttempt, setSearchAttempt] = useState(0);
-  const [results, setResults] = useState<NormalizedTmdbSearchResult[]>(() => readSearchResults(submittedQuery) ?? []);
+  const [results, setResults] = useState<NormalizedTmdbSearchResult[]>(() => demoMode ? (submittedQuery ? [] : demoResults) : readSearchResults(submittedQuery) ?? []);
   const [status, setStatus] = useState<SearchStatus>(() => {
-    if (!submittedQuery) return "idle";
-    const cached = readSearchResults(submittedQuery);
+    if (!submittedQuery) return demoMode ? "success" : "idle";
+    const cached = demoMode ? null : readSearchResults(submittedQuery);
     return cached ? (cached.length ? "success" : "empty") : "loading";
   });
   const visibleResults = results.filter((show) =>
@@ -121,11 +125,11 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
     setErrorMessage("");
     setCardMessages({});
     if (!submittedQuery) {
-      setResults([]);
-      setStatus("idle");
+      setResults(demoMode ? demoResults : []);
+      setStatus(demoMode ? "success" : "idle");
       return;
     }
-    const cached = readSearchResults(submittedQuery);
+    const cached = demoMode ? null : readSearchResults(submittedQuery);
     if (cached) {
       setResults(cached);
       setStatus(cached.length ? "success" : "empty");
@@ -142,7 +146,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
         if (!response.ok) throw new Error(await readSearchError(response));
         const body = (await response.json()) as NormalizedTmdbSearchResponse;
         if (cancelled) return;
-        rememberSearchResults(submittedQuery, body.results);
+        if (!demoMode) rememberSearchResults(submittedQuery, body.results);
         setResults(body.results);
         setStatus(body.results.length ? "success" : "empty");
       } catch (error) {
@@ -153,7 +157,7 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
       }
     })();
     return () => { cancelled = true; controller.abort(); };
-  }, [submittedQuery, searchAttempt]);
+  }, [submittedQuery, searchAttempt, demoMode, demoResults]);
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -222,10 +226,10 @@ export function ShowSearch({ initialAddedShowIds, preferences }: ShowSearchProps
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
-            aria-label="Search TV shows"
+            aria-label={demoMode ? "Search demo shows" : "Search TV shows"}
             className="field-focus h-11 w-full rounded-md border bg-background px-9 py-2 text-base placeholder:text-muted-foreground sm:text-sm"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search TV shows"
+            placeholder={demoMode ? "Search demo shows" : "Search TV shows"}
             type="search"
             value={query}
           />

@@ -18,6 +18,7 @@ type ShowDetailPageState = {
   referenceDate: string;
   show: ShowDetail | null;
   timeZone: string;
+  canRefreshMetadata?: boolean;
 };
 
 async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageState> {
@@ -60,6 +61,7 @@ async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageSta
 
     return {
       errorMessage: "",
+      canRefreshMetadata: !user.is_anonymous,
       referenceDate: dateOptions.referenceDate,
       show,
       timeZone: dateOptions.timeZone,
@@ -75,7 +77,7 @@ async function getShowDetailPageState(tmdbId: number): Promise<ShowDetailPageSta
 }
 
 export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }: ShowDetailPageContentProps) {
-  const { errorMessage, referenceDate, show, timeZone } = await getShowDetailPageState(tmdbId);
+  const { errorMessage, referenceDate, show, timeZone, canRefreshMetadata } = await getShowDetailPageState(tmdbId);
 
   if (errorMessage || !show) {
     return (
@@ -91,6 +93,7 @@ export async function ShowDetailPageContent({ seasonQueryParam = null, tmdbId }:
 
   return (
     <ShowDetailView
+      canRefreshMetadata={canRefreshMetadata}
       initialSeasonParam={seasonQueryParam}
       key={show.tmdbId}
       referenceDate={referenceDate}

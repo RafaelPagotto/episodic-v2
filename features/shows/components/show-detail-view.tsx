@@ -45,6 +45,7 @@ import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgressActio
 import { EpisodeMutationQueue } from "../episode-mutation-queue";
 
 type ShowDetailViewProps = {
+  canRefreshMetadata?: boolean;
   initialSeasonParam?: string | null;
   referenceDate?: string;
   show: ShowDetail;
@@ -269,6 +270,7 @@ function SeasonPanel({
 }
 
 export function ShowDetailView({
+  canRefreshMetadata = true,
   initialSeasonParam = null,
   referenceDate,
   show,
@@ -593,7 +595,7 @@ export function ShowDetailView({
                     <RotateCcw className="size-4" />
                   )}
                 </Button>
-                <Button
+                {canRefreshMetadata ? <Button
                   aria-label={`Refresh metadata for ${show.title}`}
                   aria-busy={pendingAction === "show:refresh"}
                   className="size-11 [&_svg]:size-5"
@@ -609,7 +611,7 @@ export function ShowDetailView({
                   ) : (
                     <RefreshCw className="size-4" />
                   )}
-                </Button>
+                </Button> : null}
               </div>
             </div>
 

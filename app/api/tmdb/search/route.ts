@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import { getCurrentUser } from "@/features/auth/session";
 import { consumeTmdbRateLimit } from "@/lib/tmdb/rate-limit";
 import { searchTmdbShows } from "@/lib/tmdb/server";
+import { searchDemoCatalogue } from "@/features/guest/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   jsonError,
   readIncludeAdultParam,
@@ -47,6 +49,10 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    if (user.is_anonymous) {
+      const client = await createSupabaseServerClient();
+      return Response.json(await searchDemoCatalogue(client, queryResult.query, pageResult.page), { headers: { "Cache-Control": "no-store" } });
+    }
     const response = await searchTmdbShows({
       includeAdult: readIncludeAdultParam(request.nextUrl.searchParams),
       language: languageResult.language,

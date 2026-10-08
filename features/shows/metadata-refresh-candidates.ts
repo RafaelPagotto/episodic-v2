@@ -40,9 +40,8 @@ async function loadEligibleShowIds(metadataClient: MetadataClient): Promise<numb
 
   while (true) {
     const { data, error } = await metadataClient
-      .from("user_shows")
+      .rpc("metadata_refresh_eligible_library_rows")
       .select("show_tmdb_id")
-      .neq("status", "dropped")
       .order("id", { ascending: true })
       .range(rangeStart, rangeStart + PAGE_SIZE - 1);
 

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { signInAction, signOutAction } from "../features/auth/actions";
+import { forgotPasswordAction, signInAction, signOutAction, signUpAction } from "../features/auth/actions";
 import { INITIAL_AUTH_FORM_STATE } from "../features/auth/state";
 
 const redirectMock = vi.hoisted(() =>
@@ -89,5 +89,30 @@ describe("auth actions", () => {
 
     expect(createOptionalWriteRequiredClientMock).toHaveBeenCalledTimes(1);
     expect(signOut).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires CAPTCHA when configured and forwards its token to password sign-in", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "test-site-key");
+    try {
+      expect((await signInAction(INITIAL_AUTH_FORM_STATE, signInFormData())).status).toBe("error");
+      expect(createWriteRequiredClientMock).not.toHaveBeenCalled();
+      const signInWithPassword = vi.fn().mockResolvedValue({ error: null });
+      createWriteRequiredClientMock.mockResolvedValue({ auth: { signInWithPassword } });
+      const data = signInFormData(); data.set("captchaToken", "test-captcha");
+      await expect(signInAction(INITIAL_AUTH_FORM_STATE, data)).rejects.toThrow("redirect:/library");
+      expect(signInWithPassword).toHaveBeenCalledWith(expect.objectContaining({ options: { captchaToken: "test-captcha" } }));
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("passes CAPTCHA to signup and password recovery without exposing provider errors", async () => {
+    const signUp = vi.fn().mockResolvedValue({ data: { session: null }, error: null });
+    const resetPasswordForEmail = vi.fn().mockResolvedValue({ error: { message: "private internal error" } });
+    createWriteRequiredClientMock.mockResolvedValue({ auth: { signUp, resetPasswordForEmail } });
+    const data = signInFormData(); data.set("name", "Guest Tester"); data.set("password", "Correct-password123"); data.set("confirmPassword", "Correct-password123"); data.set("captchaToken", "test-captcha");
+    expect((await signUpAction(INITIAL_AUTH_FORM_STATE, data)).status).toBe("success");
+    expect(signUp).toHaveBeenCalledWith(expect.objectContaining({ options: expect.objectContaining({ captchaToken: "test-captcha" }) }));
+    const result = await forgotPasswordAction(INITIAL_AUTH_FORM_STATE, data);
+    expect(resetPasswordForEmail).toHaveBeenCalledWith("viewer@example.com", expect.objectContaining({ captchaToken: "test-captcha" }));
+    expect(result.status).toBe("error"); expect(result.message).not.toContain("private internal");
   });
 });

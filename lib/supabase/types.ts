@@ -5,6 +5,18 @@ type NoArgs = Record<PropertyKey, never>;
 export type Database = {
   public: {
     Tables: {
+      guest_sessions: {
+        Row: { user_id: string; expires_at: string; seeded_at: string | null; last_reset_at: string | null };
+        Insert: { user_id: string; expires_at: string; seeded_at?: string | null; last_reset_at?: string | null };
+        Update: { expires_at?: string; seeded_at?: string | null; last_reset_at?: string | null };
+        Relationships: [];
+      };
+      demo_catalogue: {
+        Row: { show_tmdb_id: number; display_order: number };
+        Insert: { show_tmdb_id: number; display_order: number };
+        Update: { display_order?: number };
+        Relationships: [];
+      };
       episodes: {
         Row: {
           air_date: string | null;
@@ -387,6 +399,18 @@ export type Database = {
     };
     Views: Record<string, never>;
     Functions: {
+      seed_guest_demo: {
+        Args: { p_user_id: string; p_timezone: string; p_expected_timezone: string | null; p_library: Json; p_watched: Json; p_reset: boolean };
+        Returns: undefined;
+      };
+      cleanup_guest_accounts: {
+        Args: { p_dry_run: boolean };
+        Returns: { eligible: number; deleted: number; remaining: number }[];
+      };
+      metadata_refresh_eligible_library_rows: {
+        Args: NoArgs;
+        Returns: { id: number; show_tmdb_id: number }[];
+      };
       handle_new_user: {
         Args: NoArgs;
         Returns: unknown;

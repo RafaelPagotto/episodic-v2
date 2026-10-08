@@ -4,6 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isGuestReady } from "@/features/guest/server";
 
 import {
   isClearWatchedHistoryConfirmationValid,
@@ -59,7 +60,7 @@ async function getAuthenticatedActionContext(): Promise<ProfileActionContext> {
     error,
   } = await supabase.auth.getUser();
 
-  if (error || !user) {
+  if (error || !user || (user.is_anonymous && !await isGuestReady(supabase, user))) {
     return {
       error: actionError("Sign in to manage your data."),
     };

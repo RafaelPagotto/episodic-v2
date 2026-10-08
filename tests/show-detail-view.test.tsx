@@ -225,11 +225,12 @@ function renderShowDetail(
   show: ShowDetail = showDetail(),
   timeZone = "UTC",
   referenceDate?: string,
+  canRefreshMetadata = true,
 ) {
   hookState.stateIndex = 0;
   hookState.refIndex = 0;
   hookState.effectIndex = 0;
-  const tree = ShowDetailView({ referenceDate, show, timeZone });
+  const tree = ShowDetailView({ referenceDate, show, timeZone, canRefreshMetadata });
   const effects = hookState.pendingEffects.splice(0);
   effects.forEach(({ index, effect }) => {
     const cleanup = effect();
@@ -388,6 +389,12 @@ describe("ShowDetailView refresh metadata UI", () => {
       expect(button.props.size).toBe("icon");
       expect(getText(button.props.children as React.ReactNode)).toBe("");
     }
+  });
+
+  it("hides metadata refresh in demo mode while retaining tracking actions", () => {
+    const tree = renderShowDetail(showDetail(), "UTC", undefined, false);
+    expect(() => findButton("Refresh metadata", tree)).toThrow("Button not found");
+    for (const title of ["Favourite", "Drop", "Mark watched", "Reset"]) expect(findButton(title, tree)).toBeDefined();
   });
 
   it.each([false, true])("uses Library's outline favourite style for favourite=%s", (favourite) => {

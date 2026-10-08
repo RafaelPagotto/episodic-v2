@@ -10,6 +10,7 @@ import { getFullTmdbShowDetails } from "@/lib/tmdb/server";
 
 import { addTmdbShowToLibrary, getUserLibraryShowIds } from "./data";
 import type { AddShowActionResult } from "./types";
+import { addCachedDemoShow } from "@/features/guest/server";
 
 function addShowError(message: string, tmdbId?: number): AddShowActionResult {
   return {
@@ -49,6 +50,14 @@ export async function addShowToLibraryAction(tmdbId: number): Promise<AddShowAct
         status: "duplicate",
         tmdbId,
       };
+    }
+
+    if (user.is_anonymous) {
+      const result = await addCachedDemoShow(userClient, user, tmdbId);
+      revalidatePath("/search");
+      revalidatePath("/library");
+      return { status: result.duplicate ? "duplicate" : "success", tmdbId,
+        message: result.duplicate ? "This show is already in your library." : `Added ${result.title} to your library.` };
     }
 
     const metadataClient = createOptionalSupabaseServiceRoleClient();

@@ -1,7 +1,8 @@
 import * as React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ShowSearch } from "../features/search/components/show-search";
-import { forgetSearchResults } from "../features/search/search-session";
+import { forgetSearchResults, rememberSearchResults } from "../features/search/search-session";
+import type { NormalizedTmdbSearchResult } from "../lib/tmdb/types";
 import { DEFAULT_USER_PREFERENCES } from "../features/preferences/defaults";
 
 const hooks = vi.hoisted(() => ({ index: 0, states: [] as unknown[], deps: undefined as readonly unknown[] | undefined, cleanup: undefined as (() => void) | undefined, effects: [] as Array<() => void | (() => void)> }));
@@ -45,9 +46,9 @@ function nodes(node: React.ReactNode): React.ReactElement<Record<string, unknown
   const element = node as React.ReactElement<Record<string, unknown>>;
   return [element, ...nodes(element.props.children as React.ReactNode)];
 }
-function render(ids: number[] = [], preferences = DEFAULT_USER_PREFERENCES) {
+function render(ids: number[] = [], preferences = DEFAULT_USER_PREFERENCES, demoMode = false, demoResults?: NormalizedTmdbSearchResult[]) {
   hooks.index = 0;
-  const tree = ShowSearch({ initialAddedShowIds: ids, preferences });
+  const tree = ShowSearch({ initialAddedShowIds: ids, preferences, demoMode, demoResults });
   for (const effect of hooks.effects.splice(0)) hooks.cleanup = effect() || undefined;
   return tree;
 }
@@ -61,6 +62,23 @@ async function settle() { for (let i = 0; i < 8; i++) await Promise.resolve(); }
 function resetMount() { hooks.cleanup?.(); hooks.states = []; hooks.deps = undefined; hooks.cleanup = undefined; hooks.effects = []; }
 
 describe("Search restoration and request safety", () => {
+  it("shows the cached catalogue immediately in demo mode without a live search request", () => {
+    const demo = { ...result, tmdbId: 106379, title: "Fallout" } as NormalizedTmdbSearchResult;
+    const tree = render([], DEFAULT_USER_PREFERENCES, true, [demo]);
+    expect(input(tree).props["aria-label"]).toBe("Search demo shows");
+    expect(hooks.states[6]).toEqual([demo]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not restore a permanent user's cached results in demo mode", async () => {
+    rememberSearchResults("Star Trek", [result as NormalizedTmdbSearchResult]);
+    navigation.href = "http://localhost/search?q=Star%20Trek";
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
+    render([], DEFAULT_USER_PREFERENCES, true);
+    await settle();
+    expect(fetchMock).toHaveBeenCalled();
+    expect(hooks.states[6]).toEqual([]);
+  });
   beforeEach(() => {
     (globalThis as typeof globalThis & { React: typeof React }).React = React;
     resetMount(); navigation.href = "http://localhost/search";

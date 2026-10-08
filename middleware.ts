@@ -4,7 +4,7 @@ import { updateSupabaseSession } from "@/lib/supabase/middleware";
 
 export function middleware(request: NextRequest) {
   // This endpoint authenticates with CRON_SECRET and must not read user sessions.
-  if (request.nextUrl.pathname === "/api/cron/refresh-metadata") {
+  if (request.nextUrl.pathname === "/api/cron/refresh-metadata" || request.nextUrl.pathname === "/api/cron/cleanup-guests") {
     return NextResponse.next();
   }
   return updateSupabaseSession(request);

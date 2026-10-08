@@ -32,8 +32,9 @@ async function getProfilePageState(): Promise<ProfilePageState> {
   }
 
   try {
+    const data = await getUserProfileData(supabase, user.id, user.email);
     return {
-      data: await getUserProfileData(supabase, user.id, user.email),
+      data: user.is_anonymous ? { ...data, email: "Guest demo" } : data,
       errorMessage: "",
     };
   } catch (error) {

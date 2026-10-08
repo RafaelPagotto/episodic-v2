@@ -9,6 +9,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
 import { AuthField } from "./auth-field";
 import { AuthFormMessage } from "./auth-form-message";
 import { AuthSubmitButton } from "./auth-submit-button";
+import { Turnstile } from "./turnstile";
 
 export function ForgotPasswordForm() {
   const [state, formAction] = useActionState(forgotPasswordAction, INITIAL_AUTH_FORM_STATE);
@@ -24,6 +25,7 @@ export function ForgotPasswordForm() {
         placeholder="you@example.com"
         type="email"
       />
+      <Turnstile />
       <AuthSubmitButton pendingText="Sending link...">Send reset link</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         Remembered it?{" "}

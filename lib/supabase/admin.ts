@@ -24,7 +24,8 @@ function readSupabaseServiceRoleEnv() {
 }
 
 // Server-only service-role client for trusted writes to shared metadata tables.
-// Never import this from Client Components or use it for user-owned mutations.
+// Never import this from Client Components. Guest initialization/cleanup uses only
+// narrowly scoped service-only RPCs; ordinary library/progress mutations use RLS clients.
 export function createOptionalSupabaseServiceRoleClient() {
   const env = readSupabaseServiceRoleEnv();
 

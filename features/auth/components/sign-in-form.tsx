@@ -10,6 +10,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
 import { AuthField } from "./auth-field";
 import { AuthFormMessage } from "./auth-form-message";
 import { AuthSubmitButton } from "./auth-submit-button";
+import { Turnstile } from "./turnstile";
 
 type SignInFormProps = {
   initialState?: AuthFormState;
@@ -41,6 +42,7 @@ export function SignInForm({ initialState = INITIAL_AUTH_FORM_STATE }: SignInFor
           Forgot password?
         </Link>
       </div>
+      <Turnstile />
       <AuthSubmitButton pendingText="Signing in...">Sign in</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         New here?{" "}

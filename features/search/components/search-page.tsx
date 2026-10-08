@@ -5,10 +5,14 @@ import type { UserPreferences } from "@/features/preferences/types";
 
 import { getUserLibraryShowIds } from "../data";
 import { ShowSearch } from "./show-search";
+import { searchDemoCatalogue } from "@/features/guest/server";
+import type { NormalizedTmdbSearchResult } from "@/lib/tmdb/types";
 
 type SearchPageState = {
   initialAddedShowIds: number[];
   preferences: UserPreferences;
+  demoMode?: boolean;
+  demoResults?: NormalizedTmdbSearchResult[];
 };
 
 async function getSearchPageState(): Promise<SearchPageState> {
@@ -41,6 +45,8 @@ async function getSearchPageState(): Promise<SearchPageState> {
     return {
       initialAddedShowIds,
       preferences,
+      demoMode: Boolean(user.is_anonymous),
+      demoResults: user.is_anonymous ? (await searchDemoCatalogue(supabase, "", 1)).results : undefined,
     };
   } catch {
     return {
@@ -51,11 +57,11 @@ async function getSearchPageState(): Promise<SearchPageState> {
 }
 
 export async function SearchPageContent() {
-  const { initialAddedShowIds, preferences } = await getSearchPageState();
+  const { initialAddedShowIds, preferences, demoMode, demoResults } = await getSearchPageState();
 
   return (
     <section aria-label="Search" className="mx-auto flex w-full max-w-6xl flex-col gap-6">
-      <ShowSearch initialAddedShowIds={initialAddedShowIds} preferences={preferences} />
+      <ShowSearch initialAddedShowIds={initialAddedShowIds} preferences={preferences} demoMode={demoMode} demoResults={demoResults} />
     </section>
   );
 }

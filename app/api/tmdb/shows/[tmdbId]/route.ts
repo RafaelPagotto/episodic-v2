@@ -26,6 +26,7 @@ export async function GET(request: NextRequest, { params }: TmdbShowDetailsRoute
     return jsonError(401, "TMDB_UNAUTHORIZED", "Sign in to load TMDB details.");
   }
 
+  if (user.is_anonymous) return jsonError(403, "DEMO_UNAVAILABLE", "Live TMDB details are unavailable in the demo.");
   const rateLimitResult = consumeTmdbRateLimit("details", user.id);
 
   if (!rateLimitResult.allowed) {

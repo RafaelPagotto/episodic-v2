@@ -206,6 +206,7 @@ export async function refreshShowMetadataAction(tmdbId: number): Promise<ShowPro
       return context.error;
     }
 
+    if (context.user.is_anonymous) return showActionError("Metadata refresh is unavailable in the demo.");
     const userShow = await getOwnedUserShow(context.supabase, context.user.id, tmdbId);
 
     if (!userShow) {

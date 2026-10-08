@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createOptionalSupabaseServerClient } from "@/lib/supabase/server";
+import { isGuestReady } from "@/features/guest/server";
 
 export async function getCurrentUser() {
   const supabase = await createOptionalSupabaseServerClient();
@@ -16,6 +17,10 @@ export async function getCurrentUser() {
 
   if (error) {
     return null;
+  }
+
+  if (user?.is_anonymous) {
+    try { if (!await isGuestReady(supabase, user)) return null; } catch { return null; }
   }
 
   return user;

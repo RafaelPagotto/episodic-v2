@@ -9,6 +9,7 @@ import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
 import { AuthField } from "./auth-field";
 import { AuthFormMessage } from "./auth-form-message";
 import { AuthSubmitButton } from "./auth-submit-button";
+import { Turnstile } from "./turnstile";
 
 export function SignUpForm() {
   const [state, formAction] = useActionState(signUpAction, INITIAL_AUTH_FORM_STATE);
@@ -46,6 +47,7 @@ export function SignUpForm() {
         name="confirmPassword"
         type="password"
       />
+      <Turnstile />
       <AuthSubmitButton pendingText="Creating account...">Create account</AuthSubmitButton>
       <p className="text-center text-sm text-muted-foreground">
         Already have an account?{" "}
