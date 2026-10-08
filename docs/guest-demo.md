@@ -63,6 +63,23 @@ The flag gates entry, not existing sessions or daily cleanup.
    part of tests/builds. [Anonymous Auth](https://supabase.com/docs/guides/auth/auth-anonymous),
    [CAPTCHA configuration](https://supabase.com/docs/guides/auth/auth-captcha).
 
+## Local Development
+
+Vercel environment settings do not populate the gitignored `.env.local`. To show
+demo entry locally, set `DEMO_ENABLED=true` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+to the public key of the widget configured for the target Supabase project.
+Restart `npm run dev` after changing these settings if it does not reload them.
+Never copy the Turnstile secret into the app; it belongs in Supabase Auth settings.
+
+Prefer a separate local/staging Supabase backend with a matching test widget and
+test secret. A dummy site key cannot validate against a real production secret.
+When deliberately using production Supabase locally, the real widget must allow
+the local hostname, and guest creation/reset/tracking affect real production
+accounts. Adding `localhost` or `127.0.0.1` to a production widget is an explicit
+hostname-allowlist exception, not the recommended isolated development setup.
+Do not disable native CAPTCHA or change the production secret for local tests.
+See [Cloudflare testing guidance](https://developers.cloudflare.com/turnstile/troubleshooting/testing/).
+
 ## Cleanup And Monitoring
 
 `GET /api/cron/cleanup-guests` checks exact `Authorization: Bearer <CRON_SECRET>`
