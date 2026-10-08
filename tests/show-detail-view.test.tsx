@@ -391,6 +391,23 @@ describe("ShowDetailView refresh metadata UI", () => {
     }
   });
 
+  it("renders creator, stars, genres and the country-specific age rating", () => {
+    const tree = renderShowDetail(showDetail({ information: {
+      creators: ["Christian Linke", "Alex Yee"], stars: ["Hailee Steinfeld", "Ella Purnell"],
+      genres: ["Animation", "Drama"], ageRating: "TV-14 (US)",
+    } }));
+    for (const text of ["Creators", "Christian Linke, Alex Yee", "Stars", "Hailee Steinfeld, Ella Purnell", "Genres", "Animation, Drama", "Age rating", "TV-14 (US)"]) {
+      expect(hasText(text, tree)).toBe(true);
+    }
+  });
+
+  it("explicitly labels missing show information without inventing a rating", () => {
+    const tree = renderShowDetail(showDetail({ information: { creators: [], stars: [], genres: [], ageRating: null } }));
+    const information = findElements(tree, (element) => element.type === "dl")[0];
+    const markup = renderToStaticMarkup(information);
+    expect(markup.match(/>Not available<\/dd>/g)).toHaveLength(4);
+  });
+
   it("hides metadata refresh in demo mode while retaining tracking actions", () => {
     const tree = renderShowDetail(showDetail(), "UTC", undefined, false);
     expect(() => findButton("Refresh metadata", tree)).toThrow("Button not found");

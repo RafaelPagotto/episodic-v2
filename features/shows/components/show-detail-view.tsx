@@ -617,6 +617,18 @@ export function ShowDetailView({
 
             <div className="col-span-2 min-w-0 md:col-span-1 md:col-start-2">
             {show.overview ? <p className="max-w-3xl break-words text-sm leading-6 text-muted-foreground">{show.overview}</p> : null}
+            {show.information ? (
+              <dl className="mt-3 grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-sm leading-6">
+                <dt className="text-muted-foreground">{show.information.creators.length > 1 ? "Creators" : "Creator"}</dt>
+                <dd className="min-w-0 break-words">{show.information.creators.join(", ") || "Not available"}</dd>
+                <dt className="text-muted-foreground">Stars</dt>
+                <dd className="min-w-0 break-words">{show.information.stars.join(", ") || "Not available"}</dd>
+                <dt className="text-muted-foreground">{show.information.genres.length === 1 ? "Genre" : "Genres"}</dt>
+                <dd className="min-w-0 break-words">{show.information.genres.join(", ") || "Not available"}</dd>
+                <dt className="text-muted-foreground">Age rating</dt>
+                <dd className="min-w-0 break-words">{show.information.ageRating || "Not available"}</dd>
+              </dl>
+            ) : null}
             {lastSyncedAt ? (
               <p className="mt-3 text-xs text-muted-foreground">Metadata last refreshed {lastSyncedAt}</p>
             ) : null}

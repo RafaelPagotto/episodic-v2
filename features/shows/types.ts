@@ -31,6 +31,7 @@ export type ShowDetailSeason = {
 };
 
 export type ShowDetail = {
+  information?: ShowInformation;
   backdropPath: string | null;
   firstAirDate: string | null;
   favourite: boolean;
@@ -42,6 +43,13 @@ export type ShowDetail = {
   title: string;
   tmdbId: number;
   tmdbStatus: string | null;
+};
+
+export type ShowInformation = {
+  creators: string[];
+  stars: string[];
+  genres: string[];
+  ageRating: string | null;
 };
 
 export type ShowProgressActionResult = {

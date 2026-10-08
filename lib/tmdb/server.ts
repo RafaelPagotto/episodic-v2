@@ -156,6 +156,7 @@ async function mapInBatches<TInput, TOutput>(
 
 export async function getTmdbShowDetails(tmdbId: number, { language, requestControl }: GetTmdbShowDetailsOptions = {}) {
   return requestTmdb<TmdbTvDetailsResponse>(`/tv/${tmdbId}`, {
+    append_to_response: "aggregate_credits,content_ratings",
     language: language || DEFAULT_TMDB_LANGUAGE,
   }, requestControl);
 }

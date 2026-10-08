@@ -115,6 +115,17 @@ function normalizeShow(details: TmdbTvDetailsResponse): NormalizedTmdbShow {
   const title = nullableString(details.name) ?? nullableString(details.original_name) ?? "Untitled show";
 
   return {
+    creators: normalizePeople(details.created_by),
+    stars: normalizePeople(
+      [...arrayOrEmpty(details.aggregate_credits?.cast)].sort(
+        (left, right) => (nullableInteger(left?.order) ?? Infinity) - (nullableInteger(right?.order) ?? Infinity),
+      ),
+    ).slice(0, 6),
+    contentRatings: arrayOrEmpty(details.content_ratings?.results).flatMap((entry) => {
+      const countryCode = nullableString(entry?.iso_3166_1)?.toUpperCase();
+      const rating = nullableString(entry?.rating);
+      return countryCode && /^[A-Z]{2}$/.test(countryCode) && rating ? [{ countryCode, rating }] : [];
+    }),
     backdropPath: nullableString(details.backdrop_path),
     episodeRunTime: arrayOrEmpty(details.episode_run_time).filter(
       (runtime): runtime is number => Number.isInteger(runtime) && runtime > 0,
@@ -146,6 +157,17 @@ function normalizeShow(details: TmdbTvDetailsResponse): NormalizedTmdbShow {
     voteAverage: nullableNumber(details.vote_average),
     voteCount: nullableInteger(details.vote_count),
   };
+}
+
+function normalizePeople(people: Array<{ id?: number; name?: string }> | undefined) {
+  const seen = new Set<number>();
+  return arrayOrEmpty(people).flatMap((person) => {
+    const id = positiveInteger(person?.id);
+    const name = nullableString(person?.name);
+    if (!id || !name || seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, name }];
+  });
 }
 
 function normalizeEpisode(

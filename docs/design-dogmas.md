@@ -56,6 +56,8 @@ For Episodic, tracking correctness and data completeness are foundational. A fas
 
 Progress percentages use whole numbers, but rounding must not imply completion: incomplete episode progress is capped at 99%, and 100% is reserved for all eligible episodes being watched. Episode counts remain the source of truth for completion and tracking status.
 
+Show headers present creator, leading cast, genres and age rating as compact labeled text. Age ratings prefer the US classification and always identify the country, including when another country's rating is used as a fallback. Missing information is stated rather than inferred. These details use cached metadata so browsing does not add live API requests.
+
 ## Apply judgment and preserve the reasoning
 
 Begin a change by identifying the user's task and the difficulty being addressed. Explain how the proposed design helps, what information it communicates and what attention or complexity it adds. Judge it in the contexts where it will actually be used.

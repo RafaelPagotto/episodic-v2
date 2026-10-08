@@ -280,6 +280,21 @@ function compareRows(left: object, right: object, orders: QueryOrder[]) {
 }
 
 describe("show detail data loading", () => {
+  it("loads show information from the cache without changing user progress", async () => {
+    const db = new FakeSupabase();
+    seedShow(db, {
+      episodes: [episodeRow(1, 1), episodeRow(1, 2)],
+      seasons: [seasonRow(1, 2)],
+      watchedEpisodes: [watchedEpisodeRow(1, 1)],
+      show: { ...showRow("Test Show"), genres: [{ id: 18, name: "Drama" }], metadata: {
+        creators: [{ id: 1, name: "Creator" }], stars: [{ id: 2, name: "Star" }],
+        contentRatings: [{ countryCode: "US", rating: "TV-14" }],
+      } },
+    });
+    const show = await getUserShowDetail(client(db), USER_ID, SHOW_TMDB_ID);
+    expect(show?.information).toEqual({ creators: ["Creator"], stars: ["Star"], genres: ["Drama"], ageRating: "TV-14 (US)" });
+    expect(show?.progress).toMatchObject({ watchedEpisodeCount: 1, totalEpisodeCount: 2, progressPercentage: 50 });
+  });
   it("retains all episode presentation fields beyond the first page", async () => {
     const db = new FakeSupabase();
     const episodes = Array.from({ length: 1001 }, (_, index) => episodeRow(1, index + 1));

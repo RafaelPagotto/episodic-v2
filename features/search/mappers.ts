@@ -19,6 +19,9 @@ export function mapTmdbShowToShowInsert(
     last_air_date: show.lastAirDate,
     last_synced_at: lastSyncedAt,
     metadata: {
+      creators: (show.creators ?? []).map(({ id, name }) => ({ id, name })),
+      stars: (show.stars ?? []).map(({ id, name }) => ({ id, name })),
+      contentRatings: (show.contentRatings ?? []).map(({ countryCode, rating }) => ({ countryCode, rating })),
       episodeRunTime: show.episodeRunTime,
       homepage: show.homepage,
       inProduction: show.inProduction,

@@ -46,6 +46,9 @@ const tmdbShow: NormalizedTmdbFullShow = {
     },
   ],
   show: {
+    creators: [{ id: 1, name: "Vince Gilligan" }],
+    stars: [{ id: 2, name: "Bryan Cranston" }],
+    contentRatings: [{ countryCode: "US", rating: "TV-MA" }],
     backdropPath: "/backdrop.jpg",
     episodeRunTime: [45],
     firstAirDate: "2008-01-20",
@@ -82,6 +85,9 @@ describe("search mappers", () => {
       last_synced_at: syncedAt,
       last_air_date: "2013-09-29",
       metadata: {
+        creators: [{ id: 1, name: "Vince Gilligan" }],
+        stars: [{ id: 2, name: "Bryan Cranston" }],
+        contentRatings: [{ countryCode: "US", rating: "TV-MA" }],
         episodeRunTime: [45],
         numberOfEpisodes: 62,
         originCountries: ["US"],

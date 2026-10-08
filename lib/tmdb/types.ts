@@ -68,6 +68,9 @@ export type TmdbTvSeasonDetailsResponse = TmdbTvSeasonSummaryResponse & {
 };
 
 export type TmdbTvDetailsResponse = {
+  created_by?: Array<{ id?: number; name?: string }>;
+  aggregate_credits?: { cast?: Array<{ id?: number; name?: string; order?: number }> };
+  content_ratings?: { results?: Array<{ iso_3166_1?: string; rating?: string }> };
   backdrop_path?: string | null;
   episode_run_time?: number[];
   first_air_date?: string;
@@ -162,6 +165,9 @@ export type NormalizedTmdbSeason = {
 };
 
 export type NormalizedTmdbShow = {
+  creators?: Array<{ id: number; name: string }>;
+  stars?: Array<{ id: number; name: string }>;
+  contentRatings?: Array<{ countryCode: string; rating: string }>;
   backdropPath: string | null;
   episodeRunTime: number[];
   firstAirDate: string | null;

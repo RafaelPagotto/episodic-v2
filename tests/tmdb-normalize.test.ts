@@ -70,6 +70,14 @@ describe("TMDB normalization", () => {
         episode_run_time: [45],
         first_air_date: "2011-04-17",
         genres: [{ id: 18, name: "Drama" }],
+        created_by: [{ id: 1, name: " Creator " }, { id: 1, name: "Creator" }, { name: "Invalid" }],
+        aggregate_credits: { cast: [
+          { id: 2, name: "Second star", order: 1 },
+          { id: 3, name: "First star", order: 0 },
+          { id: 2, name: "Duplicate", order: 2 },
+          { id: 4, name: " " },
+        ] },
+        content_ratings: { results: [{ iso_3166_1: "US", rating: "TV-MA" }, { iso_3166_1: "BR", rating: "" }] },
         id: 1399,
         in_production: false,
         languages: ["en"],
@@ -124,6 +132,9 @@ describe("TMDB normalization", () => {
     );
 
     expect(result.show).toMatchObject({
+      creators: [{ id: 1, name: "Creator" }],
+      stars: [{ id: 3, name: "First star" }, { id: 2, name: "Second star" }],
+      contentRatings: [{ countryCode: "US", rating: "TV-MA" }],
       genres: [{ id: 18, name: "Drama" }],
       networks: [{ id: 49, logoPath: "/hbo.png", name: "HBO", originCountry: "US" }],
       numberOfEpisodes: 73,

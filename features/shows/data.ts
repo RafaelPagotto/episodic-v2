@@ -21,6 +21,7 @@ import {
 } from "../tracking";
 
 import type { ShowDetail, ShowDetailEpisode, ShowDetailSeason, ShowProgress } from "./types";
+import { getShowInformation } from "./information";
 
 type EpisodicSupabaseClient = SupabaseClient<Database>;
 type EpisodeRow = Database["public"]["Tables"]["episodes"]["Row"];
@@ -157,6 +158,7 @@ function createShowDetail(
 
   return {
     backdropPath: show?.backdrop_path ?? null,
+    information: getShowInformation(show?.metadata, show?.genres),
     favourite: userShow.favourite,
     firstAirDate: show?.first_air_date ?? null,
     lastSyncedAt: show?.last_synced_at ?? null,

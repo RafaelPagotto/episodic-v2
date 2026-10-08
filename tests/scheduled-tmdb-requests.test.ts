@@ -13,6 +13,18 @@ beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(now); });
 afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("cron-scoped TMDB request controls", () => {
+  it("fetches credits and ratings in the existing show details request", async () => {
+    vi.stubEnv("TMDB_API_KEY", "test-key");
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      expect(url.pathname).toBe("/3/tv/42");
+      expect(url.searchParams.get("append_to_response")).toBe("aggregate_credits,content_ratings");
+      return Response.json({ id: 42, name: "Show", created_by: [{ id: 1, name: "Creator" }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getTmdbShowDetails(42)).toMatchObject({ created_by: [{ id: 1, name: "Creator" }] });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("paces starts at 100ms apart, preserving concurrent in-flight requests", async () => {
     const control = createScheduledTmdbRequestControl(now + 240000);
     const starts: number[] = [];
