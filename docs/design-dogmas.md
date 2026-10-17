@@ -50,6 +50,12 @@ Keyboard focus, readable contrast and access without hover are part of clear com
 
 Library cards keep their four actions together in one row. Below 640px, those controls use 36px height, 16px icons and equal flexible widths capped at 44px. This makes the relationship between actions clearer and reduces card height while preserving every action, accessible name and safeguard. The smaller touch targets are a deliberate density trade-off to review on narrow phones. At larger widths, the existing 44px controls remain; this sizing is local to Library card actions.
 
+Dashboard Upcoming Episodes uses up to four columns according to available content width, with fewer columns in narrower containers to preserve readable episode information.
+
+Dashboard Start Watching fits up to twelve poster columns within the 1,152px content limit. Posters keep their 2:3 ratio and use smaller columns as space permits; empty columns retain their space so a short watchlist does not enlarge the artwork. Hover or keyboard focus reveals the show title at the centre of the poster over a 50% opaque black overlay, keeping the text fully opaque. This replaces the vignette on these posters so the darkening does not stack. Touch devices show this title treatment without requiring hover so the navigation target remains identifiable.
+
+Continue Watching posters share a hover and keyboard-focus area with their watched action. Both reveal together over the same 50% opaque black overlay, replacing the vignette; moving onto the button keeps the overlay visible. Touch devices keep the action and overlay visible, and saving keeps both visible until the request settles. The poster remains a navigation link and the watched button remains a separate tracking action.
+
 Start with understandable content and dependable core interactions, then add enhancements that improve them. Where practical, an enhancement's absence or failure should leave the underlying task usable. This approach is informed by Jeremy Keith's [Resilient Web Design](https://resilientwebdesign.com/), particularly its discussion of [layers and progressive enhancement](https://resilientwebdesign.com/chapter5/).
 
 For Episodic, tracking correctness and data completeness are foundational. A faster or simpler interface cannot justify incorrect progress. Consequential actions need clear explanations and safeguards appropriate to their scope; a single episode toggle and deleting a library have different consequences.

@@ -104,7 +104,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
   return (
     <Link
       aria-label={`Start watching ${item.showTitle} at ${episodeCode}`}
-      className="poster-link group/start relative min-w-0"
+      className="poster-link group/start relative min-w-0 [&_.poster-surface::after]:hidden"
       href={item.detailHref}
     >
       <div className="poster-surface aspect-[2/3] bg-secondary">
@@ -113,7 +113,7 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
             alt={`${item.showTitle} poster`}
             className="h-full w-full object-cover"
             height={513}
-            sizes="(max-width: 639px) 50vw, 180px"
+            sizes="(max-width: 639px) 33vw, 96px"
             src={posterUrl}
             width={342}
           />
@@ -125,9 +125,9 @@ function StartWatchingCard({ item }: { item: StartWatchingItem }) {
         {posterUrl ? (
           <span
             aria-hidden="true"
-            className="pointer-events-none invisible absolute inset-x-0 bottom-0 z-10 border-t bg-card px-2 py-2 text-center text-xs font-medium leading-snug text-card-foreground group-hover/start:visible group-focus-visible/start:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible"
+            className="pointer-events-none invisible absolute inset-0 z-10 flex items-center justify-center bg-black/50 p-2 text-center text-xs font-medium leading-snug text-white group-hover/start:visible group-focus-visible/start:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible"
           >
-            <span className="line-clamp-3 break-words">{item.showTitle}</span>
+            <span className="max-h-full overflow-hidden break-words">{item.showTitle}</span>
           </span>
         ) : null}
       </div>
@@ -176,15 +176,22 @@ function ContinueWatchingCard({
   const nextEpisodeLabel = `S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}`;
 
   return (
-    <Card className={cn("group/continue overflow-hidden", item.isFaded && FADED_SHOW_CARD_CLASS_NAME)}>
+    <Card className={cn("overflow-hidden", item.isFaded && FADED_SHOW_CARD_CLASS_NAME)}>
       <CardContent className="flex items-center gap-3 p-3 sm:p-4">
-        <div className="relative w-20 shrink-0">
+        <div className="group/continue relative w-20 shrink-0 [&_.poster-surface::after]:hidden">
           <ContinuePoster item={item} />
+          <span
+            aria-hidden="true"
+            className={cn(
+              "pointer-events-none absolute inset-0 z-10 rounded-md bg-black/50",
+              !pending && "invisible group-hover/continue:visible group-focus-within/continue:visible [@media(hover:none)]:visible [@media(pointer:coarse)]:visible",
+            )}
+          />
           <Button
             aria-label={pending ? `Marking ${item.title} ${nextEpisodeLabel} watched` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
             aria-busy={pending}
             className={cn(
-              "absolute bottom-1.5 left-1/2 z-10 -translate-x-1/2 shadow-md",
+              "absolute bottom-1.5 left-1/2 z-20 -translate-x-1/2 shadow-md",
               // Hover-capable pointers reveal on hover/focus; touch keeps the action visible.
               !pending && "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/continue:pointer-events-auto group-hover/continue:opacity-100 group-focus-within/continue:pointer-events-auto group-focus-within/continue:opacity-100",
             )}
@@ -393,7 +400,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-2 [@container_(min-width:40rem)]:grid-cols-2">
+          <div className="grid gap-2 [@container_(min-width:40rem)]:grid-cols-2 [@container_(min-width:54rem)]:grid-cols-3 [@container_(min-width:70rem)]:grid-cols-4">
             {data.upcomingEpisodes.map((item) => (
               <UpcomingEpisodeCard key={`${item.tmdbId}:${item.seasonNumber}:${item.episodeNumber}`} item={item} />
             ))}
@@ -413,7 +420,7 @@ export function DashboardView({ data }: DashboardViewProps) {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,8rem),1fr))] gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,5rem),1fr))] gap-3">
             {data.startWatching.map((item) => (
               <StartWatchingCard key={item.tmdbId} item={item} />
             ))}
