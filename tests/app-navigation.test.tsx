@@ -20,7 +20,8 @@ function markup(collapsed: boolean, userEmail: string | null = "rafael@example.c
   const html = renderToStaticMarkup(<AppNavigation collapsed={collapsed} onToggleSidebar={vi.fn()} userEmail={userEmail} />);
   return {
     desktop: html.match(/<aside[\s\S]*?<\/aside>/)?.[0] ?? "",
-    mobile: html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "",
+    header: html.match(/<header[\s\S]*?<\/header>/)?.[0] ?? "",
+    mobile: html.match(/<nav[^>]*class="app-bottom-navigation[\s\S]*?<\/nav>/)?.[0] ?? "",
   };
 }
 
@@ -55,15 +56,18 @@ describe("collapsible navigation", () => {
   });
 
   it("keeps mobile navigation icon-only and independent of the desktop preference", () => {
-    const { mobile } = markup(true);
+    const { header, mobile } = markup(true);
+    expect(mobile).not.toBe("");
     expect(mobile).toBe(markup(false).mobile);
     for (const item of APP_NAV_ITEMS) {
       expect(mobile).toContain(`aria-label="${item.label}"`);
       expect(mobile).toContain(`title="${item.label}"`);
       expect(mobile).toContain(`<span class="sr-only">${item.label}</span>`);
     }
-    expect(mobile).toContain('aria-label="Sign out"');
-    expect(mobile).toContain('<span class="sr-only">Sign out</span>');
+    expect(header).toContain('aria-label="Sign out"');
+    expect(header).toContain('<span class="sr-only">Sign out</span>');
+    expect(header).not.toContain('aria-label="Primary navigation"');
+    expect(mobile).not.toContain('aria-label="Sign out"');
   });
 
   it.each([true, false])("retires Progress and preserves the remaining routes when collapsed=%s", (collapsed) => {

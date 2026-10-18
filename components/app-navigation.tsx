@@ -89,29 +89,32 @@ export function AppNavigation({ collapsed, onToggleSidebar, userEmail }: AppNavi
 
   return (
     <>
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur md:hidden">
-        <div className="grid min-h-16 grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 px-3 sm:px-4">
+      <header className="app-mobile-header sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+        <div className="flex min-h-16 items-center justify-between gap-2 px-3 sm:px-4">
           <Link aria-label={APP_NAME} className="focus-ring inline-flex shrink-0 items-center gap-3 text-lg font-semibold tracking-tight" href="/dashboard">
             <BrandLogo className="size-8 shrink-0" />
-            <span className="hidden min-[480px]:inline">{APP_NAME}</span>
+            <span>{APP_NAME}</span>
           </Link>
-          <nav
-            aria-label="Primary navigation"
-            className="flex min-w-0 items-center justify-center gap-1 sm:gap-2"
-          >
-            {APP_NAV_ITEMS.map((item) => {
-              const Icon = NAV_ICONS[item.label];
-
-              return <NavLink className="w-11 shrink-0" compact key={item.href} href={item.href} icon={Icon} label={item.label} />;
-            })}
-          </nav>
           <SignOutButton compact iconOnly />
         </div>
       </header>
 
+      <nav
+        aria-label="Primary navigation"
+        className="app-bottom-navigation fixed inset-x-0 bottom-0 z-40 min-h-[var(--bottom-navigation-height)] items-center border-t bg-background pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2"
+      >
+        <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-2 px-4">
+          {APP_NAV_ITEMS.map((item) => {
+            const Icon = NAV_ICONS[item.label];
+
+            return <NavLink className="min-w-11" compact key={item.href} href={item.href} icon={Icon} label={item.label} />;
+          })}
+        </div>
+      </nav>
+
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 hidden w-[var(--sidebar-width)] flex-col overflow-y-auto border-r bg-card py-6 md:flex",
+          "app-sidebar fixed inset-y-0 left-0 w-[var(--sidebar-width)] flex-col overflow-y-auto border-r bg-card py-6",
           collapsed ? "px-2" : "px-5",
         )}
         id="desktop-sidebar"

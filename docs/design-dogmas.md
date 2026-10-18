@@ -48,6 +48,8 @@ People encounter Episodic through different screen sizes, input methods, abiliti
 
 Keyboard focus, readable contrast and access without hover are part of clear communication. Controls should have understandable accessible names. Icons can reduce clutter when their meaning is recognizable; visible words remain useful when an icon would leave people guessing.
 
+Primary navigation stays within easy reach at the bottom of small-screen layouts (below 768px) and devices whose primary input is touch (`hover: none` and `pointer: coarse`), including wider tablets. Larger mouse and trackpad layouts retain the desktop sidebar. The bottom bar uses four labeled icon targets at least 44px high, respects the bottom safe area, and reserves space below page content. Action toasts sit above it. Branding and sign-out remain in the top header; sidebar preferences remain independent of the navigation placement.
+
 Library cards keep their four actions together in one row. Below 640px, those controls use 36px height, 16px icons and equal flexible widths capped at 44px. This makes the relationship between actions clearer and reduces card height while preserving every action, accessible name and safeguard. The smaller touch targets are a deliberate density trade-off to review on narrow phones. At larger widths, the existing 44px controls remain; this sizing is local to Library card actions.
 
 Dashboard Upcoming Episodes uses up to four columns according to available content width, with fewer columns in narrower containers to preserve readable episode information.

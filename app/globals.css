@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    --bottom-navigation-height: 0px;
     --background: 0 0% 100%;
     --foreground: 240 10% 3.9%;
     --card: 0 0% 100%;
@@ -58,6 +59,42 @@
 }
 
 @layer components {
+  .app-mobile-header,
+  .app-bottom-navigation {
+    display: none;
+  }
+
+  .app-sidebar {
+    display: flex;
+  }
+
+  .app-main {
+    margin-left: var(--sidebar-width);
+  }
+
+  /* Small layouts and devices whose primary input is touch use reachable navigation. */
+  @media (max-width: 767px), (hover: none) and (pointer: coarse) {
+    :root {
+      --bottom-navigation-height: calc(4rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .app-mobile-header {
+      display: block;
+    }
+
+    .app-bottom-navigation {
+      display: flex;
+    }
+
+    .app-sidebar {
+      display: none;
+    }
+
+    .app-main {
+      margin-left: 0;
+    }
+  }
+
   .field-focus {
     @apply focus:border-primary;
     outline: none;

@@ -5,7 +5,7 @@ let region: { element: HTMLDivElement; users: number } | null = null;
 export function acquireActionToastRegion() {
   if (!region) {
     const element = document.createElement("div");
-    element.className = "pointer-events-none fixed inset-x-4 bottom-[max(1rem,env(safe-area-inset-bottom))] z-50 flex max-h-[calc(100dvh-2rem)] flex-col items-center gap-3 overflow-y-auto";
+    element.className = "pointer-events-none fixed inset-x-4 bottom-[calc(var(--bottom-navigation-height,0px)+1rem)] z-50 flex max-h-[calc(100dvh-var(--bottom-navigation-height,0px)-2rem)] flex-col items-center gap-3 overflow-y-auto";
     element.setAttribute("data-action-toasts", "");
     document.body.appendChild(element);
     region = { element, users: 0 };

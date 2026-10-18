@@ -37,7 +37,7 @@ export function AppShell({ children, userEmail }: AppShellProps) {
       style={{ "--sidebar-width": collapsed ? "4.5rem" : "16rem" } as CSSProperties}
     >
       <AppNavigation collapsed={collapsed} onToggleSidebar={toggleSidebar} userEmail={userEmail} />
-      <main className="min-h-screen px-4 py-6 sm:px-6 md:ml-[var(--sidebar-width)] md:px-4 md:py-8 lg:px-10">
+      <main className="app-main min-h-screen px-4 py-6 pb-[calc(1.5rem+var(--bottom-navigation-height))] sm:px-6 md:px-4 md:py-8 md:pb-[calc(2rem+var(--bottom-navigation-height))] lg:px-10">
         {children}
       </main>
     </div>
