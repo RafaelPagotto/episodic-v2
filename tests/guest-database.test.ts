@@ -41,7 +41,7 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
       alter default privileges in schema public grant all on tables to authenticated,service_role;
       alter default privileges in schema public grant usage,select on sequences to authenticated,service_role;
     `);
-    for (const name of ["20260604000100_create_core_schema.sql", "20260604000200_enable_rls_and_policies.sql", "20260604000300_add_supporting_indexes.sql", "20261007140947_isolated_guest_demo.sql", "20261008004252_harden_auth_trigger_grants.sql"]) {
+    for (const name of ["20260604000100_create_core_schema.sql", "20260604000200_enable_rls_and_policies.sql", "20260604000300_add_supporting_indexes.sql", "20261007140947_isolated_guest_demo.sql", "20261008004252_harden_auth_trigger_grants.sql", "20261019124735_expand_guest_demo_catalogue.sql"]) {
       await db.exec(await readFile(new URL(`../supabase/migrations/${name}`, import.meta.url), "utf8"));
     }
     for (const [index, show] of DEMO_SHOWS.entries()) {
@@ -76,7 +76,7 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
     await seed(A); await seed(B);
     await asUser(A);
     const library = (await db.query<{ user_id: string }>("select * from public.user_shows")).rows;
-    expect(library).toHaveLength(5); expect(library.every((row) => row.user_id === A)).toBe(true);
+    expect(library).toHaveLength(20); expect(library.every((row) => row.user_id === A)).toBe(true);
     expect((await db.query("select * from public.shows where tmdb_id=999")).rows).toEqual([]);
     await expect(db.query("insert into public.user_shows(user_id,show_tmdb_id) values($1,106379)", [B])).rejects.toThrow(/row-level security/);
     await expect(db.query("insert into public.user_shows(user_id,show_tmdb_id) values($1,999)", [A])).rejects.toThrow(/row-level security/);
@@ -107,6 +107,32 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
     await asUser(B); expect((await db.query("select * from public.shows")).rows).toEqual([]);
   });
 
+  it("rejects malformed expanded seeds and keeps legacy seeds valid during rollout", async () => {
+    const rows = DEMO_SHOWS.flatMap((show) => [1, 2, 3].map((episodeNumber) => ({
+      showTmdbId: show.tmdbId, seasonNumber: 1, episodeNumber, airDate: "2020-01-01",
+    })));
+    const data = buildGuestSeed(rows, { referenceDate: "2026-10-19" });
+    const invalid = [...data.library];
+    invalid[19] = invalid[0];
+    await db.exec("set role service_role;");
+    await expect(db.query("select public.seed_guest_demo($1,'UTC',null,$2::jsonb,'[]',false)",
+      [A, JSON.stringify(invalid)])).rejects.toThrow(/catalogue unavailable/);
+    await owner();
+    expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toEqual([]);
+    const originalIds = [1396,70523,95396,125988,2316];
+    const legacyLibrary = data.library.filter((show) => originalIds.includes(show.show_tmdb_id));
+    const legacyWatched = data.watched.filter((episode) => originalIds.includes(episode.show_tmdb_id));
+    await db.exec("set role service_role;");
+    await db.query("select public.seed_guest_demo($1,'UTC',null,$2::jsonb,$3::jsonb,false)",
+      [A, JSON.stringify(legacyLibrary), JSON.stringify(legacyWatched)]);
+    await owner();
+    expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toHaveLength(5);
+    await seed(A);
+    expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toHaveLength(5);
+    await seed(A, true);
+    expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toHaveLength(20);
+  });
+
   it("resumes idempotently and resets only its own data without extending expiry or changing timezone", async () => {
     await seed(A); await seed(B);
     const original = (await db.query<{ expires_at: Date }>("select * from public.guest_sessions where user_id=$1", [A])).rows[0];
@@ -120,7 +146,7 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
     expect((await db.query("select timezone from public.profiles where id=$1", [A])).rows[0]).toEqual({ timezone: "Asia/Tokyo" });
     expect((await db.query("select favourite,status from public.user_shows where user_id=$1 and show_tmdb_id=1396", [A])).rows[0]).toEqual({ favourite: true, status: "watching" });
     expect((await db.query("select status from public.user_shows where user_id=$1 and show_tmdb_id=2316", [A])).rows[0]).toEqual({ status: "dropped" });
-    expect((await db.query("select * from public.user_shows where user_id=$1", [B])).rows).toHaveLength(5);
+    expect((await db.query("select * from public.user_shows where user_id=$1", [B])).rows).toHaveLength(20);
     await expect(seed(A, true)).rejects.toThrow(/Try again/);
     await expect(seed(REAL, true)).rejects.toThrow(/Demo access required/);
   });
@@ -129,7 +155,7 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
     await expect(seed(A, false, [{ show_tmdb_id: 1396, season_number: 1, episode_number: 999 }])).rejects.toThrow(/foreign key/);
     expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toEqual([]);
     expect((await db.query("select seeded_at from public.guest_sessions where user_id=$1", [A])).rows[0]).toEqual({ seeded_at: null });
-    await seed(A); expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toHaveLength(5);
+    await seed(A); expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toHaveLength(20);
   });
 
   it("rejects a changed timezone before any seed writes and keeps privileged RPCs service-only", async () => {
@@ -167,10 +193,10 @@ describe("guest migration on PostgreSQL (PGlite)", () => {
     expect((await db.query("select * from public.cleanup_guest_accounts(false)")).rows[0]).toEqual({ eligible: 1, deleted: 1, remaining: 0 });
     await owner();
     expect((await db.query("select * from auth.users where id=$1", [REAL])).rows).toHaveLength(1);
-    expect((await db.query("select * from public.user_shows where user_id=$1", [B])).rows).toHaveLength(5);
+    expect((await db.query("select * from public.user_shows where user_id=$1", [B])).rows).toHaveLength(20);
     expect((await db.query("select * from public.user_shows where user_id=$1", [A])).rows).toEqual([]);
     expect((await db.query("select * from public.watched_episodes where user_id=$1", [A])).rows).toEqual([]);
-    expect((await db.query("select * from public.shows")).rows).toHaveLength(7);
+    expect((await db.query("select * from public.shows")).rows).toHaveLength(22);
     expect((await db.query("select * from auth.sessions")).rows).toEqual([]);
     expect((await db.query("select * from public.cleanup_guest_accounts(false)")).rows[0]).toEqual({ eligible: 0, deleted: 0, remaining: 0 });
   });

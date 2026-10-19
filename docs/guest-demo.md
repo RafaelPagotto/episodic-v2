@@ -11,7 +11,8 @@ The flag gates entry, not existing sessions or daily cleanup.
 - `guest_sessions` is registered by an Auth insert trigger, including direct Auth
   API signups. It contains server-owned expiration and initialization timestamps.
   Guests can read only their own registration; client writes are denied.
-- `demo_catalogue` contains the six curated TMDB IDs. Clients can read, not edit it.
+- `demo_catalogue` contains 21 curated, cached TMDB IDs: 20 seeded library shows
+  plus Fallout, which remains available to add through search. Clients can read, not edit it.
   Restrictive RLS applies expiry and catalogue checks alongside existing ownership
   rules. It does not trust user-editable metadata or change permanent-user access.
 - Service-role-only RPCs seed/reset one currently anonymous account atomically,
@@ -44,7 +45,7 @@ The flag gates entry, not existing sessions or daily cleanup.
    or writing anything. Then explicitly run
    `npm run demo:bootstrap -- --confirm-shared-metadata-write` using trusted operator
    credentials. It uses the existing comprehensive importer, never copies personal
-   data, and registers the catalogue only after all six imports pass. A failed
+   data, and registers the catalogue only after every import passes. A failed
    import can leave additive shared metadata writes; keep demo off and retry.
    `npm run demo:bootstrap -- --check` verifies server-only imports without loading
    local environment configuration or making network/database requests.
@@ -62,6 +63,54 @@ The flag gates entry, not existing sessions or daily cleanup.
    not apply migrations, change Supabase Auth settings, or preload production as
    part of tests/builds. [Anonymous Auth](https://supabase.com/docs/guides/auth/auth-anonymous),
    [CAPTCHA configuration](https://supabase.com/docs/guides/auth/auth-captcha).
+
+## Expanded Sample Library
+
+New guests and Reset demo receive 20 shows. Existing initialized sessions are not
+automatically reseeded. Reset still preserves timezone and the original expiry.
+The seed derives statuses from eligible episodes and lifecycle metadata; it never
+stores display statuses or automatically watches Specials/future episodes.
+
+| Show | Starting Progress | Favourite |
+| --- | --- | --- |
+| Breaking Bad | First 2 episodes | Yes |
+| Dark | All eligible episodes | No |
+| Severance | All eligible episodes | No |
+| Silo | Watchlist | No |
+| The Office | Dropped, first 2 episodes | No |
+| Better Call Saul | First 32 episodes | Yes |
+| Chernobyl | All eligible episodes | No |
+| Fleabag | All eligible episodes | Yes |
+| Andor | Watchlist | No |
+| Succession | First 20 episodes | No |
+| The Last of Us | All eligible episodes | Yes |
+| Black Mirror | First 9 episodes | No |
+| Brooklyn Nine-Nine | First 24 episodes | No |
+| BoJack Horseman | Watchlist | No |
+| Avatar: The Last Airbender | All eligible episodes | Yes |
+| Cowboy Bebop | All eligible episodes | No |
+| Gravity Falls | First 10 episodes | No |
+| Foundation | All eligible episodes | No |
+| Westworld | Dropped, first 8 episodes | No |
+| The Sopranos | Watchlist | No |
+
+For an existing installation, apply
+`20261019124735_expand_guest_demo_catalogue.sql` first. It only widens guest
+catalogue/seed validation and continues accepting the original five-show seed
+during rollout. Deploy the new code and register the expanded catalogue in the
+same rollout using:
+
+```sh
+npm run demo:bootstrap -- --cached-only --confirm-shared-metadata-write
+```
+
+This option verifies every title and main-series episode cache before one catalogue
+upsert. It makes no TMDB calls, changes no shared show/season/episode metadata,
+and never reads or copies a permanent user's library/progress. Missing cache data
+fails closed without registering a partial catalogue. Until the catalogue is
+registered, new-version entry/reset returns a safe unavailable error; existing
+initialized sessions continue normally. Do not run the full-import bootstrap for
+this expansion. No existing guest or permanent user data is migrated/reset.
 
 ## Local Development
 

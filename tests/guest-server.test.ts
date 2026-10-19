@@ -63,7 +63,7 @@ describe("cached guest services", () => {
     await initializeGuest(user, "America/Sao_Paulo");
     expect(db.rpc).toHaveBeenCalledWith("seed_guest_demo", expect.objectContaining({ p_user_id: user.id, p_timezone: "Asia/Tokyo", p_reset: false }));
     const seed = db.rpc.mock.calls[0][1];
-    expect(seed.p_library).toHaveLength(5); expect(seed.p_watched.filter((row: { show_tmdb_id: number }) => row.show_tmdb_id === 70523)).toHaveLength(3);
+    expect(seed.p_library).toHaveLength(20); expect(seed.p_watched.filter((row: { show_tmdb_id: number }) => row.show_tmdb_id === 70523)).toHaveLength(3);
     expect(db.calls.every((call) => call.method === "select")).toBe(true);
   });
   it("resumes without writes and denies expired/invalid initialization before writes", async () => {
@@ -83,9 +83,20 @@ describe("cached guest services", () => {
     await expect(initializeGuest(user, "UTC")).rejects.toThrow("timezone query failed");
     expect(db.rpc).not.toHaveBeenCalled();
   });
+  it("loads a larger catalogue beyond one episode page without imports or user writes", async () => {
+    db.episodes = DEMO_SHOWS.flatMap((show) => Array.from({ length: 70 }, (_, index) => ({
+      show_tmdb_id: show.tmdbId, season_number: 1, episode_number: index + 1, air_date: "2020-01-01",
+    })));
+    await initializeGuest(user, "UTC");
+    const seed = db.rpc.mock.calls[0][1];
+    expect(seed.p_library).toHaveLength(20);
+    expect(seed.p_watched.filter((row: { show_tmdb_id: number }) => row.show_tmdb_id === 93740)).toHaveLength(70);
+    expect(seed.p_watched.some((row: { show_tmdb_id: number }) => row.show_tmdb_id === 106379)).toBe(false);
+    expect(db.calls.every((call) => call.method === "select")).toBe(true);
+  });
   it("searches only stored catalogue rows with the existing response shape", async () => {
     const result = await searchDemoCatalogue(client(db), "fall", 1);
-    expect(result.results.map((show) => show.tmdbId)).toEqual([106379]); expect(result.totalResults).toBe(1); expect(result.attribution).toBeDefined();
+    expect(result.results.map((show) => show.tmdbId)).toEqual([106379, 40075]); expect(result.totalResults).toBe(2); expect(result.attribution).toBeDefined();
     expect((await searchDemoCatalogue(client(db), "fall", 2)).results).toEqual([]);
     expect(db.calls.every((call) => call.method === "select" && ["demo_catalogue", "shows"].includes(call.table))).toBe(true);
   });

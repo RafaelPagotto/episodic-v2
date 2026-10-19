@@ -3,25 +3,32 @@ import { createOptionalSupabaseServiceRoleClient } from "../lib/supabase/admin";
 import { getFullTmdbShowDetails } from "../lib/tmdb/server";
 import { upsertTmdbShowMetadata } from "../features/search/data";
 import { DEMO_SHOWS } from "../features/guest/catalogue";
+import { registerCachedDemoCatalogue } from "../features/guest/bootstrap";
 
 let stage = "configuration";
 
 async function main() {
   if (process.argv.includes("--check")) {
-    if ([loadEnvConfig, createOptionalSupabaseServiceRoleClient, getFullTmdbShowDetails, upsertTmdbShowMetadata].some((fn) => typeof fn !== "function")) {
+    if ([loadEnvConfig, createOptionalSupabaseServiceRoleClient, getFullTmdbShowDetails, upsertTmdbShowMetadata, registerCachedDemoCatalogue].some((fn) => typeof fn !== "function")) {
       throw new Error("Server imports unavailable");
     }
     console.info("[demo-bootstrap] Server imports ready. No environment loaded or requests made.");
     return;
   }
   if (!process.argv.includes("--confirm-shared-metadata-write")) {
-    console.info("Usage: npm run demo:bootstrap -- --confirm-shared-metadata-write");
-    console.info("Imports the six demo shows into the configured Supabase project's shared metadata. No user data is copied or changed.");
+    console.info("Usage: npm run demo:bootstrap -- --cached-only --confirm-shared-metadata-write");
+    console.info(`Registers ${DEMO_SHOWS.length} cached demo titles without TMDB calls when --cached-only is supplied. Omit it to import metadata. No user data is copied or changed.`);
     return;
   }
   loadEnvConfig(process.cwd());
   const client = createOptionalSupabaseServiceRoleClient();
   if (!client) throw new Error("Bootstrap not configured");
+  if (process.argv.includes("--cached-only")) {
+    stage = "cached-catalogue-registration";
+    await registerCachedDemoCatalogue(client);
+    console.info("[demo-bootstrap] Cached catalogue ready. No TMDB requests or metadata writes.", { count: DEMO_SHOWS.length });
+    return;
+  }
   // Register nothing until every import completes; visitors must never see a partial catalogue.
   for (const show of DEMO_SHOWS) {
     stage = "fetch";
