@@ -184,20 +184,34 @@ describe("Dashboard view", () => {
     getTmdbImageUrl.mockReturnValue(null);
   });
 
-  it.each([false, true])("opens the full Watchlist below Start Watching, including the empty state: %s", (empty) => {
+  it.each([false, true])("links section headings to their Library filters, including empty sections: %s", (empty) => {
     const baseline = data();
-    if (empty) baseline.startWatching = [];
-    const section = elements(renderDashboard(baseline)).find((element) =>
+    if (empty) {
+      baseline.startWatching = [];
+      baseline.continueWatching = [];
+    }
+    const tree = renderDashboard(baseline);
+    const section = elements(tree).find((element) =>
       element.type === "section" && element.props["aria-labelledby"] === "start-watching-heading",
     );
     expect(section).toBeDefined();
-    const children = React.Children.toArray(section?.props.children as React.ReactNode);
-    const footer = children.at(-1);
-    const link = elements(footer).find((element) => element.props.href);
+    const heading = elements(section).find((element) => element.type === "h2");
+    const link = elements(heading).find((element) => element.props.href);
     expect(link?.props.href).toBe("/library?filter=watchlist");
-    expect(link?.props.children).toBe("Open Watchlist");
-    expect(elements(footer).find((element) => element.props.asChild)?.props.variant).toBe("outline");
+    expect(link?.props["aria-label"]).toBe("Start Watching — open Watchlist");
+    expect(elements(section).filter((element) => element.props.href === "/library?filter=watchlist")).toHaveLength(1);
+    expect(componentProps(section, "Button")).toHaveLength(0);
     expect(componentProps(section, "StartWatchingCard")).toHaveLength(empty ? 0 : 1);
+
+    const continueHeading = elements(tree).find((element) => element.type === "h2" && element.props.id === "continue-watching-heading");
+    const continueLink = elements(continueHeading).find((element) => element.props.href);
+    expect(continueLink?.props.href).toBe("/library?filter=watching");
+    expect(continueLink?.props["aria-label"]).toBe("Continue Watching — open Watching in Library");
+    expect(cards(tree)).toHaveLength(empty ? 0 : 3);
+
+    const upcomingHeading = elements(tree).find((element) => element.type === "h2" && element.props.id === "upcoming-episodes-heading");
+    expect(upcomingHeading?.props.children).toBe("Upcoming Episodes");
+    expect(elements(upcomingHeading).some((element) => element.props.href)).toBe(false);
     expect(markWatched).not.toHaveBeenCalled();
   });
 

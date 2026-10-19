@@ -5,6 +5,7 @@ import { FADED_SHOW_CARD_CLASS_NAME } from "../../preferences/card-appearance";
 import {
   CalendarDays,
   Check,
+  ChevronRight,
   Loader2,
 } from "lucide-react";
 import Image from "next/image";
@@ -354,8 +355,17 @@ export function DashboardView({ data }: DashboardViewProps) {
         <LibrarySummaryTiles summary={data.summary} />
       </section>
 
-      <section className="space-y-4">
-        <h2 className="text-lg font-semibold tracking-tight">Continue Watching</h2>
+      <section aria-labelledby="continue-watching-heading" className="space-y-4">
+        <h2 id="continue-watching-heading" className="text-lg font-semibold tracking-tight">
+          <Link
+            aria-label="Continue Watching — open Watching in Library"
+            className="title-link inline-flex min-h-11 items-center gap-1"
+            href="/library?filter=watching"
+          >
+            Continue Watching
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+          </Link>
+        </h2>
 
         {message ? (
           <ActionFeedback
@@ -410,7 +420,14 @@ export function DashboardView({ data }: DashboardViewProps) {
 
       <section aria-labelledby="start-watching-heading" className="space-y-3">
         <h2 id="start-watching-heading" className="text-lg font-semibold tracking-tight">
-          Start Watching
+          <Link
+            aria-label="Start Watching — open Watchlist"
+            className="title-link inline-flex min-h-11 items-center gap-1"
+            href="/library?filter=watchlist"
+          >
+            Start Watching
+            <ChevronRight aria-hidden="true" className="size-4 shrink-0" />
+          </Link>
         </h2>
 
         {data.startWatching.length === 0 ? (
@@ -426,11 +443,6 @@ export function DashboardView({ data }: DashboardViewProps) {
             ))}
           </div>
         )}
-        <div className="flex justify-center pt-3">
-          <Button asChild variant="outline">
-            <Link href="/library?filter=watchlist">Open Watchlist</Link>
-          </Button>
-        </div>
       </section>
     </div>
   );
