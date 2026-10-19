@@ -50,4 +50,16 @@ describe("guest demo controls", () => {
     expect(html).toContain("RESET DEMO"); expect(html).toContain("expiration stay unchanged");
     expect(hooks.actions).toContain(actions.reset); expect(hooks.actions).toContain(actions.exit);
   });
+  it("keeps reset confirmation collapsed and exit available outside the disclosure", () => {
+    const html = renderToStaticMarkup(<GuestControls expiresAt="2026-10-10T12:00:00Z" timeZone="America/Sao_Paulo" />);
+    const disclosure = html.match(/<details[\s\S]*?<\/details>/)?.[0] ?? "";
+    expect(disclosure).not.toBe("");
+    expect(disclosure).not.toMatch(/<details[^>]*\sopen(?:[\s=>])/);
+    expect(disclosure).toContain("Type RESET DEMO to confirm");
+    expect(disclosure).toContain('name="confirmation"');
+    expect(disclosure).not.toContain("Exit demo");
+    expect(html.slice(html.indexOf("</details>") + "</details>".length)).toContain("Exit demo");
+    expect(html.match(/<form\b/g)).toHaveLength(2);
+    expect(html).toMatch(/<time datetime="2026-10-10T12:00:00Z"/i);
+  });
 });

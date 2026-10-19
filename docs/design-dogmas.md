@@ -79,6 +79,10 @@ Existing decisions remain the shared starting point. When a better application o
 Guest sessions use an unframed, restrained identity/expiration band with an Exit
 demo command and a collapsed Reset demo confirmation. Expiration and reset copy
 explain data loss; the typed confirmation protects the visitor's demo changes.
+The band aligns with the main content and places identity/expiration beside compact
+Reset and Exit controls on wider screens, wrapping into two rows on phones. Full
+expiration and timezone stay visible. The reset form expands below the identity
+and exit row only when requested, and both controls retain 44px-high targets.
 Try demo is secondary to sign-in. Demo search shows the available cached titles
 immediately rather than asking visitors to guess which titles are available.
 CAPTCHA appears only when configured and uses the provider's familiar widget;
