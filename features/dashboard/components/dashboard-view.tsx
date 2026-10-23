@@ -254,7 +254,7 @@ function EmptyContinueWatchingState({
       action={
         !hasShows ? (
           <Button asChild>
-            <Link href="/search">Search shows</Link>
+            <Link href="/discover">Discover shows</Link>
           </Button>
         ) : null
       }

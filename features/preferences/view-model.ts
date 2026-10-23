@@ -26,13 +26,13 @@ export const PREFERENCE_ITEMS: Array<{
     name: "hideCompleted",
   },
   {
-    description: "Dim search result cards for shows already in your library. Hover or focus a card to restore its brightness.",
-    label: "Fade added search results",
+    description: "Dim Discover cards for shows already in your library. Hover or focus a card to restore its brightness.",
+    label: "Fade added shows in Discover",
     name: "fadeAdded",
   },
   {
-    description: "Hide TMDB search results for shows already in your library.",
-    label: "Hide added search results",
+    description: "Hide Discover cards for shows already in your library.",
+    label: "Hide added shows in Discover",
     name: "hideAdded",
   },
 ];

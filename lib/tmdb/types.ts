@@ -1,5 +1,7 @@
 import type { TmdbAttribution } from "./attribution";
 
+export type TmdbDiscoverFeed = "trending" | "popular" | "top-rated";
+
 export type TmdbGenreResponse = {
   id?: number;
   name?: string;

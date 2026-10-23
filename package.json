@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "vitest run tests/e2e --passWithNoTests",
+    "test:discover-cache": "node tests/integration/run-discover-cache.mjs",
     "demo:bootstrap": "node --conditions=react-server --import tsx scripts/bootstrap-demo.ts"
   },
   "dependencies": {

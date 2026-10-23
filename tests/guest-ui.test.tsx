@@ -15,6 +15,7 @@ vi.mock("react-dom", () => ({ useFormStatus: () => ({ pending: hooks.pending }) 
 vi.mock("next/script", () => ({ default: () => null }));
 vi.mock("../features/guest/actions", () => ({ startGuestDemoAction: actions.start, resetGuestDemoAction: actions.reset, exitGuestDemoAction: actions.exit }));
 vi.mock("@/features/auth/state", async () => vi.importActual("../features/auth/state"));
+vi.mock("@/features/discover/session", async () => vi.importActual("../features/discover/session"));
 vi.mock("@/features/auth/components/auth-submit-button", async () => vi.importActual("../features/auth/components/auth-submit-button"));
 vi.mock("@/features/auth/components/turnstile", async () => vi.importActual("../features/auth/components/turnstile"));
 vi.mock("@/features/auth/components/shared-auth-captcha", async () => vi.importActual("../features/auth/components/shared-auth-captcha"));

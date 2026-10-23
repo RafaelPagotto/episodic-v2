@@ -58,14 +58,15 @@ function throwDataError(error: { message?: string } | null, fallbackMessage: str
 }
 
 export async function getUserLibraryShowIds(supabase: EpisodicSupabaseClient, userId: string) {
-  const { data, error } = await supabase
-    .from("user_shows")
-    .select("show_tmdb_id")
-    .eq("user_id", userId);
-
-  throwDataError(error, "Unable to load user library.");
-
-  return data?.map((row) => row.show_tmdb_id) ?? [];
+  const ids: number[] = [];
+  const pageSize = 500;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from("user_shows").select("show_tmdb_id")
+      .eq("user_id", userId).order("show_tmdb_id", { ascending: true }).range(offset, offset + pageSize - 1);
+    throwDataError(error, "Unable to load user library.");
+    ids.push(...(data ?? []).map((row) => row.show_tmdb_id));
+    if (!data || data.length < pageSize) return ids;
+  }
 }
 
 export async function upsertTmdbShowMetadata({

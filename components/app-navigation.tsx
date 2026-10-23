@@ -1,6 +1,6 @@
 "use client";
 
-import { Clapperboard, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, Search, UserCircle } from "lucide-react";
+import { Clapperboard, Compass, LayoutDashboard, LogOut, PanelLeftClose, PanelLeftOpen, UserCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
@@ -9,13 +9,14 @@ import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/features/auth/actions";
 import { APP_NAME, APP_NAV_ITEMS } from "@/lib/constants";
+import { clearDiscoverVisit } from "@/features/discover/session";
 import { cn } from "@/lib/utils";
 
 const NAV_ICONS: Record<(typeof APP_NAV_ITEMS)[number]["label"], ComponentType<{ className?: string }>> = {
   Dashboard: LayoutDashboard,
   Library: Clapperboard,
   Profile: UserCircle,
-  Search,
+  Discover: Compass,
 };
 
 type AppNavigationProps = {
@@ -63,7 +64,7 @@ function NavLink({
 
 function SignOutButton({ compact = false, iconOnly = false }: { compact?: boolean; iconOnly?: boolean }) {
   return (
-    <form action={signOutAction}>
+    <form action={signOutAction} onSubmit={clearDiscoverVisit}>
       <button
         aria-label="Sign out"
         className={cn(

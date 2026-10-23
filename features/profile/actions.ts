@@ -51,6 +51,7 @@ function revalidateUserDataPages() {
   revalidatePath("/profile");
   revalidatePath("/progress");
   revalidatePath("/search");
+  revalidatePath("/discover");
 }
 
 async function getAuthenticatedActionContext(): Promise<ProfileActionContext> {

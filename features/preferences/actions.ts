@@ -42,6 +42,7 @@ function revalidatePreferenceAwarePages() {
   revalidatePath("/profile");
   revalidatePath("/progress");
   revalidatePath("/search");
+  revalidatePath("/discover");
 }
 
 export async function updatePreferencesAction(

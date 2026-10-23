@@ -74,6 +74,31 @@ Begin a change by identifying the user's task and the difficulty being addressed
 
 Existing decisions remain the shared starting point. When a better application of the philosophy emerges, explain the reason, update the shared pattern and record the decision here. New situations require reasoning from the principles; an effect is not justified simply because it is absent from a prohibited list, and an existing pattern is not justified in a context where it no longer serves its purpose.
 
+## Discover Pattern
+
+The approved Discover direction is Option A: persistent search, a compact feed
+selector and one responsive poster grid. Search results temporarily replace the
+feed and provide a clear return to browsing. Keep existing expandable synopses,
+Add/Track actions and library visibility preferences. No hero or stacked
+collection carousels are used.
+
+The [Discover V1 specification](discover-spec.md) records interaction, data, caching,
+guest and verification contracts. Its explicit rules take precedence over
+illustrative details in generated mock-ups. Guests use cached Demo Picks, not
+fabricated trends or live suggestions they cannot add. Feed tabs retain keyboard
+focus and preserve the current viewport when switching feeds, rather than jumping
+to a previously saved feed offset; remembered page numbers remain intact.
+Clearing search returns focus to the input. Pagination restores a saved
+position or starts at the top, without overriding a newer interaction. Ratings
+identify TMDB and use an explicit unrated fallback. Search can submit as a normal
+GET form when JavaScript is unavailable. Existing visibility preferences apply
+after loading each page; hidden cards never trigger extra-page fetching.
+
+Discover pagination uses double-chevron first/last shortcuts alongside the
+single-chevron previous/next controls. All four retain 44px targets, accessible
+names and matching hover helpers; boundary controls are disabled. A constrained
+five-column row keeps the page count and controls together on narrow screens.
+
 ## Review checklist
 
 Guest sessions use an unframed, restrained identity/expiration band with an Exit

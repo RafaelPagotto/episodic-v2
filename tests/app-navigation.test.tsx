@@ -12,6 +12,7 @@ vi.mock("next/link", () => ({
 }));
 vi.mock("@/components/brand-logo", () => ({ BrandLogo: () => <svg aria-hidden="true" /> }));
 vi.mock("@/features/auth/actions", () => ({ signOutAction: vi.fn() }));
+vi.mock("@/features/discover/session", async () => vi.importActual("../features/discover/session"));
 vi.mock("@/lib/constants", async () => vi.importActual("../lib/constants"));
 vi.mock("@/lib/utils", async () => vi.importActual("../lib/utils"));
 vi.mock("@/components/ui/button", async () => vi.importActual("../components/ui/button"));
@@ -75,7 +76,7 @@ describe("collapsible navigation", () => {
     const expectedRoutes = [
       ["Dashboard", "/dashboard"],
       ["Library", "/library"],
-      ["Search", "/search"],
+      ["Discover", "/discover"],
       ["Profile", "/profile"],
     ];
     for (const navigation of [desktop, mobile]) {

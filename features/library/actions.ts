@@ -61,6 +61,7 @@ export async function removeShowFromLibraryAction(tmdbId: number): Promise<Remov
 
     revalidatePath("/library");
     revalidatePath("/search");
+    revalidatePath("/discover");
 
     return {
       message: "Show removed from your library.",

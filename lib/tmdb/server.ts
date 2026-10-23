@@ -13,10 +13,12 @@ import type {
   TmdbSearchTvResponse,
   TmdbTvDetailsResponse,
   TmdbTvSeasonDetailsResponse,
+  TmdbDiscoverFeed,
 } from "./types";
 
 const TMDB_API_BASE_URL = "https://api.themoviedb.org/3";
 const SEASON_FETCH_BATCH_SIZE = 5;
+let discoverCooldownUntil = 0;
 
 type TmdbRequestParams = Record<string, boolean | number | string | null | undefined>;
 
@@ -185,6 +187,47 @@ export async function searchTmdbShows({
   });
 
   return normalizeSearchResponse(response);
+}
+
+export async function discoverTmdbShows(feed: TmdbDiscoverFeed, page: number): Promise<NormalizedTmdbSearchResponse> {
+  const paths = { trending: "/trending/tv/week", popular: "/tv/popular", "top-rated": "/tv/top_rated" };
+  if (!Object.hasOwn(paths, feed) || !Number.isInteger(page) || page < 1 || page > 10) {
+    throw new TmdbClientError({ code: "TMDB_UPSTREAM_ERROR", message: "Invalid listing request.", status: 503 });
+  }
+  if (Date.now() < discoverCooldownUntil) {
+    throw new TmdbClientError({ code: "TMDB_RATE_LIMITED", message: "Try again shortly.", status: 429,
+      retryAfter: String(Math.ceil((discoverCooldownUntil - Date.now()) / 1000)) });
+  }
+  discoverCooldownUntil = 0;
+  let response: TmdbSearchTvResponse;
+  try {
+    response = await requestTmdbOnce<TmdbSearchTvResponse>(paths[feed], {
+      language: DEFAULT_TMDB_LANGUAGE, page,
+    }, AbortSignal.timeout(10_000));
+  } catch (error) {
+    if (!(error instanceof TmdbClientError) || error.code !== "TMDB_RATE_LIMITED") throw error;
+    const header = error.retryAfter;
+    const delay = header && /^\d+(\.\d+)?$/.test(header) ? Number(header) * 1000 :
+      header ? Date.parse(header) - Date.now() : 1000;
+    const retryMs = Math.max(1000, Number.isFinite(delay) ? delay : 1000);
+    // Shared by discovery feeds in this process; never sleeps or retries a request.
+    discoverCooldownUntil = Math.max(discoverCooldownUntil, Date.now() + retryMs);
+    throw new TmdbClientError({ code: "TMDB_RATE_LIMITED", message: "Try again shortly.", status: 429,
+      retryAfter: String(Math.ceil(retryMs / 1000)), upstreamStatus: 429 });
+  }
+  if (!response || response.page !== page || !Array.isArray(response.results) ||
+      !Number.isInteger(response.total_pages) || (response.total_pages ?? -1) < 0 ||
+      !Number.isInteger(response.total_results) || (response.total_results ?? -1) < 0) {
+    throw new TmdbClientError({ code: "TMDB_UPSTREAM_ERROR", message: "Listing unavailable.", status: 503 });
+  }
+  const normalized = normalizeSearchResponse({ ...response, results: response.results.filter((item) => item && typeof item === "object" && item.adult !== true) });
+  const seen = new Set<number>();
+  normalized.results = normalized.results.filter((item) => {
+    if (seen.has(item.tmdbId)) return false;
+    seen.add(item.tmdbId);
+    return true;
+  }).slice(0, 20);
+  return normalized;
 }
 
 export async function getFullTmdbShowDetails(

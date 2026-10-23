@@ -6,6 +6,7 @@ import { AuthField } from "@/features/auth/components/auth-field";
 import { AuthFormMessage } from "@/features/auth/components/auth-form-message";
 import { AuthSubmitButton } from "@/features/auth/components/auth-submit-button";
 import { INITIAL_AUTH_FORM_STATE } from "@/features/auth/state";
+import { clearDiscoverVisit } from "@/features/discover/session";
 import { resetGuestDemoAction, exitGuestDemoAction } from "../actions";
 
 export function GuestControls({ expiresAt, timeZone }: { expiresAt: string; timeZone: string }) {
@@ -13,7 +14,7 @@ export function GuestControls({ expiresAt, timeZone }: { expiresAt: string; time
   const [exitState, exitAction] = useActionState(exitGuestDemoAction, INITIAL_AUTH_FORM_STATE);
   useEffect(() => {
     const expires = Date.parse(expiresAt);
-    const checkExpiry = () => { if (Date.now() >= expires) window.location.assign("/sign-in"); };
+    const checkExpiry = () => { if (Date.now() >= expires) { clearDiscoverVisit(); window.location.assign("/sign-in"); } };
     const timer = window.setTimeout(checkExpiry, Math.max(0, expires - Date.now()));
     document.addEventListener("visibilitychange", checkExpiry);
     return () => { window.clearTimeout(timer); document.removeEventListener("visibilitychange", checkExpiry); };
@@ -38,7 +39,7 @@ export function GuestControls({ expiresAt, timeZone }: { expiresAt: string; time
             <AuthSubmitButton variant="outline" pendingText="Resetting demo...">Reset demo</AuthSubmitButton>
           </form>
         </details>
-        <form action={exitAction} className="ml-auto shrink-0 sm:ml-0">
+        <form action={exitAction} className="ml-auto shrink-0 sm:ml-0" onSubmit={clearDiscoverVisit}>
           <AuthFormMessage state={exitState} />
           <AuthSubmitButton variant="outline" pendingText="Exiting demo...">Exit demo</AuthSubmitButton>
         </form>

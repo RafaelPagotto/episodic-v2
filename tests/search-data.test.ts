@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 
-import { addTmdbShowToLibrary, upsertTmdbShowMetadata } from "../features/search/data";
+import { addTmdbShowToLibrary, getUserLibraryShowIds, upsertTmdbShowMetadata } from "../features/search/data";
 import type { Database } from "../lib/supabase/types";
 import type {
   NormalizedTmdbEpisode,
@@ -108,6 +108,7 @@ class FakeSupabase {
 
 class FakeQuery {
   private readonly filters: QueryFilter[] = [];
+  private bounds = [0, Infinity];
 
   constructor(
     private readonly db: FakeSupabase,
@@ -118,6 +119,9 @@ class FakeQuery {
     this.filters.push({ column, value });
     return this;
   }
+
+  order() { return this; }
+  range(from: number, to: number) { this.bounds = [from, to]; return this; }
 
   insert(value: UserShowInsert) {
     this.db.calls.push({ method: "insert", table: this.table });
@@ -150,7 +154,7 @@ class FakeQuery {
 
   private execute(): QueryResponse {
     return {
-      data: this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters)),
+      data: this.db.getRows(this.table).filter((row) => matchesFilters(row, this.filters)).slice(this.bounds[0], this.bounds[1] + 1),
       error: null,
     };
   }
@@ -419,6 +423,12 @@ function matchesFilters(row: object, filters: QueryFilter[]) {
 }
 
 describe("search data", () => {
+  it("loads membership beyond the Supabase row cap without writes", async () => {
+    const db = new FakeSupabase();
+    db.userShows = Array.from({ length: 1201 }, (_, i) => userShowRow({ show_tmdb_id: i + 1, user_id: USER_ID }));
+    expect(await getUserLibraryShowIds(client(db), USER_ID)).toHaveLength(1201);
+    expect(db.calls).toEqual(Array.from({ length: 3 }, () => ({ method: "select", table: "user_shows" })));
+  });
   it("upserts show, season, and episode metadata with one sync timestamp", async () => {
     const db = new FakeSupabase();
 

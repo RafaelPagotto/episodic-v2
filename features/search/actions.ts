@@ -55,6 +55,7 @@ export async function addShowToLibraryAction(tmdbId: number): Promise<AddShowAct
     if (user.is_anonymous) {
       const result = await addCachedDemoShow(userClient, user, tmdbId);
       revalidatePath("/search");
+      revalidatePath("/discover");
       revalidatePath("/library");
       return { status: result.duplicate ? "duplicate" : "success", tmdbId,
         message: result.duplicate ? "This show is already in your library." : `Added ${result.title} to your library.` };
@@ -76,6 +77,7 @@ export async function addShowToLibraryAction(tmdbId: number): Promise<AddShowAct
     });
 
     revalidatePath("/search");
+    revalidatePath("/discover");
     revalidatePath("/library");
 
     if (result.status === "duplicate") {
@@ -91,8 +93,8 @@ export async function addShowToLibraryAction(tmdbId: number): Promise<AddShowAct
       status: "success",
       tmdbId,
     };
-  } catch (error) {
-    console.error("[Add show failed]", error);
+  } catch {
+    console.error("[Add show failed] Unable to add show.");
 
     return addShowError("Unable to add this show right now.", tmdbId);
   }
