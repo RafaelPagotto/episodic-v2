@@ -42,6 +42,11 @@ A loading spinner communicates that work is still underway. That makes it a usef
 
 Feedback should acknowledge actions promptly, remain concise and preserve the user's place. A notification should not move the content being used. Showing that something is loading can make a delay understandable, but we should also reduce the delay itself. Snappiness comes from responsive behavior, stable layouts and efficient work.
 
+Page loaders have no minimum display duration, deliberate hold or exit-animation
+delay. Reveal usable content as soon as its required work is ready, including
+valid account-scoped cache hits. Run independent reads concurrently while
+preserving authentication, timezone, data freshness and tracking correctness.
+
 ## Design for varying circumstances
 
 People encounter Episodic through different screen sizes, input methods, abilities, devices and connections. A usable design accommodates those circumstances. Its layout may change while its meaning and essential capabilities remain dependable.
@@ -98,6 +103,11 @@ Discover pagination uses double-chevron first/last shortcuts alongside the
 single-chevron previous/next controls. All four retain 44px targets, accessible
 names and matching hover helpers; boundary controls are disabled. A constrained
 five-column row keeps the page count and controls together on narrow screens.
+
+Discover uses the shared logo-and-Loading page treatment instead of poster
+skeletons, including streamed listings and subsequent feed/search/page requests.
+Search and feed controls remain usable while the results are loading, with one
+polite loading announcement.
 
 ## Review checklist
 

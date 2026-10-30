@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, use, useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { ActionFeedback, ACTION_FEEDBACK_AUTO_DISMISS_MS } from "@/components/ui/action-feedback";
+import { PageLoading } from "@/components/page-loading";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { TmdbAttribution } from "@/components/tmdb-attribution";
@@ -15,9 +16,8 @@ import type { NormalizedTmdbSearchResponse } from "@/lib/tmdb/types";
 import { cn } from "@/lib/utils";
 import { discoverHref, discoverKey, discoverRequest, parseDiscoverState, type DiscoverState } from "../state";
 import { updateDiscoverHistory } from "../history";
-import { beginDiscoverVisit, clearDiscoverVisit, forgetListing, readFeedPage, readListing, readPosition, rememberFeedPage, rememberListing, rememberNavigationPosition, rememberPosition } from "../session";
+import { beginDiscoverVisit, clearDiscoverVisit, forgetListing, readFeedPage, readListing, readPosition, readVisitListing, rememberFeedPage, rememberListing, rememberNavigationPosition, rememberPosition } from "../session";
 import { DISCOVER_FEEDS, type DiscoverResponse, type ListingResult } from "../types";
-import { DiscoverSkeleton } from "./discover-skeleton";
 import { DiscoverPagination } from "./discover-pagination";
 import { ShowResultCard } from "./show-result-card";
 
@@ -154,7 +154,7 @@ export function DiscoverView(props: DiscoverViewProps) {
         </button>)}
       </div>}
     <TmdbAttribution />
-    <Suspense fallback={<div id="discover-results"><DiscoverSkeleton /></div>}>
+    <Suspense fallback={<div id="discover-results"><PageLoading /></div>}>
       <DiscoverResults key={`${props.accountScope}:${key}`} {...props} state={state} resourceKey={key} attempt={attempt} retry={retry} navigate={navigate} expire={expire}
         added={added} pending={pending} add={add} interaction={interaction} seed={key === initialKey && initialAllowed.current ? props.initialListing : undefined} />
     </Suspense>
@@ -167,8 +167,12 @@ type ResultsProps = DiscoverViewProps & { state: DiscoverState; resourceKey: str
   added: Set<number>; pending: number | null; add: (tmdbId: number) => Promise<void>; interaction: RefObject<number> };
 function DiscoverResults(props: ResultsProps) {
   const seed = props.seed ? use(props.seed) : undefined;
-  const [result, setResult] = useState<ListingResult | null>(() => seed ?? null);
-  const [loading, setLoading] = useState(!seed);
+  const [result, setResult] = useState<ListingResult | null>(() => {
+    if (seed) return seed;
+    const cached = props.demo ? null : readVisitListing(props.accountScope, props.resourceKey);
+    return cached ? { data: cached } : null;
+  });
+  const [loading, setLoading] = useState(result === null);
   const [retryAt, setRetryAt] = useState(0);
   const [retryWait, setRetryWait] = useState(false);
   const region = useRef<HTMLDivElement>(null);
@@ -244,8 +248,8 @@ function DiscoverResults(props: ResultsProps) {
   const changePage = (page: number) => props.navigate({ ...props.state, ...(queryMode ? { searchPage: page } : { page }) });
   return <div aria-busy={loading} aria-label={queryMode ? "Search results" : props.demo ? "Demo Picks" : FEED_LABELS[props.state.feed]}
     aria-labelledby={!queryMode && !props.demo ? `discover-tab-${props.state.feed}` : undefined} className="flex flex-col gap-5 focus:outline-none" id="discover-results" ref={region} role={!queryMode && !props.demo ? "tabpanel" : "region"} tabIndex={-1}>
-    <p className="sr-only" role="status">{loading ? "Loading shows..." : result?.error ? "Shows unavailable." : `${visible.length} shows displayed. Page ${currentPage}.`}</p>
-    {loading ? <DiscoverSkeleton announce={false} /> : result?.error ? <div className="flex flex-wrap items-center gap-3 rounded-md border p-4">
+    {!loading ? <p className="sr-only" role="status">{result?.error ? "Shows unavailable." : `${visible.length} shows displayed. Page ${currentPage}.`}</p> : null}
+    {loading ? <PageLoading /> : result?.error ? <div className="flex flex-wrap items-center gap-3 rounded-md border p-4">
       <p className="text-sm">{result.error.message}</p><Button className="gap-2" disabled={retryWait} onClick={props.retry} variant="outline"><RotateCw aria-hidden="true" className="size-4" />Retry</Button>
     </div> : data ? <>
       {"freshness" in data && data.freshness === "stale" && data.fetchedAt ? <p className="text-xs text-muted-foreground">Last updated <time dateTime={data.fetchedAt}>{new Date(data.fetchedAt).toLocaleString("en-US", { timeZone: "UTC" })} UTC</time></p> : null}

@@ -24,16 +24,18 @@ export async function getUserProfileData(
   email: string | null | undefined,
 ): Promise<ProfilePageData> {
   try {
-    const [preferences, persistedTimeZone] = await Promise.all([
+    const [preferences, { persistedTimeZone, summary }] = await Promise.all([
       getUserPreferences(supabase, userId),
-      getPersistedUserTimeZone(supabase, userId),
+      getPersistedUserTimeZone(supabase, userId).then(async (persistedTimeZone) => {
+        const timeZone = resolveTimeZone(persistedTimeZone);
+        const dateOptions = {
+          referenceDate: getDateOnlyForTimeZone(new Date(), timeZone),
+          timeZone,
+        };
+        const summary = await getUserDashboardSummary(supabase, userId, dateOptions);
+        return { persistedTimeZone, summary };
+      }),
     ]);
-    const timeZone = resolveTimeZone(persistedTimeZone);
-    const dateOptions = {
-      referenceDate: getDateOnlyForTimeZone(new Date(), timeZone),
-      timeZone,
-    };
-    const summary = await getUserDashboardSummary(supabase, userId, dateOptions);
 
     return {
       deleteConfirmationTarget: getDeleteAccountConfirmationTarget(email),

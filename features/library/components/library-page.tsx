@@ -38,11 +38,10 @@ async function getLibraryPageState(): Promise<LibraryPageState> {
   }
 
   try {
-    const [preferences, dateOptions] = await Promise.all([
+    const [preferences, shows] = await Promise.all([
       getUserPreferences(supabase, user.id),
-      getUserDateOptions(supabase, user.id),
+      getUserDateOptions(supabase, user.id).then((dateOptions) => getUserLibraryShows(supabase, user.id, dateOptions)),
     ]);
-    const shows = await getUserLibraryShows(supabase, user.id, dateOptions);
 
     return {
       errorMessage: "",

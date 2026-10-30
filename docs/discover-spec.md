@@ -272,11 +272,15 @@ with permanent-user behavior.
 
 ## Loading, Errors And Accessibility
 
-- Initial loading: stable poster-shaped skeletons and an accessible loading status.
+- Initial loading: the shared `PageLoading` logo-and-Loading treatment used by
+  other routes, including the streamed listing fallback; no poster skeletons.
 - Stream/suspend the listing independently of search and page chrome so a cold
   or unavailable TMDB request does not prevent someone from submitting a search.
-- Subsequent loading: keep search usable, label the target mode/page and avoid
+- Subsequent loading: use the same shared loader; keep search usable, label the target mode/page and avoid
   presenting previous cards as the new results. Prevent duplicate page submissions.
+- A valid same-account visit snapshot renders on the first pass, without waiting
+  for an effect or briefly showing a loader. Guests never use these snapshots;
+  expiry and maximum-age checks still apply. No minimum loading duration is used.
 - Zero query matches: No shows found with normal search recovery.
 - Zero visible cards after preferences: explain that added shows are hidden;
   keep supported pagination and a link to existing preference controls.
@@ -288,7 +292,7 @@ with permanent-user behavior.
 - Tab changes retain tab focus. Search/page submissions can focus the results
   heading after completion, but must not steal focus after a newer interaction.
 - Announce loading/results/empty states once using polite status updates; do not
-  announce every skeleton/card or every keystroke. Mark the results region busy.
+  duplicate loading messages, individual cards or every keystroke. Mark the results region busy.
 - Support 320px phones through wide desktop, 200% zoom and reduced motion. Keep
   44px touch actions, stable card geometry and bottom-navigation/toast clearance.
 - No essential action or information may require hover.

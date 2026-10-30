@@ -18,8 +18,10 @@ export const dynamic = "force-dynamic";
 export default async function ProtectedAppLayout({ children }: ProtectedAppLayoutProps) {
   const user = await requireCurrentUser();
   const supabase = await createSupabaseServerClient();
-  const persistedTimeZone = await getPersistedUserTimeZone(supabase, user.id);
-  const guest = user.is_anonymous ? await getGuestSession(supabase, user) : null;
+  const [persistedTimeZone, guest] = await Promise.all([
+    getPersistedUserTimeZone(supabase, user.id),
+    user.is_anonymous ? getGuestSession(supabase, user) : null,
+  ]);
 
   return (
     <>

@@ -26,6 +26,9 @@ export function readListing(key: string, now = Date.now()) {
   if (now - cached.saved >= 5 * 60_000 || freshness === null) { snapshots.delete(key); return null; }
   return freshness ? { ...data, freshness } : data;
 }
+export function readVisitListing(scope: string, key: string) {
+  return scope === account ? readListing(key) : null;
+}
 export function rememberPosition(key: string, y: number) {
   positions.delete(key); positions.set(key, Math.max(0, y));
   while (positions.size > 8) positions.delete(positions.keys().next().value!);
