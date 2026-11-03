@@ -192,7 +192,7 @@ function ContinueWatchingCard({
             aria-label={pending ? `Marking ${item.title} ${nextEpisodeLabel} watched` : `Mark ${item.title} ${nextEpisodeLabel} watched`}
             aria-busy={pending}
             className={cn(
-              "absolute bottom-1.5 left-1/2 z-20 -translate-x-1/2 shadow-md",
+              "absolute bottom-1.5 left-1/2 z-20 h-[33px] w-[33px] -translate-x-1/2 shadow-md [&_svg]:size-[15px]",
               // Hover-capable pointers reveal on hover/focus; touch keeps the action visible.
               !pending && "[@media(hover:hover)_and_(pointer:fine)]:pointer-events-none [@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/continue:pointer-events-auto group-hover/continue:opacity-100 group-focus-within/continue:pointer-events-auto group-focus-within/continue:opacity-100",
             )}

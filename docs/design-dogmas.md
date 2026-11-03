@@ -65,6 +65,10 @@ Dashboard Start Watching fits up to twelve poster columns within the 1,152px con
 
 Continue Watching posters share a hover and keyboard-focus area with their watched action. Both reveal together over the same 50% opaque black overlay, replacing the vignette; moving onto the button keeps the overlay visible. Touch devices keep the action and overlay visible, and saving keeps both visible until the request settles. The poster remains a navigation link and the watched button remains a separate tracking action.
 
+The Continue Watching poster action uses a compact 33px square with a 15px icon
+to leave more of the small artwork visible. This local density trade-off reduces
+the control by 25% without changing shared button sizes or its tracking behavior.
+
 Start with understandable content and dependable core interactions, then add enhancements that improve them. Where practical, an enhancement's absence or failure should leave the underlying task usable. This approach is informed by Jeremy Keith's [Resilient Web Design](https://resilientwebdesign.com/), particularly its discussion of [layers and progressive enhancement](https://resilientwebdesign.com/chapter5/).
 
 For Episodic, tracking correctness and data completeness are foundational. A faster or simpler interface cannot justify incorrect progress. Consequential actions need clear explanations and safeguards appropriate to their scope; a single episode toggle and deleting a library have different consequences.
