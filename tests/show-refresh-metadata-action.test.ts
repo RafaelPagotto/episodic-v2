@@ -94,6 +94,7 @@ type QueryResponse = {
 };
 type RecordedCall = {
   method: "insert" | "select" | "upsert";
+  ignoreDuplicates?: boolean;
   onConflict?: string;
   table: TableName;
 };
@@ -122,7 +123,7 @@ class FakeDatabase {
     return this.watchedEpisodes;
   }
 
-  upsertRows(table: TableName, values: unknown, onConflict: string): QueryResponse {
+  upsertRows(table: TableName, values: unknown, onConflict: string, ignoreDuplicates = false): QueryResponse {
     if (this.failUpsertTable === table) {
       return {
         data: null,
@@ -133,7 +134,8 @@ class FakeDatabase {
     const rows = Array.isArray(values) ? values : [values];
 
     if (table === "shows") {
-      upsertRows(this.shows, rows as ShowInsert[], onConflict, showRowFromInsert);
+      const inserts = rows as ShowInsert[];
+      upsertRows(this.shows, ignoreDuplicates ? inserts.filter((row) => !this.shows.some((old) => old.tmdb_id === row.tmdb_id)) : inserts, onConflict, showRowFromInsert);
       return { data: null, error: null };
     }
 
@@ -210,11 +212,11 @@ class FakeQuery {
     return this;
   }
 
-  upsert(values: unknown, options: { onConflict?: string } = {}) {
+  upsert(values: unknown, options: { onConflict?: string; ignoreDuplicates?: boolean } = {}) {
     const onConflict = options.onConflict ?? "";
-    this.client.calls.push({ method: "upsert", onConflict, table: this.table });
+    this.client.calls.push({ method: "upsert", onConflict, table: this.table, ...(options.ignoreDuplicates ? { ignoreDuplicates: true } : {}) });
 
-    return Promise.resolve(this.client.db.upsertRows(this.table, values, onConflict));
+    return Promise.resolve(this.client.db.upsertRows(this.table, values, onConflict, options.ignoreDuplicates));
   }
 
   then<TResult1 = QueryResponse, TResult2 = never>(
@@ -626,9 +628,10 @@ describe("refreshTmdbShowMetadata", () => {
       tmdbId: SHOW_TMDB_ID,
     });
     expect(metadataClient.calls).toEqual([
-      { method: "upsert", onConflict: "tmdb_id", table: "shows" },
+      { method: "upsert", onConflict: "tmdb_id", table: "shows", ignoreDuplicates: true },
       { method: "upsert", onConflict: "show_tmdb_id,season_number", table: "seasons" },
       { method: "upsert", onConflict: "show_tmdb_id,season_number,episode_number", table: "episodes" },
+      { method: "upsert", onConflict: "tmdb_id", table: "shows" },
     ]);
     for (const row of [...db.shows, ...db.seasons, ...db.episodes]) {
       expect(row.last_synced_at).toBe(result.lastSyncedAt);
@@ -781,9 +784,10 @@ describe("refreshShowMetadataAction", () => {
     expect(createOptionalSupabaseServiceRoleClientMock).toHaveBeenCalledTimes(1);
     expect(consumeTmdbRateLimitMock).toHaveBeenCalledWith("refresh-show", USER_ID);
     expect(metadataClient.calls).toEqual([
-      { method: "upsert", onConflict: "tmdb_id", table: "shows" },
+      { method: "upsert", onConflict: "tmdb_id", table: "shows", ignoreDuplicates: true },
       { method: "upsert", onConflict: "show_tmdb_id,season_number", table: "seasons" },
       { method: "upsert", onConflict: "show_tmdb_id,season_number,episode_number", table: "episodes" },
+      { method: "upsert", onConflict: "tmdb_id", table: "shows" },
     ]);
     expect(userClient.calls).not.toEqual(expect.arrayContaining([expect.objectContaining({ method: "upsert" })]));
 

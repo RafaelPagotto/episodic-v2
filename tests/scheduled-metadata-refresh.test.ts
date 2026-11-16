@@ -98,6 +98,7 @@ describe("selective scheduled metadata refresh", () => {
   });
   it("paginates baselines, updates summaries and selected details, preserves skipped details and user state", async () => {
     const db = database();
+    db.tables.shows[0].metadata = { scheduledRefreshRetry: { failureCount: 4, retryAt: "2026-11-01T12:00:00Z" } };
     const before = structuredClone(db.tables);
     await refreshScheduledTmdbShowMetadata(42, db.client, control());
     expect(fetchSeason.mock.calls.map((c) => c[1])).toEqual([3, 4]);
@@ -112,6 +113,7 @@ describe("selective scheduled metadata refresh", () => {
     expect(db.from.mock.calls.flat()).not.toContain("watched_episodes");
     expect(db.calls.at(-1)).toMatchObject({ table: "shows", kind: "upsert" });
     expect(db.tables.shows[0].last_synced_at).toBe(now.toISOString());
+    expect(db.tables.shows[0].metadata).not.toHaveProperty("scheduledRefreshRetry");
   });
   it("fetches count changes before overwriting the baseline and imports new seasons/episodes", async () => {
     const db = database();

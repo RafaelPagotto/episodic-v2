@@ -128,15 +128,19 @@ Use the production app URL for production `NEXT_PUBLIC_APP_URL`. For preview dep
 
 The root `vercel.json` schedules `GET /api/cron/refresh-metadata` daily at **05:00 UTC**, using `0 5 * * *`. Vercel invokes the production deployment; this does not schedule preview or local runs. See [Vercel Cron overview](https://vercel.com/docs/cron-jobs).
 
-This is the only configured schedule. On Hobby, the invocation may occur anywhere from 05:00:00 through 05:59:59 UTC; it is not guaranteed to start at exactly 05:00. See [Vercel scheduling limits](https://vercel.com/docs/cron-jobs/usage-and-pricing).
+The guest-cleanup cron runs separately at 06:00 UTC. On Hobby, the metadata invocation may occur anywhere from 05:00:00 through 05:59:59 UTC; it is not guaranteed to start at exactly 05:00. See [Vercel scheduling limits](https://vercel.com/docs/cron-jobs/usage-and-pricing).
 
 ### Eligibility And Batch
 
-- Select distinct shows present in at least one non-dropped library. Favourite and watched progress do not affect eligibility.
-- Null `last_synced_at` is immediately stale and has highest priority.
-- Active or unknown lifecycle is stale at 5 days; Ended/Canceled/Cancelled is stale at 180 days. Exact thresholds count as stale; matching ignores case and surrounding whitespace.
-- After null timestamps, prioritize active lifecycle, then oldest sync time, then ascending TMDB ID.
-- Each invocation selects at most the default 5 candidates and refreshes them sequentially. The selector's hard cap remains 10, but the route does not override its default.
+- Select distinct shows present in at least one non-dropped permanent user's library; guest-only demand is excluded. Favourite and watched progress do not affect eligibility.
+- Select both `id` and `show_tmdb_id` from the eligibility RPC before ordering by `id`. PostgREST's RPC record projection otherwise fails with `42703: column record.id does not exist`, preventing the whole batch from starting. The selector paginates this RPC and metadata/date reads, including when the server returns fewer rows than requested.
+- A show is airing when a stored **main-season** episode has an air date in the inclusive UTC window from 14 days ago through seven days ahead. This also covers recently ended finales so late-added details can be collected. Specials, null dates and dates outside that window do not create daily eligibility.
+- Airing shows become due at midnight UTC on the day after their last successful refresh. Using calendar days prevents a daily invocation arriving earlier than yesterday's invocation from skipping a day. A successful manual refresh today also satisfies today's freshness requirement. Outside the airing window, active/unknown shows are stale at 5 days and Ended/Canceled/Cancelled at 180 days. Lifecycle matching ignores case and surrounding whitespace; exact thresholds count as stale.
+- Null `last_synced_at` is immediately stale and first within its queue unless a retry window applies. Each queue orders by its oldest due time, then prioritizes aired episodes missing a real title, synopsis or runtime when due times tie, then ascending TMDB ID. Future placeholder details alone do not break ties ahead of already aired episodes. Older overdue work therefore remains ahead of repeatedly incomplete upstream data.
+- Interleave four airing candidates with one background candidate. With both queues full, a batch of 25 includes 20 airing and five background shows; either queue uses spare capacity. Interleaving also starts background work before the end of the invocation, rather than leaving it behind the whole airing backlog. Watching, caught-up and watchlist demand all benefit without changing tracked progress.
+- Scheduled attempts persist `shows.metadata.scheduledRefreshRetry` before fetching metadata. Its `failureCount` and `retryAt` defer unsuccessful or interrupted attempts for 2, 4, 8, 16, then at most 30 days. This prevents permanently failing shows from taking every daily slot. Retries become eligible at the later of their normal due time and `retryAt`, and rank by that later time. Unattempted candidates do not receive backoff.
+- Successful scheduled, manual, or full imports finalize show metadata and freshness only after all season/episode writes succeed, clearing retry state at that final step. Full imports first ensure the show parent exists with an insert that ignores existing rows; incomplete new imports keep null freshness, and failed manual imports preserve existing freshness and retry state. Reserving a scheduled attempt preserves other metadata and never advances `last_synced_at`; it compares the selected metadata and freshness before writing so a concurrent update cannot be overwritten. A failed reservation is reported as a per-show failure and does not start a refresh. No schema migration is required.
+- Each invocation selects at most 25 candidates (both the default and hard cap) and refreshes them sequentially within the existing time budget. This increases daily capacity without increasing the cron frequency or exceeding the Hobby daily scheduling limit.
 
 Policy and pagination live in `features/shows/metadata-refresh-candidates.ts`; scheduled execution uses `features/shows/scheduled-metadata-refresh.ts` and its plan in `features/shows/metadata-refresh-plan.ts`. These thresholds determine eligibility, not a guarantee that every eligible show is refreshed that day.
 
@@ -146,10 +150,10 @@ Policy and pagination live in `features/shows/metadata-refresh-candidates.ts`; s
 - For active/unknown shows, fetch details for last-aired/next-airing main seasons and the preceding main season (fallback: highest two main seasons). Also fetch new/count-changed/incomplete seasons, main seasons with unresolved or future dates, and any season whose successful detail sync is missing, pending, or at least 180 days old.
 - Specials participate in new/count-changed/incomplete/periodic detail refresh, not main-series scheduling signals. Newly fetched Ended/Canceled/Cancelled lifecycle triggers a full detail refresh, including Specials.
 - `seasons.last_synced_at` describes summary sync. Season JSON `episodesLastSyncedAt` describes successful episode-detail sync. Skipped episodes retain their timestamps and fields. `episodesRefreshPending` survives an interrupted write so overwritten summary counts cannot hide unfinished details.
-- Existing seasons without a detail marker get a conservative detail fetch. Full initial imports and manual refresh remain comprehensive and unchanged; they replace season JSON, so the following scheduled refresh may need to establish detail markers again.
-- Fetch and validate selected responses before any writes. Reject changed season/episode TMDB identities or renumbering rather than reassigning watched coordinates. Upsert summaries, selected episodes, successful detail markers, then show freshness last. Never delete missing rows or write tracking tables.
+- Existing seasons without a detail marker get a conservative detail fetch. Full initial imports and manual refresh still fetch all season details and replace season JSON, so the following scheduled refresh may need to establish detail markers again.
+- After reserving the attempt, fetch and validate selected responses before catalogue writes. Reject changed season/episode TMDB identities or renumbering rather than reassigning watched coordinates. Upsert summaries, selected episodes, successful detail markers, then show freshness last. Never delete missing rows or write tracking tables.
 - Season requests are batched at five concurrent requests; a failed batch drains its siblings before failing the show. Shared invocation controls pace starts at 100ms apart, use 15-second request timeouts, and honor a shared 429 Retry-After cooldown with one retry per request. Database operations have up to 10 seconds each. No raw errors, user data, credentials, or request URLs are logged.
-- The route declares `maxDuration = 300`, with an internal 240-second deadline measured from invocation start and 20-second headroom before starting fetches/writes. Candidates lacking time fail safely and remain eligible. Confirm the deployed Vercel project supports this duration. Batch size, sequential show execution, and daily schedule are unchanged.
+- The route declares `maxDuration = 300`, with an internal 240-second deadline measured from invocation start and 20-second headroom before starting work. The same controller bounds eligibility scans, every metadata/date page, retry reservations, and refresh execution. Selection checks the deadline between pages, and each database request has an abort signal with at most 10 seconds remaining. Selection failure or timeout returns a safe 500 before any reservations or refreshes start, including dry runs. Candidates lacking time to reserve an attempt remain eligible; reserved but interrupted attempts retain backoff. A selected batch of 25 is a work budget, not a guarantee that all 25 finish. Confirm the deployed Vercel project supports this duration. Sequential show execution and the daily schedule are unchanged.
 - Logs include season-selection reasons, request/retry totals, per-show timing/failure stage, and batch summary. Compare a long-running show's steady-state detail count against its total seasons before considering higher capacity.
 
 ### Security And Configuration
@@ -160,7 +164,9 @@ Only the variable name and blank entry belong in `.env.example`. Never commit th
 
 The existing Production `SUPABASE_SERVICE_ROLE_KEY`, Supabase URL, and `TMDB_API_KEY` must also be valid. No Episodic user session is required: the exact cron path bypasses session middleware and authenticates inside the route. Do not add an unprotected alternate endpoint or weaken token validation.
 
-Invalid authorization returns 401. Missing cron secret or metadata-client configuration returns 503. Candidate-selection failure returns a safe 500 before any refresh starts. Per-show failures are recorded and processing continues; a 200 response can therefore contain `failed > 0`.
+Invalid authorization returns 401. Missing cron secret or metadata-client configuration returns 503. A real refresh also requires a configured `TMDB_API_KEY`; a missing/placeholder key returns 503 before database access or retry reservations, so fixing the configuration does not leave shows deferred. If TMDB rejects credentials during execution (`TMDB_AUTH_ERROR` or `TMDB_NOT_CONFIGURED`), the route releases the current reservation and stops the batch with a safe 503. The release compares the reserved metadata and original freshness so it cannot undo a concurrent update. Earlier completed shows remain committed; later candidates are untouched. A failed release is logged without raw errors and still stops the batch; inspect the affected show's retry state after restoring database access.
+
+Candidate-selection failure returns a safe 500 before any refresh starts. Ordinary per-show failures retain their retry state and processing continues; a 200 response can therefore contain `failed > 0`.
 
 ### Authenticated Dry Run
 
@@ -171,14 +177,14 @@ GET /api/cron/refresh-metadata?dryRun=1
 Authorization: Bearer <CRON_SECRET>
 ```
 
-The dry run requires the same authentication, selects candidates, and returns only candidate TMDB IDs with `ok`, `dryRun`, and `considered`. It performs no TMDB metadata refresh or metadata writes. Only `dryRun=1` is supported; other supplied values return 400. All responses use `Cache-Control: no-store`.
+The dry run requires the same authentication, selects candidates, and returns only candidate TMDB IDs with `ok`, `dryRun`, and `considered`. It performs no TMDB metadata refresh or metadata writes, and remains available without a TMDB key to diagnose database eligibility. Only `dryRun=1` is supported; other supplied values return 400. All responses use `Cache-Control: no-store`.
 
 ### Production QA Sequence
 
 1. Configure the strong random `CRON_SECRET` in Vercel Production and confirm the existing Supabase and TMDB server credentials are configured.
 2. Deploy the application, including `vercel.json` and the Phase 1-3 route/services. Scheduling becomes active on production deployment, so allow time for QA outside the scheduled hour.
-3. Send the authenticated dry-run request above. Expect HTTP 200, `ok: true`, `dryRun: true`, and at most 5 candidate IDs. Also confirm a request without authorization returns 401.
-4. Verify those IDs against non-dropped library membership, lifecycle, and last-sync timestamps using trusted database access. Confirm that the dry run changed no data. An empty set is valid if nothing is eligible and stale.
+3. Send the authenticated dry-run request above. Expect HTTP 200, `ok: true`, `dryRun: true`, and at most 25 candidate IDs. Also confirm a request without authorization returns 401.
+4. Verify those IDs against non-dropped library membership, main-episode air dates, lifecycle, retry state and last-sync timestamps using trusted database access. Check the airing/background interleave and that a show refreshed earlier on the current UTC day is excluded. Confirm that the dry run changed no data. An empty set is valid if nothing is eligible and stale.
 5. Record a private before-state for the selected shows' metadata and their associated `user_shows` and `watched_episodes`. Invoke `GET /api/cron/refresh-metadata` once with the same Authorization header and no `dryRun` parameter. This request performs real shared metadata writes; avoid overlapping another invocation.
 6. Inspect the HTTP summary: `considered`, `refreshed`, `failed`, and per-ID `results`. Review Vercel logs under `[metadata-refresh-cron]`; investigate failures even when HTTP status is 200.
 7. For successful IDs, verify `shows.last_synced_at` advanced and any available title/date/runtime corrections or new seasons/episodes appeared. Confirm old stored rows were retained, `user_shows` (including favourite and dropped status) and `watched_episodes` match the before-state, and new episodes were not marked watched. Keep user data and credentials out of shared QA logs. Reload affected app pages to inspect changes.
@@ -188,11 +194,11 @@ If there were no stale candidates, the real endpoint should return zero counts. 
 
 ### Operational Limitations
 
-- Metadata upserts are not transactional. Scheduled refresh advances show freshness last and leaves unfinished detail writes pending, but earlier successful row writes are not rolled back. The unchanged manual/full writer still advances show freshness before later writes.
-- Invocations are not locked; overlapping manual/cron requests may duplicate work.
+- Metadata upserts are not transactional across requests. Both scheduled and manual/full refresh finalize show freshness and clear retry state last, but earlier successful season/episode writes are not rolled back. Scheduled refresh also leaves unfinished detail writes pending. Failed full imports of existing shows preserve their previous show metadata/freshness/retry state; failed first imports may leave a parent with null freshness and partial children.
+- Guarded reservations stop concurrent scheduled requests from starting work from the same snapshot. There is no lock spanning manual and scheduled writes, so overlapping manual/cron requests may still duplicate work.
 - First-pass/detail-marker recovery and inactive full refreshes can still fetch many seasons. Deadline and request controls bound work but do not guarantee a large show completes; inspect repeated failures and runtime metrics.
 - Vercel does not automatically retry failed invocations, and delivery may be missed or duplicated. Monitor results and logs. See [Vercel cron operations](https://vercel.com/docs/cron-jobs/manage-cron-jobs).
-- Five shows per day may leave a stale backlog. This initial schedule intentionally favors low resource use.
+- The 25-show cap, API/database latency and execution deadline may still leave a backlog. Successful shows leave the due queue, unattempted shows remain due, and failed/interrupted attempts retain backoff. The next daily invocation can continue remaining work. Existing cached dates drive daily classification; an unknown/unannounced release is discovered by the normal five-day active-show refresh before it can enter the daily queue.
 - Already-open browser pages do not update automatically. App pages read Supabase dynamically on subsequent server renders; there is no polling or cron-driven browser refresh.
 
 ## Test And Build Commands

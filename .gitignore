@@ -20,3 +20,5 @@ build/
 
 # Database
 supabase_config.txt
+.vercel
+.env*

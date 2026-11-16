@@ -133,8 +133,9 @@ See [Cloudflare testing guidance](https://developers.cloudflare.com/turnstile/tr
 
 `GET /api/cron/cleanup-guests` checks exact `Authorization: Bearer <CRON_SECRET>`
 before database access. `?dryRun=1` is read-only; other supplied values return 400.
-The daily schedule is 06:00 UTC. Metadata refresh stays at 05:00 UTC with five
-sequential candidates, unchanged ordering and stale thresholds.
+The daily schedule is 06:00 UTC. Metadata refresh stays at 05:00 UTC with up to
+25 sequential candidates, daily eligibility for airing shows, and interleaved
+background work. See the metadata-refresh policy in `deployment.md`.
 
 Cleanup deletes at most 100 accounts, oldest expiry/ID first. Auth rows are locked
 before deletion, with a current anonymous identity check protecting converted

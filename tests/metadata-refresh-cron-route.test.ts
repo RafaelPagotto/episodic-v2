@@ -3,11 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GET } from "../app/api/cron/refresh-metadata/route";
 import { middleware } from "../middleware";
+import { TmdbClientError } from "../lib/tmdb/errors";
 
 vi.mock("server-only", () => ({}));
 
 const selectCandidates = vi.hoisted(() => vi.fn());
 const refreshMetadata = vi.hoisted(() => vi.fn());
+const beginRefresh = vi.hoisted(() => vi.fn());
+const cancelRefresh = vi.hoisted(() => vi.fn());
 const createMetadataClient = vi.hoisted(() => vi.fn());
 const updateSession = vi.hoisted(() => vi.fn());
 const consumeUserRateLimit = vi.hoisted(() => vi.fn());
@@ -15,11 +18,14 @@ const createUserClient = vi.hoisted(() => vi.fn());
 
 vi.mock("@/features/shows/metadata-refresh-candidates", () => ({ getMetadataRefreshCandidates: selectCandidates }));
 vi.mock("@/features/shows/scheduled-metadata-refresh", () => ({ refreshScheduledTmdbShowMetadata: refreshMetadata }));
+vi.mock("@/features/shows/metadata-refresh-retry", () => ({ beginScheduledMetadataRefresh: beginRefresh }));
 vi.mock("@/lib/supabase/admin", () => ({ createOptionalSupabaseServiceRoleClient: createMetadataClient }));
 vi.mock("@/lib/supabase/middleware", () => ({ updateSupabaseSession: updateSession }));
 vi.mock("@/lib/tmdb/rate-limit", () => ({ consumeTmdbRateLimit: consumeUserRateLimit }));
 vi.mock("@/lib/supabase/server", () => ({ createSupabaseServerClient: createUserClient }));
 vi.mock("@/lib/tmdb/scheduled-requests", () => import("../lib/tmdb/scheduled-requests"));
+vi.mock("@/lib/tmdb/errors", () => import("../lib/tmdb/errors"));
+vi.mock("@/lib/tmdb/server", () => import("../lib/tmdb/server"));
 
 const SECRET = "test-cron-secret";
 const metadataClient = {
@@ -33,23 +39,27 @@ function request(query = "", authorization: string | null = `Bearer ${SECRET}`) 
 }
 
 function candidates(...ids: number[]) {
-  return ids.map((tmdbId) => ({ tmdbId, lastSyncedAt: null, tmdbStatus: "Returning Series" }));
+  return ids.map((tmdbId) => ({ tmdbId, lastSyncedAt: null, tmdbStatus: "Returning Series", metadata: {} }));
 }
 
 function expectNoWork() {
   expect(createMetadataClient).not.toHaveBeenCalled();
   expect(selectCandidates).not.toHaveBeenCalled();
   expect(refreshMetadata).not.toHaveBeenCalled();
+  expect(beginRefresh).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubEnv("CRON_SECRET", SECRET);
+  vi.stubEnv("TMDB_API_KEY", "test-key");
   vi.spyOn(console, "info").mockImplementation(() => undefined);
   vi.spyOn(console, "error").mockImplementation(() => undefined);
   createMetadataClient.mockReturnValue(metadataClient);
   selectCandidates.mockResolvedValue(candidates(20, 10, 30));
   refreshMetadata.mockResolvedValue({ title: "Not included in response" });
+  beginRefresh.mockResolvedValue(cancelRefresh);
+  cancelRefresh.mockResolvedValue(undefined);
   updateSession.mockResolvedValue(NextResponse.next());
 });
 
@@ -82,13 +92,59 @@ describe("metadata refresh cron route", () => {
     expectNoWork();
   });
 
+  it.each([undefined, "", "your-tmdb-api-key"])("rejects unconfigured TMDB key %s before reservations or database work", async (key) => {
+    vi.stubEnv("TMDB_API_KEY", key);
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.json()).toEqual({ ok: false, error: { message: "Metadata refresh is not configured." } });
+    expectNoWork();
+    // Restoring configuration must allow the next invocation immediately.
+    vi.stubEnv("TMDB_API_KEY", "restored-key");
+    expect((await GET(request())).status).toBe(200);
+    expect(beginRefresh).toHaveBeenCalledTimes(3);
+  });
+
+  it("keeps dry runs read-only and available without a TMDB key", async () => {
+    vi.stubEnv("TMDB_API_KEY", "");
+    const response = await GET(request("?dryRun=1"));
+    expect(response.status).toBe(200);
+    expect(beginRefresh).not.toHaveBeenCalled();
+    expect(refreshMetadata).not.toHaveBeenCalled();
+  });
+
+  it.each(["TMDB_AUTH_ERROR", "TMDB_NOT_CONFIGURED"] as const)("releases the reservation and stops the batch for global failure %s", async (code) => {
+    refreshMetadata.mockRejectedValueOnce(new TmdbClientError({ code, message: "private API key details", status: 503 }));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ ok: false, error: { message: "Metadata refresh is unavailable. Check TMDB configuration." } });
+    expect(cancelRefresh).toHaveBeenCalledOnce();
+    expect(beginRefresh).toHaveBeenCalledOnce();
+    expect(refreshMetadata).toHaveBeenCalledOnce();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private API key details");
+  });
+
+  it("stops safely even if releasing a global-failure reservation fails", async () => {
+    refreshMetadata.mockRejectedValueOnce(new TmdbClientError({ code: "TMDB_AUTH_ERROR", message: "private TMDB error", status: 503 }));
+    cancelRefresh.mockRejectedValueOnce(new Error("private database error"));
+    const response = await GET(request());
+    expect(response.status).toBe(503);
+    expect(beginRefresh).toHaveBeenCalledOnce();
+    expect(refreshMetadata).toHaveBeenCalledOnce();
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toMatch(/private database error|private TMDB error/);
+  });
+
   it("uses the service-role client, selector default batch, and selected order", async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(createMetadataClient).toHaveBeenCalledTimes(1);
-    expect(selectCandidates.mock.calls).toEqual([[metadataClient]]);
     const control = refreshMetadata.mock.calls[0][2];
+    expect(selectCandidates.mock.calls).toEqual([[metadataClient, { control }]]);
+    expect(beginRefresh.mock.calls).toEqual(candidates(20, 10, 30).map((candidate) => [candidate, metadataClient, control]));
+    for (let index = 0; index < 3; index++) {
+      expect(beginRefresh.mock.invocationCallOrder[index]).toBeLessThan(refreshMetadata.mock.invocationCallOrder[index]);
+    }
     expect(control).toEqual(expect.objectContaining({ run: expect.any(Function), checkTime: expect.any(Function) }));
     expect(refreshMetadata.mock.calls).toEqual([[20, metadataClient, control], [10, metadataClient, control], [30, metadataClient, control]]);
     expect(await response.json()).toEqual({
@@ -124,6 +180,7 @@ describe("metadata refresh cron route", () => {
       ],
     });
     expect(refreshMetadata).toHaveBeenCalledTimes(3);
+    expect(cancelRefresh).not.toHaveBeenCalled();
     const logs = JSON.stringify([vi.mocked(console.info).mock.calls, vi.mocked(console.error).mock.calls]);
     for (const privateValue of [SECRET, "private-upstream-error", "private-user", "private-token", "private-title", "Bearer"]) {
       expect(logs).not.toContain(privateValue);
@@ -171,8 +228,9 @@ describe("metadata refresh cron route", () => {
     const response = await GET(request("?dryRun=1"));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, dryRun: true, considered: 1, candidates: [{ tmdbId: 20 }] });
-    expect(selectCandidates.mock.calls).toEqual([[metadataClient]]);
+    expect(selectCandidates.mock.calls).toEqual([[metadataClient, { control: expect.any(Object) }]]);
     expect(refreshMetadata).not.toHaveBeenCalled();
+    expect(beginRefresh).not.toHaveBeenCalled();
   });
 
   it("fails dry run safely when selection fails", async () => {
@@ -180,6 +238,32 @@ describe("metadata refresh cron route", () => {
     const response = await GET(request("?dryRun=1"));
     expect(response.status).toBe(500);
     expect(refreshMetadata).not.toHaveBeenCalled();
+    expect(beginRefresh).not.toHaveBeenCalled();
+  });
+
+  it("does not start unreserved work and continues to the next candidate", async () => {
+    beginRefresh.mockRejectedValueOnce(new Error("private bookkeeping error"));
+    const response = await GET(request());
+    expect(refreshMetadata.mock.calls.map(([id]) => id)).toEqual([10, 30]);
+    expect(await response.json()).toMatchObject({ considered: 3, refreshed: 2, failed: 1 });
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toContain("private bookkeeping error");
+  });
+
+  it("shares the original invocation deadline with selection and show execution", async () => {
+    vi.useFakeTimers();
+    try {
+      selectCandidates.mockImplementationOnce(async (_client, { control }) => {
+        vi.setSystemTime(Date.now() + 221_000);
+        expect(() => control.checkTime()).toThrow("time budget");
+        throw new Error("budget exhausted during selection");
+      });
+      const response = await GET(request());
+      expect(response.status).toBe(500);
+      expect(beginRefresh).not.toHaveBeenCalled();
+      expect(refreshMetadata).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each(["true", "0", ""])("rejects ambiguous dryRun=%s instead of performing writes", async (value) => {

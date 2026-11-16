@@ -76,7 +76,11 @@ export async function upsertTmdbShowMetadata({
 }: UpsertTmdbShowMetadataInput): Promise<UpsertTmdbShowMetadataResult> {
   const { error: showError } = await metadataClient
     .from("shows")
-    .upsert(mapTmdbShowToShowInsert(tmdbShow, lastSyncedAt), { onConflict: "tmdb_id" });
+    // Ensure the parent exists for the season/episode foreign keys. Existing
+    // freshness, metadata and retry state must survive an interrupted import.
+    .upsert({ tmdb_id: tmdbShow.show.tmdbId, title: tmdbShow.show.title }, {
+      onConflict: "tmdb_id", ignoreDuplicates: true,
+    });
 
   throwDataError(showError, "Unable to save show metadata.");
 
@@ -101,6 +105,12 @@ export async function upsertTmdbShowMetadata({
 
     throwDataError(episodesError, "Unable to save episode metadata.");
   }
+
+  // Only a complete import may advance freshness and replace retry metadata.
+  const { error: completedShowError } = await metadataClient
+    .from("shows")
+    .upsert(mapTmdbShowToShowInsert(tmdbShow, lastSyncedAt), { onConflict: "tmdb_id" });
+  throwDataError(completedShowError, "Unable to save show metadata.");
 
   return {
     episodeCount: tmdbShow.episodes.length,
